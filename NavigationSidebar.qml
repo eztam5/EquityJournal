@@ -12,7 +12,7 @@ Rectangle {
     signal newSecurityRequested()
     signal newWatchlistRequested()
     signal newTaxonomyRequested()
-    signal navigationRequested(string viewType, string entityId, string title)
+    signal navigationRequested(string viewType, string entityId, string title, string color)
 
     color: Theme.sidebarBackground
 
@@ -40,7 +40,7 @@ Rectangle {
             Layout.fillWidth: true
             label: qsTr("All Securities")
             selected: root.currentEntityId === "all"
-            onClicked: root.navigationRequested("allSecurities", "all", label)
+            onClicked: root.navigationRequested("allSecurities", "all", label, "")
         }
 
         ListView {
@@ -58,7 +58,7 @@ Rectangle {
                 width: ListView.view.width
                 label: name
                 selected: root.currentEntityId === watchlistId
-                onClicked: root.navigationRequested("watchlist", watchlistId, name)
+                onClicked: root.navigationRequested("watchlist", watchlistId, name, "")
             }
         }
 
@@ -85,7 +85,7 @@ Rectangle {
                 label: name
                 markerColor: taxonomyColor
                 selected: root.currentEntityId === taxonomyId
-                onClicked: root.navigationRequested("taxonomy", taxonomyId, name)
+                onClicked: root.navigationRequested("taxonomy", taxonomyId, name, taxonomyColor)
             }
         }
 

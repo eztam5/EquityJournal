@@ -22,6 +22,8 @@ qt_add_executable(EquityJournal
     src/database/migrationrunner.h
     src/models/securitymodel.cpp
     src/models/securitymodel.h
+    src/models/tagtreemodel.cpp
+    src/models/tagtreemodel.h
     src/models/taxonomymodel.cpp
     src/models/taxonomymodel.h
     src/models/watchlistmodel.cpp
@@ -29,11 +31,14 @@ qt_add_executable(EquityJournal
     src/repositories/securityrepository.h
     src/repositories/sqlsecurityrepository.cpp
     src/repositories/sqlsecurityrepository.h
+    src/repositories/sqltagrepository.cpp
+    src/repositories/sqltagrepository.h
     src/repositories/sqltaxonomyrepository.cpp
     src/repositories/sqltaxonomyrepository.h
     src/repositories/sqlwatchlistrepository.cpp
     src/repositories/sqlwatchlistrepository.h
     src/repositories/taxonomyrepository.h
+    src/repositories/tagrepository.h
     src/repositories/watchlistrepository.h
     src/settings/applicationsettings.cpp
     src/settings/applicationsettings.h
@@ -50,13 +55,16 @@ qt_add_qml_module(EquityJournal
         MainWindow.qml
         ContentRouter.qml
         DeleteSecurityWindow.qml
+        DeleteTagWindow.qml
         NavigationItem.qml
         NavigationSidebar.qml
         NewSecurityWindow.qml
+        NewTagWindow.qml
         NewTaxonomyWindow.qml
         NewWatchlistWindow.qml
         SecuritiesView.qml
         SidebarSectionHeader.qml
+        TaxonomyView.qml
         Theme.qml
 )
 

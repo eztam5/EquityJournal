@@ -7,6 +7,7 @@ ApplicationWindow {
 
     required property var watchlistModel
     required property var securityModel
+    required property var tagTreeModel
     required property var taxonomyModel
     required property var applicationSettings
 
@@ -32,6 +33,7 @@ ApplicationWindow {
     property string currentView: "allSecurities"
     property string currentEntityId: "all"
     property string currentTitle: qsTr("All Securities")
+    property string currentEntityColor: ""
 
     function selectTheme(mode) {
         root.applicationSettings.themeMode = mode
@@ -96,21 +98,34 @@ ApplicationWindow {
             onNewSecurityRequested: newSecurityWindow.openWindow()
             onNewWatchlistRequested: newWatchlistWindow.openWindow()
             onNewTaxonomyRequested: newTaxonomyWindow.openWindow()
-            onNavigationRequested: function(viewType, entityId, title) {
+            onNavigationRequested: function(viewType, entityId, title, color) {
                 root.currentView = viewType
                 root.currentEntityId = entityId
                 root.currentTitle = title
+                root.currentEntityColor = color
             }
         }
 
         ContentRouter {
             currentView: root.currentView
+            currentEntityId: root.currentEntityId
             currentTitle: root.currentTitle
+            currentEntityColor: root.currentEntityColor
             securityModel: root.securityModel
+            tagTreeModel: root.tagTreeModel
             SplitView.fillWidth: true
             onEditSecurityRequested: function(row) { newSecurityWindow.openForEdit(row) }
             onDeleteSecurityRequested: function(securityId, companyName) {
                 deleteSecurityWindow.openForSecurity(securityId, companyName)
+            }
+            onNewTagRequested: function(taxonomyId, parentTagId, parentName, defaultColor) {
+                newTagWindow.openForParent(taxonomyId, parentTagId, parentName, defaultColor)
+            }
+            onEditTagRequested: function(taxonomyId, tagId, tagName, description, color) {
+                newTagWindow.openForEdit(taxonomyId, tagId, tagName, description, color)
+            }
+            onDeleteTagRequested: function(taxonomyId, tagId, tagName) {
+                deleteTagWindow.openForTag(taxonomyId, tagId, tagName)
             }
         }
     }
@@ -131,6 +146,18 @@ ApplicationWindow {
         id: newTaxonomyWindow
         ownerWindow: root
         taxonomyModel: root.taxonomyModel
+    }
+
+    NewTagWindow {
+        id: newTagWindow
+        ownerWindow: root
+        tagTreeModel: root.tagTreeModel
+    }
+
+    DeleteTagWindow {
+        id: deleteTagWindow
+        ownerWindow: root
+        tagTreeModel: root.tagTreeModel
     }
 
     DeleteSecurityWindow {

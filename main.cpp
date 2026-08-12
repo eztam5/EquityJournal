@@ -1,8 +1,10 @@
 #include "src/database/databasemanager.h"
 #include "src/models/securitymodel.h"
+#include "src/models/tagtreemodel.h"
 #include "src/models/taxonomymodel.h"
 #include "src/models/watchlistmodel.h"
 #include "src/repositories/sqlsecurityrepository.h"
+#include "src/repositories/sqltagrepository.h"
 #include "src/repositories/sqltaxonomyrepository.h"
 #include "src/repositories/sqlwatchlistrepository.h"
 #include "src/settings/applicationsettings.h"
@@ -38,9 +40,11 @@ int main(int argc, char *argv[])
 
     SqlWatchlistRepository watchlistRepository(databaseManager.connectionName());
     SqlSecurityRepository securityRepository(databaseManager.connectionName());
+    SqlTagRepository tagRepository(databaseManager.connectionName());
     SqlTaxonomyRepository taxonomyRepository(databaseManager.connectionName());
     WatchlistModel watchlistModel(watchlistRepository);
     SecurityModel securityModel(securityRepository);
+    TagTreeModel tagTreeModel(tagRepository);
     TaxonomyModel taxonomyModel(taxonomyRepository);
 
     QQmlApplicationEngine engine;
@@ -49,6 +53,8 @@ int main(int argc, char *argv[])
           QVariant::fromValue(static_cast<QObject *>(&watchlistModel)) },
         { QStringLiteral("securityModel"),
           QVariant::fromValue(static_cast<QObject *>(&securityModel)) },
+        { QStringLiteral("tagTreeModel"),
+          QVariant::fromValue(static_cast<QObject *>(&tagTreeModel)) },
         { QStringLiteral("taxonomyModel"),
           QVariant::fromValue(static_cast<QObject *>(&taxonomyModel)) },
         { QStringLiteral("applicationSettings"),
