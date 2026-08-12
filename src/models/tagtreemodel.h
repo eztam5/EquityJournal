@@ -69,6 +69,9 @@ private:
     void reload();
     void appendChildren(Node *parentNode, const QString &parentTagId);
     void setLastError(const QString &message);
+    void setTagCount(int count);
+    Node *findTagNode(Node *parentNode, const QString &tagId) const;
+    QModelIndex indexForNode(const Node *node) const;
     static int rowOf(const Node *node);
 
     TagRepository &m_repository;

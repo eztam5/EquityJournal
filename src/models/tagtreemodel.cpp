@@ -145,10 +145,28 @@ bool TagTreeModel::addTag(const QString &taxonomyId,
         return false;
     }
 
-    if (targetTaxonomyId == m_taxonomyId)
-        reload();
-    else
+    if (targetTaxonomyId == m_taxonomyId && !m_invisibleRoot.children.empty()) {
+        Node *parentNode = parentTagId.trimmed().isEmpty()
+            ? m_invisibleRoot.children.front().get()
+            : findTagNode(&m_invisibleRoot, parentTagId.trimmed());
+        if (!parentNode) {
+            reload();
+            return m_lastError.isEmpty();
+        }
+
+        const int row = static_cast<int>(parentNode->children.size());
+        beginInsertRows(indexForNode(parentNode), row, row);
+        auto child = std::make_unique<Node>();
+        child->tag = createdTag;
+        child->parent = parentNode;
+        parentNode->children.push_back(std::move(child));
+        m_tags.append(createdTag);
+        endInsertRows();
+        setTagCount(m_tags.size());
         setLastError({});
+    } else {
+        setLastError({});
+    }
     return m_lastError.isEmpty();
 }
 
@@ -185,10 +203,34 @@ bool TagTreeModel::updateTag(const QString &taxonomyId,
         return false;
     }
 
-    if (targetTaxonomyId == m_taxonomyId)
-        reload();
-    else
+    if (targetTaxonomyId == m_taxonomyId) {
+        Node *node = findTagNode(&m_invisibleRoot, tagId.trimmed());
+        if (!node) {
+            reload();
+            return m_lastError.isEmpty();
+        }
+
+        node->tag.name = name.trimmed();
+        node->tag.description = description.trimmed();
+        node->tag.color = color.trimmed().toUpper();
+        for (auto &tag : m_tags) {
+            if (tag.id == node->tag.id) {
+                tag = node->tag;
+                break;
+            }
+        }
+
+        const QModelIndex changedIndex = indexForNode(node);
+        emit dataChanged(changedIndex,
+                         changedIndex,
+                         { Qt::DisplayRole,
+                           TagNameRole,
+                           DescriptionRole,
+                           TagColorRole });
         setLastError({});
+    } else {
+        setLastError({});
+    }
     return m_lastError.isEmpty();
 }
 
@@ -206,10 +248,29 @@ bool TagTreeModel::deleteTag(const QString &taxonomyId, const QString &tagId)
         return false;
     }
 
-    if (targetTaxonomyId == m_taxonomyId)
-        reload();
-    else
+    if (targetTaxonomyId == m_taxonomyId) {
+        Node *node = findTagNode(&m_invisibleRoot, tagId.trimmed());
+        if (!node || !node->parent) {
+            reload();
+            return m_lastError.isEmpty();
+        }
+
+        Node *parentNode = node->parent;
+        const int row = rowOf(node);
+        beginRemoveRows(indexForNode(parentNode), row, row);
+        parentNode->children.erase(parentNode->children.begin() + row);
+        for (auto iterator = m_tags.begin(); iterator != m_tags.end(); ++iterator) {
+            if (iterator->id == tagId.trimmed()) {
+                m_tags.erase(iterator);
+                break;
+            }
+        }
+        endRemoveRows();
+        setTagCount(m_tags.size());
         setLastError({});
+    } else {
+        setLastError({});
+    }
     return m_lastError.isEmpty();
 }
 
@@ -236,10 +297,7 @@ void TagTreeModel::reload()
     }
     endResetModel();
 
-    const int previousCount = m_tagCount;
-    m_tagCount = m_tags.size();
-    if (previousCount != m_tagCount)
-        emit tagCountChanged();
+    setTagCount(m_tags.size());
     setLastError(repositoryError);
 }
 
@@ -264,6 +322,37 @@ void TagTreeModel::setLastError(const QString &message)
 
     m_lastError = message;
     emit lastErrorChanged();
+}
+
+void TagTreeModel::setTagCount(int count)
+{
+    if (m_tagCount == count)
+        return;
+
+    m_tagCount = count;
+    emit tagCountChanged();
+}
+
+TagTreeModel::Node *TagTreeModel::findTagNode(Node *parentNode,
+                                              const QString &tagId) const
+{
+    if (!parentNode)
+        return nullptr;
+
+    for (const auto &child : parentNode->children) {
+        if (!child->taxonomyRoot && child->tag.id == tagId)
+            return child.get();
+        if (auto *match = findTagNode(child.get(), tagId))
+            return match;
+    }
+    return nullptr;
+}
+
+QModelIndex TagTreeModel::indexForNode(const Node *node) const
+{
+    if (!node || node == &m_invisibleRoot)
+        return {};
+    return createIndex(rowOf(node), 0, const_cast<Node *>(node));
 }
 
 int TagTreeModel::rowOf(const Node *node)
