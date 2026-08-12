@@ -13,6 +13,7 @@ StackLayout {
     required property var tagTreeModel
     signal editSecurityRequested(int row)
     signal deleteSecurityRequested(string securityId, string companyName)
+    signal securityActivated(string securityId)
     signal newTagRequested(string taxonomyId, string parentTagId,
                            string parentName, string defaultColor)
     signal editTagRequested(string taxonomyId, string tagId, string tagName,
@@ -20,13 +21,17 @@ StackLayout {
     signal deleteTagRequested(string taxonomyId, string tagId, string tagName)
 
     currentIndex: currentView === "allSecurities" ? 0
-                  : currentView === "taxonomy" ? 1 : 2
+                  : currentView === "taxonomy" ? 1
+                  : currentView === "securityDetail" ? 2 : 3
 
     SecuritiesView {
         securityModel: root.securityModel
         onEditSecurityRequested: function(row) { root.editSecurityRequested(row) }
         onDeleteSecurityRequested: function(securityId, companyName) {
             root.deleteSecurityRequested(securityId, companyName)
+        }
+        onSecurityActivated: function(securityId) {
+            root.securityActivated(securityId)
         }
     }
 
@@ -44,6 +49,11 @@ StackLayout {
         onDeleteTagRequested: function(taxonomyId, tagId, tagName) {
             root.deleteTagRequested(taxonomyId, tagId, tagName)
         }
+    }
+
+    SecurityDetailView {
+        securityId: root.currentEntityId
+        securityModel: root.securityModel
     }
 
     Rectangle {

@@ -126,6 +126,22 @@ QVariantMap SecurityModel::securityAt(int row) const
     };
 }
 
+QVariantMap SecurityModel::securityById(const QString &id) const
+{
+    const auto position = std::find_if(
+        m_securities.cbegin(), m_securities.cend(),
+        [&id](const SecurityRecord &security) { return security.id == id; });
+    if (position == m_securities.cend())
+        return {};
+
+    return {
+        { QStringLiteral("id"), position->id },
+        { QStringLiteral("name"), position->name },
+        { QStringLiteral("symbol"), position->symbol },
+        { QStringLiteral("currency"), position->currency }
+    };
+}
+
 bool SecurityModel::updateSecurity(const QString &id,
                                    const QString &symbol,
                                    const QString &currency,
@@ -167,6 +183,7 @@ bool SecurityModel::updateSecurity(const QString &id,
     m_securities = reloadedSecurities;
     endResetModel();
     setLastError({});
+    emit securityUpdated(id);
     return true;
 }
 
@@ -192,6 +209,7 @@ bool SecurityModel::deleteSecurity(const QString &id)
     endRemoveRows();
     emit countChanged();
     setLastError({});
+    emit securityDeleted(id);
     return true;
 }
 

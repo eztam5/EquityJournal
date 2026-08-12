@@ -1,5 +1,6 @@
 #include "src/database/databasemanager.h"
 #include "src/models/securitymodel.h"
+#include "src/models/recentsecuritiesmodel.h"
 #include "src/models/tagtreemodel.h"
 #include "src/models/taxonomymodel.h"
 #include "src/models/watchlistmodel.h"
@@ -44,6 +45,7 @@ int main(int argc, char *argv[])
     SqlTaxonomyRepository taxonomyRepository(databaseManager.connectionName());
     WatchlistModel watchlistModel(watchlistRepository);
     SecurityModel securityModel(securityRepository);
+    RecentSecuritiesModel recentSecuritiesModel(securityModel);
     TagTreeModel tagTreeModel(tagRepository);
     TaxonomyModel taxonomyModel(taxonomyRepository);
 
@@ -53,6 +55,8 @@ int main(int argc, char *argv[])
           QVariant::fromValue(static_cast<QObject *>(&watchlistModel)) },
         { QStringLiteral("securityModel"),
           QVariant::fromValue(static_cast<QObject *>(&securityModel)) },
+        { QStringLiteral("recentSecuritiesModel"),
+          QVariant::fromValue(static_cast<QObject *>(&recentSecuritiesModel)) },
         { QStringLiteral("tagTreeModel"),
           QVariant::fromValue(static_cast<QObject *>(&tagTreeModel)) },
         { QStringLiteral("taxonomyModel"),

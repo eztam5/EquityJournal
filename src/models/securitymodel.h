@@ -38,6 +38,7 @@ public:
                                  const QString &currency,
                                  const QString &companyName);
     Q_INVOKABLE QVariantMap securityAt(int row) const;
+    Q_INVOKABLE QVariantMap securityById(const QString &id) const;
     Q_INVOKABLE bool updateSecurity(const QString &id,
                                     const QString &symbol,
                                     const QString &currency,
@@ -47,6 +48,8 @@ public:
 signals:
     void countChanged();
     void lastErrorChanged();
+    void securityUpdated(const QString &securityId);
+    void securityDeleted(const QString &securityId);
 
 private:
     void setLastError(const QString &message);

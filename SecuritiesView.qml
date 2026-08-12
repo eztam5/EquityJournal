@@ -8,6 +8,7 @@ Rectangle {
     required property var securityModel
     signal editSecurityRequested(int row)
     signal deleteSecurityRequested(string securityId, string companyName)
+    signal securityActivated(string securityId)
 
     color: Theme.contentBackground
 
@@ -137,12 +138,22 @@ Rectangle {
 
                         MouseArea {
                             anchors.fill: parent
-                            acceptedButtons: Qt.RightButton
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
                             cursorShape: Qt.ArrowCursor
 
                             onClicked: function(mouse) {
-                                securityContextMenu.securityRow = cell.row
-                                securityContextMenu.popup()
+                                if (mouse.button === Qt.RightButton) {
+                                    securityContextMenu.securityRow = cell.row
+                                    securityContextMenu.popup()
+                                }
+                            }
+
+                            onDoubleClicked: function(mouse) {
+                                if (mouse.button !== Qt.LeftButton)
+                                    return
+                                const security = root.securityModel.securityAt(cell.row)
+                                if (security.id)
+                                    root.securityActivated(security.id)
                             }
                         }
                     }

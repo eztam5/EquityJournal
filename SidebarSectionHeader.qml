@@ -7,6 +7,7 @@ RowLayout {
 
     required property string title
     property var addMenu: null
+    property bool showAddButton: true
     signal addRequested()
 
     Layout.fillWidth: true
@@ -24,6 +25,7 @@ RowLayout {
 
     Button {
         id: addButton
+        visible: root.showAddButton
         implicitWidth: 30
         implicitHeight: 30
         flat: true

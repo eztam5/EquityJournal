@@ -22,6 +22,8 @@ qt_add_executable(EquityJournal
     src/database/migrationrunner.h
     src/models/securitymodel.cpp
     src/models/securitymodel.h
+    src/models/recentsecuritiesmodel.cpp
+    src/models/recentsecuritiesmodel.h
     src/models/tagtreemodel.cpp
     src/models/tagtreemodel.h
     src/models/taxonomymodel.cpp
@@ -63,6 +65,7 @@ qt_add_qml_module(EquityJournal
         NewTaxonomyWindow.qml
         NewWatchlistWindow.qml
         SecuritiesView.qml
+        SecurityDetailView.qml
         SidebarSectionHeader.qml
         TaxonomyView.qml
         Theme.qml

@@ -7,6 +7,7 @@ ApplicationWindow {
 
     required property var watchlistModel
     required property var securityModel
+    required property var recentSecuritiesModel
     required property var tagTreeModel
     required property var taxonomyModel
     required property var applicationSettings
@@ -38,6 +39,17 @@ ApplicationWindow {
     function selectTheme(mode) {
         root.applicationSettings.themeMode = mode
         Theme.setMode(mode)
+    }
+
+    function openSecurity(securityId) {
+        const security = root.securityModel.securityById(securityId)
+        if (!security.id || !root.recentSecuritiesModel.recordView(securityId))
+            return
+
+        root.currentView = "securityDetail"
+        root.currentEntityId = security.id
+        root.currentTitle = security.symbol + " — " + security.name
+        root.currentEntityColor = ""
     }
 
     Component.onCompleted: Theme.setMode(root.applicationSettings.themeMode)
@@ -90,6 +102,8 @@ ApplicationWindow {
             id: sidebar
             watchlistModel: root.watchlistModel
             taxonomyModel: root.taxonomyModel
+            recentSecuritiesModel: root.recentSecuritiesModel
+            currentView: root.currentView
             currentEntityId: root.currentEntityId
             SplitView.preferredWidth: 280
             SplitView.minimumWidth: 210
@@ -99,6 +113,10 @@ ApplicationWindow {
             onNewWatchlistRequested: newWatchlistWindow.openWindow()
             onNewTaxonomyRequested: newTaxonomyWindow.openWindow()
             onNavigationRequested: function(viewType, entityId, title, color) {
+                if (viewType === "securityDetail") {
+                    root.openSecurity(entityId)
+                    return
+                }
                 root.currentView = viewType
                 root.currentEntityId = entityId
                 root.currentTitle = title
@@ -118,6 +136,7 @@ ApplicationWindow {
             onDeleteSecurityRequested: function(securityId, companyName) {
                 deleteSecurityWindow.openForSecurity(securityId, companyName)
             }
+            onSecurityActivated: function(securityId) { root.openSecurity(securityId) }
             onNewTagRequested: function(taxonomyId, parentTagId, parentName, defaultColor) {
                 newTagWindow.openForParent(taxonomyId, parentTagId, parentName, defaultColor)
             }
@@ -127,6 +146,29 @@ ApplicationWindow {
             onDeleteTagRequested: function(taxonomyId, tagId, tagName) {
                 deleteTagWindow.openForTag(taxonomyId, tagId, tagName)
             }
+        }
+    }
+
+    Connections {
+        target: root.securityModel
+
+        function onSecurityUpdated(securityId) {
+            if (root.currentView !== "securityDetail"
+                    || root.currentEntityId !== securityId)
+                return
+            const security = root.securityModel.securityById(securityId)
+            if (security.id)
+                root.currentTitle = security.symbol + " — " + security.name
+        }
+
+        function onSecurityDeleted(securityId) {
+            if (root.currentView !== "securityDetail"
+                    || root.currentEntityId !== securityId)
+                return
+            root.currentView = "allSecurities"
+            root.currentEntityId = "all"
+            root.currentTitle = qsTr("All Securities")
+            root.currentEntityColor = ""
         }
     }
 

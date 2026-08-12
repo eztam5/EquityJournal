@@ -7,6 +7,8 @@ Rectangle {
 
     required property var watchlistModel
     required property var taxonomyModel
+    required property var recentSecuritiesModel
+    property string currentView: "allSecurities"
     property string currentEntityId: "all"
 
     signal newSecurityRequested()
@@ -39,7 +41,7 @@ Rectangle {
         NavigationItem {
             Layout.fillWidth: true
             label: qsTr("All Securities")
-            selected: root.currentEntityId === "all"
+            selected: root.currentView === "allSecurities"
             onClicked: root.navigationRequested("allSecurities", "all", label, "")
         }
 
@@ -57,7 +59,8 @@ Rectangle {
 
                 width: ListView.view.width
                 label: name
-                selected: root.currentEntityId === watchlistId
+                selected: root.currentView === "watchlist"
+                          && root.currentEntityId === watchlistId
                 onClicked: root.navigationRequested("watchlist", watchlistId, name, "")
             }
         }
@@ -84,8 +87,41 @@ Rectangle {
                 width: ListView.view.width
                 label: name
                 markerColor: taxonomyColor
-                selected: root.currentEntityId === taxonomyId
+                selected: root.currentView === "taxonomy"
+                          && root.currentEntityId === taxonomyId
                 onClicked: root.navigationRequested("taxonomy", taxonomyId, name, taxonomyColor)
+            }
+        }
+
+        SidebarSectionHeader {
+            Layout.topMargin: 14
+            visible: root.recentSecuritiesModel.count > 0
+            title: qsTr("Recently Viewed")
+            showAddButton: false
+        }
+
+        ListView {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(contentHeight, 210)
+            Layout.maximumHeight: 210
+            visible: root.recentSecuritiesModel.count > 0
+            clip: true
+            spacing: 3
+            model: root.recentSecuritiesModel
+
+            delegate: NavigationItem {
+                required property string securityId
+                required property string name
+                required property string symbol
+
+                width: ListView.view.width
+                label: symbol + " — " + name
+                selected: root.currentView === "securityDetail"
+                          && root.currentEntityId === securityId
+                onClicked: root.navigationRequested("securityDetail",
+                                                     securityId,
+                                                     label,
+                                                     "")
             }
         }
 
