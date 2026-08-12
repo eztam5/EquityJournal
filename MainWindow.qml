@@ -8,6 +8,7 @@ ApplicationWindow {
     required property var watchlistModel
     required property var securityModel
     required property var recentSecuritiesModel
+    required property var securityTagAssignmentModel
     required property var tagTreeModel
     required property var taxonomyModel
     required property var applicationSettings
@@ -130,6 +131,7 @@ ApplicationWindow {
             currentTitle: root.currentTitle
             currentEntityColor: root.currentEntityColor
             securityModel: root.securityModel
+            securityTagAssignmentModel: root.securityTagAssignmentModel
             tagTreeModel: root.tagTreeModel
             SplitView.fillWidth: true
             onEditSecurityRequested: function(row) { newSecurityWindow.openForEdit(row) }
@@ -137,6 +139,9 @@ ApplicationWindow {
                 deleteSecurityWindow.openForSecurity(securityId, companyName)
             }
             onSecurityActivated: function(securityId) { root.openSecurity(securityId) }
+            onAssignTagsRequested: function(securityId) {
+                tagAssignmentWindow.openForSecurity(securityId)
+            }
             onNewTagRequested: function(taxonomyId, parentTagId, parentName, defaultColor) {
                 newTagWindow.openForParent(taxonomyId, parentTagId, parentName, defaultColor)
             }
@@ -194,6 +199,12 @@ ApplicationWindow {
         id: newTagWindow
         ownerWindow: root
         tagTreeModel: root.tagTreeModel
+    }
+
+    TagAssignmentWindow {
+        id: tagAssignmentWindow
+        ownerWindow: root
+        assignmentModel: root.securityTagAssignmentModel
     }
 
     DeleteTagWindow {

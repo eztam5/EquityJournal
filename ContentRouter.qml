@@ -10,10 +10,12 @@ StackLayout {
     required property string currentTitle
     required property string currentEntityColor
     required property var securityModel
+    required property var securityTagAssignmentModel
     required property var tagTreeModel
     signal editSecurityRequested(int row)
     signal deleteSecurityRequested(string securityId, string companyName)
     signal securityActivated(string securityId)
+    signal assignTagsRequested(string securityId)
     signal newTagRequested(string taxonomyId, string parentTagId,
                            string parentName, string defaultColor)
     signal editTagRequested(string taxonomyId, string tagId, string tagName,
@@ -54,6 +56,10 @@ StackLayout {
     SecurityDetailView {
         securityId: root.currentEntityId
         securityModel: root.securityModel
+        assignmentModel: root.securityTagAssignmentModel
+        onAssignTagsRequested: function(securityId) {
+            root.assignTagsRequested(securityId)
+        }
     }
 
     Rectangle {

@@ -24,6 +24,8 @@ qt_add_executable(EquityJournal
     src/models/securitymodel.h
     src/models/recentsecuritiesmodel.cpp
     src/models/recentsecuritiesmodel.h
+    src/models/securitytagassignmentmodel.cpp
+    src/models/securitytagassignmentmodel.h
     src/models/tagtreemodel.cpp
     src/models/tagtreemodel.h
     src/models/taxonomymodel.cpp
@@ -33,6 +35,9 @@ qt_add_executable(EquityJournal
     src/repositories/securityrepository.h
     src/repositories/sqlsecurityrepository.cpp
     src/repositories/sqlsecurityrepository.h
+    src/repositories/securitytagrepository.h
+    src/repositories/sqlsecuritytagrepository.cpp
+    src/repositories/sqlsecuritytagrepository.h
     src/repositories/sqltagrepository.cpp
     src/repositories/sqltagrepository.h
     src/repositories/sqltaxonomyrepository.cpp
@@ -67,6 +72,7 @@ qt_add_qml_module(EquityJournal
         SecuritiesView.qml
         SecurityDetailView.qml
         SidebarSectionHeader.qml
+        TagAssignmentWindow.qml
         TaxonomyView.qml
         Theme.qml
 )

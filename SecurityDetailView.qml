@@ -7,12 +7,15 @@ Rectangle {
 
     required property string securityId
     required property var securityModel
+    required property var assignmentModel
     property var security: ({})
+    signal assignTagsRequested(string securityId)
 
     color: Theme.contentBackground
 
     function loadSecurity() {
         security = securityModel.securityById(securityId)
+        assignmentModel.loadSecurity(securityId)
     }
 
     Component.onCompleted: loadSecurity()
@@ -114,6 +117,89 @@ Rectangle {
                         font.pixelSize: 15
                         font.weight: Font.Medium
                         elide: Text.ElideRight
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: classificationContent.implicitHeight + 40
+            color: Theme.windowBackground
+            border.width: 1
+            border.color: Theme.border
+            radius: Theme.mediumRadius
+
+            ColumnLayout {
+                id: classificationContent
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 20
+                spacing: 12
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Classification")
+                        color: Theme.textPrimary
+                        font.pixelSize: 18
+                        font.weight: Font.DemiBold
+                    }
+                    Button {
+                        text: qsTr("Add tags")
+                        onClicked: root.assignTagsRequested(root.securityId)
+                    }
+                }
+
+                Label {
+                    visible: root.assignmentModel.assignedCount === 0
+                    text: qsTr("No tags assigned yet")
+                    color: Theme.textMuted
+                    font.pixelSize: 13
+                }
+
+                Repeater {
+                    model: root.assignmentModel.assignedGroups
+
+                    delegate: ColumnLayout {
+                        id: groupDelegate
+                        required property var modelData
+                        Layout.fillWidth: true
+                        spacing: 7
+
+                        Label {
+                            text: parent.modelData.taxonomyName
+                            color: Theme.textSecondary
+                            font.pixelSize: 13
+                            font.weight: Font.Medium
+                        }
+
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Repeater {
+                                model: groupDelegate.modelData.tags
+
+                                delegate: Button {
+                                    id: tagChip
+                                    required property var modelData
+                                    text: modelData.name + "  ×"
+                                    flat: true
+                                    onClicked: root.assignmentModel.removeAssignedTag(
+                                                   root.securityId, modelData.id)
+
+                                    background: Rectangle {
+                                        radius: Theme.mediumRadius
+                                        color: Theme.selected
+                                        border.width: 1
+                                        border.color: tagChip.modelData.color
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
