@@ -22,6 +22,8 @@ qt_add_executable(EquityJournal
     src/database/migrationrunner.h
     src/models/securitymodel.cpp
     src/models/securitymodel.h
+    src/models/securitynotemodel.cpp
+    src/models/securitynotemodel.h
     src/models/recentsecuritiesmodel.cpp
     src/models/recentsecuritiesmodel.h
     src/models/securitytagassignmentmodel.cpp
@@ -33,8 +35,11 @@ qt_add_executable(EquityJournal
     src/models/watchlistmodel.cpp
     src/models/watchlistmodel.h
     src/repositories/securityrepository.h
+    src/repositories/securitynoterepository.h
     src/repositories/sqlsecurityrepository.cpp
     src/repositories/sqlsecurityrepository.h
+    src/repositories/sqlsecuritynoterepository.cpp
+    src/repositories/sqlsecuritynoterepository.h
     src/repositories/securitytagrepository.h
     src/repositories/sqlsecuritytagrepository.cpp
     src/repositories/sqlsecuritytagrepository.h
@@ -63,6 +68,8 @@ qt_add_qml_module(EquityJournal
         ContentRouter.qml
         DeleteSecurityWindow.qml
         DeleteTagWindow.qml
+        InsertLinkWindow.qml
+        InsertTableWindow.qml
         NavigationItem.qml
         NavigationSidebar.qml
         NewSecurityWindow.qml
@@ -85,6 +92,7 @@ qt_add_resources(EquityJournal database_migrations
         database/migrations/002_unique_security_symbol.sql
         database/migrations/003_security_tags.sql
         database/migrations/004_taxonomies.sql
+        database/migrations/005_security_notes.sql
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

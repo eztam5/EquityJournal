@@ -1,11 +1,13 @@
 #include "src/database/databasemanager.h"
 #include "src/models/securitymodel.h"
+#include "src/models/securitynotemodel.h"
 #include "src/models/recentsecuritiesmodel.h"
 #include "src/models/securitytagassignmentmodel.h"
 #include "src/models/tagtreemodel.h"
 #include "src/models/taxonomymodel.h"
 #include "src/models/watchlistmodel.h"
 #include "src/repositories/sqlsecurityrepository.h"
+#include "src/repositories/sqlsecuritynoterepository.h"
 #include "src/repositories/sqlsecuritytagrepository.h"
 #include "src/repositories/sqltagrepository.h"
 #include "src/repositories/sqltaxonomyrepository.h"
@@ -43,11 +45,13 @@ int main(int argc, char *argv[])
 
     SqlWatchlistRepository watchlistRepository(databaseManager.connectionName());
     SqlSecurityRepository securityRepository(databaseManager.connectionName());
+    SqlSecurityNoteRepository securityNoteRepository(databaseManager.connectionName());
     SqlSecurityTagRepository securityTagRepository(databaseManager.connectionName());
     SqlTagRepository tagRepository(databaseManager.connectionName());
     SqlTaxonomyRepository taxonomyRepository(databaseManager.connectionName());
     WatchlistModel watchlistModel(watchlistRepository);
     SecurityModel securityModel(securityRepository);
+    SecurityNoteModel securityNoteModel(securityNoteRepository);
     RecentSecuritiesModel recentSecuritiesModel(securityModel);
     SecurityTagAssignmentModel securityTagAssignmentModel(securityTagRepository);
     TagTreeModel tagTreeModel(tagRepository);
@@ -59,6 +63,8 @@ int main(int argc, char *argv[])
           QVariant::fromValue(static_cast<QObject *>(&watchlistModel)) },
         { QStringLiteral("securityModel"),
           QVariant::fromValue(static_cast<QObject *>(&securityModel)) },
+        { QStringLiteral("securityNoteModel"),
+          QVariant::fromValue(static_cast<QObject *>(&securityNoteModel)) },
         { QStringLiteral("recentSecuritiesModel"),
           QVariant::fromValue(static_cast<QObject *>(&recentSecuritiesModel)) },
         { QStringLiteral("securityTagAssignmentModel"),

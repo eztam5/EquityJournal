@@ -11,11 +11,14 @@ StackLayout {
     required property string currentEntityColor
     required property var securityModel
     required property var securityTagAssignmentModel
+    required property var securityNoteModel
     required property var tagTreeModel
     signal editSecurityRequested(int row)
     signal deleteSecurityRequested(string securityId, string companyName)
     signal securityActivated(string securityId)
     signal assignTagsRequested(string securityId)
+    signal insertLinkRequested(var textDocument, int start, int end, string selectedText)
+    signal insertTableRequested(var textDocument, int cursorPosition)
     signal newTagRequested(string taxonomyId, string parentTagId,
                            string parentName, string defaultColor)
     signal editTagRequested(string taxonomyId, string tagId, string tagName,
@@ -57,8 +60,15 @@ StackLayout {
         securityId: root.currentEntityId
         securityModel: root.securityModel
         assignmentModel: root.securityTagAssignmentModel
+        noteModel: root.securityNoteModel
         onAssignTagsRequested: function(securityId) {
             root.assignTagsRequested(securityId)
+        }
+        onInsertLinkRequested: function(textDocument, start, end, selectedText) {
+            root.insertLinkRequested(textDocument, start, end, selectedText)
+        }
+        onInsertTableRequested: function(textDocument, cursorPosition) {
+            root.insertTableRequested(textDocument, cursorPosition)
         }
     }
 

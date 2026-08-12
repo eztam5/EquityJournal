@@ -9,6 +9,7 @@ ApplicationWindow {
     required property var securityModel
     required property var recentSecuritiesModel
     required property var securityTagAssignmentModel
+    required property var securityNoteModel
     required property var tagTreeModel
     required property var taxonomyModel
     required property var applicationSettings
@@ -132,6 +133,7 @@ ApplicationWindow {
             currentEntityColor: root.currentEntityColor
             securityModel: root.securityModel
             securityTagAssignmentModel: root.securityTagAssignmentModel
+            securityNoteModel: root.securityNoteModel
             tagTreeModel: root.tagTreeModel
             SplitView.fillWidth: true
             onEditSecurityRequested: function(row) { newSecurityWindow.openForEdit(row) }
@@ -141,6 +143,12 @@ ApplicationWindow {
             onSecurityActivated: function(securityId) { root.openSecurity(securityId) }
             onAssignTagsRequested: function(securityId) {
                 tagAssignmentWindow.openForSecurity(securityId)
+            }
+            onInsertLinkRequested: function(textDocument, start, end, selectedText) {
+                insertLinkWindow.openForSelection(textDocument, start, end, selectedText)
+            }
+            onInsertTableRequested: function(textDocument, cursorPosition) {
+                insertTableWindow.openAtCursor(textDocument, cursorPosition)
             }
             onNewTagRequested: function(taxonomyId, parentTagId, parentName, defaultColor) {
                 newTagWindow.openForParent(taxonomyId, parentTagId, parentName, defaultColor)
@@ -205,6 +213,18 @@ ApplicationWindow {
         id: tagAssignmentWindow
         ownerWindow: root
         assignmentModel: root.securityTagAssignmentModel
+    }
+
+    InsertLinkWindow {
+        id: insertLinkWindow
+        ownerWindow: root
+        noteModel: root.securityNoteModel
+    }
+
+    InsertTableWindow {
+        id: insertTableWindow
+        ownerWindow: root
+        noteModel: root.securityNoteModel
     }
 
     DeleteTagWindow {
