@@ -142,8 +142,11 @@ void SecurityNoteModel::setParagraphStyle(QObject *textDocument,
         cursor.select(QTextCursor::BlockUnderCursor);
     QTextBlockFormat format = cursor.blockFormat();
     const int level = std::clamp(headingLevel, 0, 2);
-    format.setHeadingLevel(level);
-    cursor.mergeBlockFormat(format);
+    if (level == 0)
+        format.clearProperty(QTextFormat::HeadingLevel);
+    else
+        format.setHeadingLevel(level);
+    cursor.setBlockFormat(format);
 
     QTextCharFormat characterFormat;
     if (level == 1) {
@@ -153,8 +156,10 @@ void SecurityNoteModel::setParagraphStyle(QObject *textDocument,
         characterFormat.setFontPointSize(17);
         characterFormat.setFontWeight(QFont::DemiBold);
     } else {
-        characterFormat.clearProperty(QTextFormat::FontPointSize);
-        characterFormat.clearProperty(QTextFormat::FontWeight);
+        const QFont defaultFont = quickDocument->textDocument()->defaultFont();
+        characterFormat.setFontPointSize(defaultFont.pointSizeF() > 0
+                                             ? defaultFont.pointSizeF() : 13);
+        characterFormat.setFontWeight(defaultFont.weight());
     }
     cursor.mergeCharFormat(characterFormat);
 }
@@ -178,17 +183,21 @@ void SecurityNoteModel::changeIndent(QObject *textDocument,
     if (!quickDocument)
         return;
     QTextCursor cursor = selectionCursor(quickDocument->textDocument(), start, end);
-    cursor.beginEditBlock();
-    if (auto *list = cursor.currentList()) {
+    QTextCursor blockCursor(cursor.block());
+    blockCursor.beginEditBlock();
+    if (auto *list = blockCursor.currentList()) {
         QTextListFormat format = list->format();
-        format.setIndent(std::max(1, format.indent() + delta));
-        list->setFormat(format);
+        const int newIndent = std::max(1, format.indent() + delta);
+        if (newIndent != format.indent()) {
+            format.setIndent(newIndent);
+            blockCursor.createList(format);
+        }
     } else {
-        QTextBlockFormat format = cursor.blockFormat();
+        QTextBlockFormat format = blockCursor.blockFormat();
         format.setIndent(std::max(0, format.indent() + delta));
-        cursor.mergeBlockFormat(format);
+        blockCursor.setBlockFormat(format);
     }
-    cursor.endEditBlock();
+    blockCursor.endEditBlock();
 }
 
 void SecurityNoteModel::setTextColor(QObject *textDocument,
@@ -359,6 +368,29 @@ void SecurityNoteModel::deleteTable(QObject *textDocument, int position)
     auto *table = cursor.currentTable();
     if (table)
         table->removeRows(0, table->rows());
+}
+
+int SecurityNoteModel::listStyleAt(QObject *textDocument, int position) const
+{
+    auto *quickDocument = documentFrom(textDocument);
+    if (!quickDocument || !quickDocument->textDocument())
+        return 0;
+    QTextDocument *document = quickDocument->textDocument();
+    QTextCursor cursor(document);
+    cursor.setPosition(std::clamp(position, 0, document->characterCount() - 1));
+    auto *list = cursor.currentList();
+    return list ? static_cast<int>(list->format().style()) : 0;
+}
+
+int SecurityNoteModel::headingLevelAt(QObject *textDocument, int position) const
+{
+    auto *quickDocument = documentFrom(textDocument);
+    if (!quickDocument || !quickDocument->textDocument())
+        return 0;
+    QTextDocument *document = quickDocument->textDocument();
+    QTextCursor cursor(document);
+    cursor.setPosition(std::clamp(position, 0, document->characterCount() - 1));
+    return std::clamp(cursor.blockFormat().headingLevel(), 0, 2);
 }
 
 void SecurityNoteModel::toggleList(QObject *textDocument,

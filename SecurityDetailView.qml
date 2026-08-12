@@ -13,6 +13,10 @@ Rectangle {
     property string editorSecurityId: ""
     property bool loadingNote: false
     property string noteSaveError: ""
+    property int currentListStyle: 0
+    property int currentHeadingLevel: 0
+    property int formatSelectionStart: 0
+    property int formatSelectionEnd: 0
     signal assignTagsRequested(string securityId)
     signal insertLinkRequested(var textDocument, int start, int end, string selectedText)
     signal insertTableRequested(var textDocument, int cursorPosition)
@@ -45,6 +49,18 @@ Rectangle {
         noteSaveError = ""
     }
 
+    function refreshEditorToolbar() {
+        currentListStyle = noteModel.listStyleAt(noteEditor.textDocument,
+                                                 noteEditor.cursorPosition)
+        currentHeadingLevel = noteModel.headingLevelAt(noteEditor.textDocument,
+                                                       noteEditor.cursorPosition)
+    }
+
+    function rememberEditorSelection() {
+        formatSelectionStart = noteEditor.selectionStart
+        formatSelectionEnd = noteEditor.selectionEnd
+    }
+
     Component.onCompleted: loadSecurity()
     onSecurityIdChanged: loadSecurity()
 
@@ -62,6 +78,84 @@ Rectangle {
         interval: 1200
         repeat: false
         onTriggered: root.saveNote(root.editorSecurityId)
+    }
+
+    Action {
+        id: boldAction
+        text: qsTr("Bold")
+        shortcut: StandardKey.Bold
+        checkable: true
+        checked: noteEditor.cursorSelection.font.bold
+        onTriggered: root.noteModel.toggleBold(noteEditor.textDocument,
+                                               noteEditor.selectionStart,
+                                               noteEditor.selectionEnd)
+    }
+    Action {
+        id: italicAction
+        text: qsTr("Italic")
+        shortcut: StandardKey.Italic
+        checkable: true
+        checked: noteEditor.cursorSelection.font.italic
+        onTriggered: root.noteModel.toggleItalic(noteEditor.textDocument,
+                                                 noteEditor.selectionStart,
+                                                 noteEditor.selectionEnd)
+    }
+    Action {
+        id: underlineAction
+        text: qsTr("Underline")
+        shortcut: StandardKey.Underline
+        checkable: true
+        checked: noteEditor.cursorSelection.font.underline
+        onTriggered: root.noteModel.toggleUnderline(noteEditor.textDocument,
+                                                    noteEditor.selectionStart,
+                                                    noteEditor.selectionEnd)
+    }
+    Action {
+        id: strikeAction
+        text: qsTr("Strikethrough")
+        checkable: true
+        checked: noteEditor.cursorSelection.font.strikeout
+        onTriggered: root.noteModel.toggleStrikethrough(noteEditor.textDocument,
+                                                       noteEditor.selectionStart,
+                                                       noteEditor.selectionEnd)
+    }
+    Action {
+        id: bulletAction
+        text: qsTr("Bulleted list")
+        checkable: true
+        checked: root.currentListStyle === -1
+        onTriggered: {
+            root.noteModel.toggleBulletList(noteEditor.textDocument,
+                                            noteEditor.selectionStart,
+                                            noteEditor.selectionEnd)
+            Qt.callLater(root.refreshEditorToolbar)
+        }
+    }
+    Action {
+        id: numberedAction
+        text: qsTr("Numbered list")
+        checkable: true
+        checked: root.currentListStyle === -4
+        onTriggered: {
+            root.noteModel.toggleNumberedList(noteEditor.textDocument,
+                                              noteEditor.selectionStart,
+                                              noteEditor.selectionEnd)
+            Qt.callLater(root.refreshEditorToolbar)
+        }
+    }
+    Action {
+        id: undoAction
+        text: qsTr("Undo")
+        shortcut: StandardKey.Undo
+        enabled: noteEditor.canUndo
+        onTriggered: noteEditor.undo()
+    }
+    Action {
+        id: redoAction
+        text: qsTr("Redo")
+        shortcut: StandardKey.Redo
+        enabled: noteEditor.canRedo
+        onTriggered: noteEditor.redo()
     }
 
     ColumnLayout {
@@ -282,134 +376,124 @@ Rectangle {
                     }
                 }
 
-                Flow {
+                Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: childrenRect.height
-                    spacing: 4
+                    implicitHeight: toolbarFlow.childrenRect.height + 8
+                    color: Theme.sidebarBackground
+                    border.width: 1
+                    border.color: Theme.border
+                    radius: Theme.smallRadius
 
-                    ComboBox {
-                        width: 130
-                        model: [qsTr("Paragraph"), qsTr("Heading 1"), qsTr("Heading 2")]
-                        onActivated: noteModel.setParagraphStyle(
-                                         noteEditor.textDocument,
-                                         noteEditor.selectionStart,
-                                         noteEditor.selectionEnd,
-                                         currentIndex)
-                    }
-                    Button {
-                        text: "B"
-                        font.bold: true
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Bold")
-                        onClicked: noteModel.toggleBold(noteEditor.textDocument,
-                                                       noteEditor.selectionStart,
-                                                       noteEditor.selectionEnd)
-                    }
-                    Button {
-                        text: "I"
-                        font.italic: true
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Italic")
-                        onClicked: noteModel.toggleItalic(noteEditor.textDocument,
-                                                         noteEditor.selectionStart,
-                                                         noteEditor.selectionEnd)
-                    }
-                    Button {
-                        text: "U"
-                        font.underline: true
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Underline")
-                        onClicked: noteModel.toggleUnderline(noteEditor.textDocument,
-                                                            noteEditor.selectionStart,
-                                                            noteEditor.selectionEnd)
-                    }
-                    Button {
-                        text: "S"
-                        font.strikeout: true
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Strikethrough")
-                        onClicked: noteModel.toggleStrikethrough(
-                                       noteEditor.textDocument,
-                                       noteEditor.selectionStart,
-                                       noteEditor.selectionEnd)
-                    }
-                    Button {
-                        text: "•"
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Bulleted list")
-                        onClicked: noteModel.toggleBulletList(noteEditor.textDocument,
-                                                             noteEditor.selectionStart,
-                                                             noteEditor.selectionEnd)
-                    }
-                    Button {
-                        text: "1."
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Numbered list")
-                        onClicked: noteModel.toggleNumberedList(
-                                       noteEditor.textDocument,
-                                       noteEditor.selectionStart,
-                                       noteEditor.selectionEnd)
-                    }
-                    Button {
-                        text: "←"
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Decrease indentation")
-                        onClicked: noteModel.changeIndent(noteEditor.textDocument,
-                                                        noteEditor.selectionStart,
-                                                        noteEditor.selectionEnd, -1)
-                    }
-                    Button {
-                        text: "→"
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Increase indentation")
-                        onClicked: noteModel.changeIndent(noteEditor.textDocument,
-                                                        noteEditor.selectionStart,
-                                                        noteEditor.selectionEnd, 1)
-                    }
-                    Button {
-                        id: textColorButton
-                        text: "A"
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Text color")
-                        onClicked: textColorMenu.popup(textColorButton, 0, height)
-                    }
-                    Button {
-                        id: backgroundColorButton
-                        text: "▨"
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Background color")
-                        onClicked: backgroundColorMenu.popup(backgroundColorButton, 0, height)
-                    }
-                    Button {
-                        text: "🔗"
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Insert link")
-                        onClicked: root.insertLinkRequested(noteEditor.textDocument,
-                                                           noteEditor.selectionStart,
-                                                           noteEditor.selectionEnd,
-                                                           noteEditor.selectedText)
-                    }
-                    Button {
-                        text: "▦"
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Insert table")
-                        onClicked: root.insertTableRequested(noteEditor.textDocument,
-                                                            noteEditor.cursorPosition)
-                    }
-                    Rectangle { implicitWidth: 1; implicitHeight: 26; color: Theme.border }
-                    Button {
-                        text: "↶"
-                        enabled: noteEditor.canUndo
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Undo")
-                        onClicked: noteEditor.undo()
-                    }
-                    Button {
-                        text: "↷"
-                        enabled: noteEditor.canRedo
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Redo")
-                        onClicked: noteEditor.redo()
+                    Flow {
+                        id: toolbarFlow
+                        x: 4
+                        y: 4
+                        width: parent.width - 8
+                        spacing: 2
+
+                        Row {
+                            spacing: 1
+                            EditorToolButton { action: undoAction; iconSource: "qrc:/assets/icons/editor-undo.svg" }
+                            EditorToolButton { action: redoAction; iconSource: "qrc:/assets/icons/editor-redo.svg" }
+                            ToolSeparator { height: 30 }
+                        }
+
+                        Row {
+                            spacing: 2
+                            ComboBox {
+                                id: paragraphStyleBox
+                                width: 132
+                                height: 30
+                                model: [qsTr("Paragraph"), qsTr("Heading 1"), qsTr("Heading 2")]
+                                currentIndex: root.currentHeadingLevel
+                                onPressedChanged: {
+                                    if (pressed)
+                                        root.rememberEditorSelection()
+                                }
+                                onActivated: {
+                                    root.noteModel.setParagraphStyle(
+                                        noteEditor.textDocument,
+                                        root.formatSelectionStart,
+                                        root.formatSelectionEnd,
+                                        currentIndex)
+                                    Qt.callLater(root.refreshEditorToolbar)
+                                }
+                            }
+                            ToolSeparator { height: 30 }
+                        }
+
+                        Row {
+                            spacing: 1
+                            EditorToolButton { action: boldAction; displayText: "B"; font.bold: true }
+                            EditorToolButton { action: italicAction; displayText: "I"; font.italic: true }
+                            EditorToolButton { action: underlineAction; displayText: "U"; font.underline: true }
+                            EditorToolButton { action: strikeAction; displayText: "S"; font.strikeout: true }
+                            EditorToolButton {
+                                id: textColorButton
+                                displayText: "A"
+                                tooltipText: qsTr("Text color")
+                                indicatorColor: Theme.accent
+                                onPressedChanged: {
+                                    if (pressed)
+                                        root.rememberEditorSelection()
+                                }
+                                onClicked: textColorPalette.popup(textColorButton, 0, height)
+                            }
+                            EditorToolButton {
+                                id: backgroundColorButton
+                                tooltipText: qsTr("Highlight color")
+                                iconSource: "qrc:/assets/icons/editor-highlight.svg"
+                                indicatorColor: "#F2C94C"
+                                onPressedChanged: {
+                                    if (pressed)
+                                        root.rememberEditorSelection()
+                                }
+                                onClicked: backgroundColorPalette.popup(
+                                               backgroundColorButton, 0, height)
+                            }
+                            ToolSeparator { height: 30 }
+                        }
+
+                        Row {
+                            spacing: 1
+                            EditorToolButton { action: bulletAction; iconSource: "qrc:/assets/icons/editor-bullets.svg" }
+                            EditorToolButton { action: numberedAction; iconSource: "qrc:/assets/icons/editor-numbered.svg" }
+                            EditorToolButton {
+                                tooltipText: qsTr("Decrease indentation")
+                                iconSource: "qrc:/assets/icons/editor-indent-decrease.svg"
+                                onClicked: root.noteModel.changeIndent(noteEditor.textDocument,
+                                                                       noteEditor.selectionStart,
+                                                                       noteEditor.selectionEnd, -1)
+                            }
+                            EditorToolButton {
+                                tooltipText: qsTr("Increase indentation")
+                                iconSource: "qrc:/assets/icons/editor-indent-increase.svg"
+                                onClicked: root.noteModel.changeIndent(noteEditor.textDocument,
+                                                                       noteEditor.selectionStart,
+                                                                       noteEditor.selectionEnd, 1)
+                            }
+                            ToolSeparator { height: 30 }
+                        }
+
+                        Row {
+                            spacing: 1
+                            EditorToolButton {
+                                tooltipText: qsTr("Insert link")
+                                iconSource: "qrc:/assets/icons/editor-link.svg"
+                                onClicked: root.insertLinkRequested(
+                                               noteEditor.textDocument,
+                                               noteEditor.selectionStart,
+                                               noteEditor.selectionEnd,
+                                               noteEditor.selectedText)
+                            }
+                            EditorToolButton {
+                                tooltipText: qsTr("Insert table")
+                                iconSource: "qrc:/assets/icons/editor-table.svg"
+                                onClicked: root.insertTableRequested(
+                                               noteEditor.textDocument,
+                                               noteEditor.cursorPosition)
+                            }
+                        }
                     }
                 }
 
@@ -430,12 +514,38 @@ Rectangle {
                             textFormat: TextEdit.RichText
                             wrapMode: TextEdit.Wrap
                             selectByMouse: true
+                            persistentSelection: true
+                            Keys.priority: Keys.BeforeItem
+                            Keys.onTabPressed: function(event) {
+                                if (root.noteModel.listStyleAt(textDocument,
+                                                               cursorPosition) === 0) {
+                                    event.accepted = false
+                                    return
+                                }
+                                root.noteModel.changeIndent(textDocument,
+                                                            selectionStart,
+                                                            selectionEnd, 1)
+                                event.accepted = true
+                            }
+                            Keys.onBacktabPressed: function(event) {
+                                if (root.noteModel.listStyleAt(textDocument,
+                                                               cursorPosition) === 0) {
+                                    event.accepted = false
+                                    return
+                                }
+                                root.noteModel.changeIndent(textDocument,
+                                                            selectionStart,
+                                                            selectionEnd, -1)
+                                event.accepted = true
+                            }
                             placeholderText: qsTr("Write your investment thesis, observations, and open questions…")
                             color: Theme.textPrimary
                             onTextChanged: {
                                 if (!root.loadingNote && root.editorSecurityId.length > 0)
                                     saveTimer.restart()
                             }
+                            onCursorPositionChanged: root.refreshEditorToolbar()
+                            onSelectionStartChanged: root.refreshEditorToolbar()
 
                             TapHandler {
                                 acceptedButtons: Qt.RightButton
@@ -460,24 +570,28 @@ Rectangle {
         }
     }
 
-    Menu {
-        id: textColorMenu
-        MenuItem { text: qsTr("Default"); onTriggered: root.noteModel.setTextColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "") }
-        MenuItem { text: qsTr("Red"); onTriggered: root.noteModel.setTextColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "#C25555") }
-        MenuItem { text: qsTr("Orange"); onTriggered: root.noteModel.setTextColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "#C47F17") }
-        MenuItem { text: qsTr("Green"); onTriggered: root.noteModel.setTextColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "#2E8B78") }
-        MenuItem { text: qsTr("Blue"); onTriggered: root.noteModel.setTextColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "#3478C9") }
-        MenuItem { text: qsTr("Purple"); onTriggered: root.noteModel.setTextColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "#7A5AF8") }
+    EditorColorPalette {
+        id: textColorPalette
+        title: qsTr("Text color")
+        clearText: qsTr("Automatic")
+        colors: ["#172033", "#F2F4F7", "#C25555", "#C47F17", "#2E8B78", "#3478C9", "#7A5AF8", "#9B5C8F", "#667085", "#000000", "#FFFFFF", "#B42318"]
+        onColorSelected: function(color) {
+            root.noteModel.setTextColor(noteEditor.textDocument,
+                                        root.formatSelectionStart,
+                                        root.formatSelectionEnd, color)
+        }
     }
 
-    Menu {
-        id: backgroundColorMenu
-        MenuItem { text: qsTr("None"); onTriggered: root.noteModel.setBackgroundColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "") }
-        MenuItem { text: qsTr("Yellow"); onTriggered: root.noteModel.setBackgroundColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "#FFF2A8") }
-        MenuItem { text: qsTr("Red"); onTriggered: root.noteModel.setBackgroundColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "#F6C7C7") }
-        MenuItem { text: qsTr("Green"); onTriggered: root.noteModel.setBackgroundColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "#C7E9D9") }
-        MenuItem { text: qsTr("Blue"); onTriggered: root.noteModel.setBackgroundColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "#C9DDF5") }
-        MenuItem { text: qsTr("Purple"); onTriggered: root.noteModel.setBackgroundColor(noteEditor.textDocument, noteEditor.selectionStart, noteEditor.selectionEnd, "#DDD1FA") }
+    EditorColorPalette {
+        id: backgroundColorPalette
+        title: qsTr("Highlight color")
+        clearText: qsTr("No highlight")
+        colors: ["#FFF2A8", "#F6C7C7", "#FAD8B4", "#C7E9D9", "#C9DDF5", "#DDD1FA", "#E4E7EC", "#FDE68A", "#FECACA", "#BBF7D0", "#BFDBFE", "#E9D5FF"]
+        onColorSelected: function(color) {
+            root.noteModel.setBackgroundColor(noteEditor.textDocument,
+                                              root.formatSelectionStart,
+                                              root.formatSelectionEnd, color)
+        }
     }
 
     Menu {

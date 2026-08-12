@@ -68,6 +68,8 @@ qt_add_qml_module(EquityJournal
         ContentRouter.qml
         DeleteSecurityWindow.qml
         DeleteTagWindow.qml
+        EditorColorPalette.qml
+        EditorToolButton.qml
         InsertLinkWindow.qml
         InsertTableWindow.qml
         NavigationItem.qml
@@ -82,6 +84,20 @@ qt_add_qml_module(EquityJournal
         TagAssignmentWindow.qml
         TaxonomyView.qml
         Theme.qml
+)
+
+qt_add_resources(EquityJournal editor_icons
+    PREFIX "/"
+    FILES
+        assets/icons/editor-bullets.svg
+        assets/icons/editor-highlight.svg
+        assets/icons/editor-indent-decrease.svg
+        assets/icons/editor-indent-increase.svg
+        assets/icons/editor-link.svg
+        assets/icons/editor-numbered.svg
+        assets/icons/editor-redo.svg
+        assets/icons/editor-table.svg
+        assets/icons/editor-undo.svg
 )
 
 qt_add_resources(EquityJournal database_migrations

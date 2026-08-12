@@ -62,6 +62,8 @@ public:
                                        bool before);
     Q_INVOKABLE void deleteTableColumn(QObject *textDocument, int position);
     Q_INVOKABLE void deleteTable(QObject *textDocument, int position);
+    Q_INVOKABLE int listStyleAt(QObject *textDocument, int position) const;
+    Q_INVOKABLE int headingLevelAt(QObject *textDocument, int position) const;
 
 signals:
     void contentHtmlChanged();
