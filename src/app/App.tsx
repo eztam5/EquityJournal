@@ -8,7 +8,7 @@ import { SecurityForm, TaxonomyForm, WatchlistForm } from '../components/Forms'
 
 type Dialog = 'security'|'watchlist'|'taxonomy'|null
 export function App(){
-  const app=useApp();const[dialog,setDialog]=useState<Dialog>(null);const[sidebarWidth,setSidebarWidth]=useState(()=>Number(localStorage.getItem('equity-journal.sidebar-width'))||280)
+  const app=useApp();const[dialog,setDialog]=useState<Dialog>(null);const[sidebarWidth,setSidebarWidth]=useState(()=>Number(localStorage.getItem('equity-journal.sidebar-width'))||196)
   useEffect(()=>{localStorage.setItem('equity-journal.sidebar-width',String(sidebarWidth))},[sidebarWidth])
   useEffect(()=>{
     if(!('__TAURI_INTERNALS__' in window))return
