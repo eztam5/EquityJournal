@@ -58,6 +58,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
     const actual = theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme
     document.documentElement.dataset.theme = actual
     document.documentElement.style.colorScheme = actual
+    document.documentElement.classList.toggle('bp6-dark', actual === 'dark')
     localStorage.setItem(THEME_KEY, theme)
   }, [theme])
 

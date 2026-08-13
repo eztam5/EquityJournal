@@ -1,0 +1,50 @@
+/* Blueprint owns component structure; these rules connect it to EquityJournal's tokens and compact layout. */
+.bp6-button { font-size: 13px; }
+.bp6-menu { min-width: 170px; }
+.bp6-card { background: var(--window); color: var(--text); }
+.page h1,
+.page h2,
+.page h3 { color: var(--text); }
+.bp6-form-group { margin-bottom: 0; }
+.bp6-label { color: var(--secondary); }
+.bp6-input:focus-visible,
+.bp6-html-select select:focus-visible { outline: none; }
+
+.floating-dialog.bp6-card { position: fixed; padding: 0; overflow: hidden; }
+.dialog-titlebar .bp6-button { cursor: pointer; }
+.form-error.bp6-callout { margin: 0; color: inherit; }
+.form-context.bp6-callout { margin: 0; }
+.color-picker .bp6-popover-wrapper { display: inline-flex; }
+.color-picker .bp6-button { width: 31px; height: 31px; min-width: 31px; min-height: 31px; padding: 0; border-radius: 50%; }
+.color-picker .bp6-button .bp6-icon { color: #fff; filter: drop-shadow(0 1px 1px #0008); }
+
+.nav-item.bp6-button { min-height: 38px; padding: 0 10px; justify-content: flex-start; }
+.nav-item.bp6-button .bp6-button-text { overflow: hidden; text-overflow: ellipsis; }
+.nav-item.bp6-button.active { background: var(--selected); font-weight: 600; }
+.nav-item.bp6-button:hover { background: var(--hover); }
+
+.security-table.bp6-html-table { width: 100%; }
+.security-table.bp6-html-table th { padding: 12px 18px; }
+.security-table.bp6-html-table td { padding: 12px 18px; }
+
+.taxonomy-card .bp6-tree { background: transparent; }
+.taxonomy-card .bp6-tree-node-content { height: 42px; }
+.taxonomy-card .bp6-tree-node-label { color: var(--text); }
+.taxonomy-card > .bp6-tree > .bp6-tree-node > .bp6-tree-node-content { height: 52px; background: var(--selected); }
+.taxonomy-node-label { display: inline-flex; align-items: center; gap: 9px; }
+.taxonomy-node-label i,
+.tag-choice-label i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+
+.assignment-list .bp6-section { margin-bottom: 12px; }
+.assignment-list .bp6-section-card { padding: 8px 12px; }
+.tag-choice.bp6-control { min-height: 32px; margin: 0; display: flex; align-items: center; }
+.tag-choice-label { display: inline-flex; align-items: center; gap: 8px; }
+.assigned-group .bp6-tag { margin-right: 7px; border: 1px solid; }
+
+.editor-toolbar .bp6-button-group.tool-group { gap: 1px; }
+.editor-toolbar .bp6-html-select select { height: 30px; padding-top: 3px; padding-bottom: 3px; }
+.editor-toolbar .bp6-button.editor-tool { width: 31px; height: 30px; min-width: 31px; min-height: 30px; padding: 0; }
+.editor-palette { position: static; width: 216px; padding: 8px; }
+.editor-palette > div .bp6-button { width: 26px; height: 26px; min-width: 26px; min-height: 26px; padding: 0; }
+.link-popover { position: static; width: 330px; padding: 8px; }
+.link-popover .bp6-input-group { width: 100%; }

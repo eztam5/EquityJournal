@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { Button, Card } from '@blueprintjs/core'
 
 export function DraggableDialog({ title, children, onClose, width = 480 }: { title: string; children: ReactNode; onClose(): void; width?: number }) {
   const panel = useRef<HTMLDivElement>(null)
@@ -20,10 +20,10 @@ export function DraggableDialog({ title, children, onClose, width = 480 }: { tit
     const end = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', end) }
     addEventListener('pointermove', move); addEventListener('pointerup', end)
   }
-  return <div ref={panel} className="floating-dialog" role="dialog" aria-modal="false" aria-label={title} style={{ width, left: position.x, top: position.y }}>
-    <header className="dialog-titlebar" onPointerDown={startDrag}><strong>{title}</strong><button className="icon-button" onClick={onClose} aria-label="Close"><X size={17}/></button></header>
+  return <Card ref={panel} className="floating-dialog" role="dialog" aria-modal="false" aria-label={title} style={{ width, left: position.x, top: position.y }} elevation={3}>
+    <header className="dialog-titlebar" onPointerDown={startDrag}><strong>{title}</strong><Button variant="minimal" icon="cross" size="small" onClick={onClose} aria-label="Close"/></header>
     <div className="dialog-body">{children}</div>
-  </div>
+  </Card>
 }
 
 export function DialogActions({ children }: { children: ReactNode }) { return <div className="dialog-actions">{children}</div> }
