@@ -1,0 +1,18 @@
+PRAGMA foreign_keys = ON;
+CREATE TABLE IF NOT EXISTS securities (id TEXT PRIMARY KEY,name TEXT NOT NULL,symbol TEXT NOT NULL,currency TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS securities_symbol_ci ON securities (lower(symbol));
+CREATE TABLE IF NOT EXISTS watchlists (id TEXT PRIMARY KEY,name TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS watchlists_name_ci ON watchlists (lower(name));
+CREATE TABLE IF NOT EXISTS watchlist_securities (watchlist_id TEXT NOT NULL,security_id TEXT NOT NULL,PRIMARY KEY (watchlist_id,security_id),FOREIGN KEY (watchlist_id) REFERENCES watchlists(id) ON DELETE CASCADE,FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE);
+CREATE INDEX IF NOT EXISTS watchlist_securities_security_id_idx ON watchlist_securities (security_id);
+CREATE TABLE IF NOT EXISTS taxonomies (id TEXT PRIMARY KEY,name TEXT NOT NULL,description TEXT,color TEXT NOT NULL,sort_order INTEGER NOT NULL DEFAULT 0,archived_at TEXT);
+CREATE UNIQUE INDEX IF NOT EXISTS taxonomies_name_ci ON taxonomies (lower(name));
+CREATE INDEX IF NOT EXISTS taxonomies_sort_order_idx ON taxonomies (sort_order,lower(name));
+CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY,taxonomy_id TEXT NOT NULL,parent_id TEXT,name TEXT NOT NULL,description TEXT,color TEXT,sort_order INTEGER NOT NULL DEFAULT 0,archived_at TEXT,FOREIGN KEY (taxonomy_id) REFERENCES taxonomies(id) ON DELETE CASCADE,FOREIGN KEY (parent_id) REFERENCES tags(id) ON DELETE RESTRICT,CHECK (parent_id IS NULL OR parent_id <> id));
+CREATE UNIQUE INDEX IF NOT EXISTS tags_unique_root_name_ci ON tags (taxonomy_id,lower(name)) WHERE parent_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS tags_unique_child_name_ci ON tags (taxonomy_id,parent_id,lower(name)) WHERE parent_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS tags_parent_id_idx ON tags (parent_id);
+CREATE INDEX IF NOT EXISTS tags_taxonomy_id_idx ON tags (taxonomy_id,sort_order,lower(name));
+CREATE TABLE IF NOT EXISTS security_tags (security_id TEXT NOT NULL,tag_id TEXT NOT NULL,PRIMARY KEY (security_id,tag_id),FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE,FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+CREATE INDEX IF NOT EXISTS security_tags_tag_id_idx ON security_tags (tag_id);
+CREATE TABLE IF NOT EXISTS security_notes (security_id TEXT PRIMARY KEY,content_html TEXT NOT NULL DEFAULT '',updated_at TEXT NOT NULL,FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE);
