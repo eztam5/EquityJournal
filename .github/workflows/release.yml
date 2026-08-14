@@ -17,14 +17,17 @@ jobs:
           - platform: macos-latest
             args: "--target aarch64-apple-darwin"
             assetName: "EquityJournal-[version]-macos-arm64.[ext]"
+            signingIdentity: "-"
 
           - platform: macos-latest
             args: "--target x86_64-apple-darwin"
             assetName: "EquityJournal-[version]-macos-x64.[ext]"
+            signingIdentity: "-"
 
           - platform: windows-latest
             args: ""
             assetName: "EquityJournal-[version]-windows-x64[_setup].[ext]"
+            signingIdentity: ""
 
     runs-on: ${{ matrix.platform }}
 
@@ -56,6 +59,7 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ matrix.signingIdentity }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "EquityJournal ${{ github.ref_name }}"
