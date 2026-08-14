@@ -19,11 +19,6 @@ jobs:
             assetName: "EquityJournal-[version]-macos-arm64.[ext]"
             signingIdentity: "-"
 
-          - platform: macos-latest
-            args: "--target x86_64-apple-darwin"
-            assetName: "EquityJournal-[version]-macos-x64.[ext]"
-            signingIdentity: "-"
-
           - platform: windows-latest
             args: ""
             assetName: "EquityJournal-[version]-windows-x64[_setup].[ext]"
@@ -46,7 +41,7 @@ jobs:
         with:
           targets: >-
             ${{ startsWith(matrix.platform, 'macos')
-                && 'aarch64-apple-darwin,x86_64-apple-darwin'
+                && 'aarch64-apple-darwin'
                 || '' }}
 
       - name: Install dependencies
