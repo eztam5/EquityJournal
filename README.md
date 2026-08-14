@@ -38,6 +38,16 @@ npm run build
 npm run tauri build
 ```
 
+
+## Releasing a new version
+update the version in these files:
+package.json
+src-tauri/Cargo.toml
+src-tauri/tauri.conf.json
+
+git tag v0.0.2
+git push origin v0.0.2
+
 ## Current functionality
 
 - Resizable navigation sidebar
