@@ -16,12 +16,15 @@ jobs:
         include:
           - platform: macos-latest
             args: "--target aarch64-apple-darwin"
+            assetName: "EquityJournal-[version]-macos-arm64.[ext]"
 
           - platform: macos-latest
             args: "--target x86_64-apple-darwin"
+            assetName: "EquityJournal-[version]-macos-x64.[ext]"
 
           - platform: windows-latest
             args: ""
+            assetName: "EquityJournal-[version]-windows-x64[_setup].[ext]"
 
     runs-on: ${{ matrix.platform }}
 
@@ -60,3 +63,4 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+          releaseAssetNamePattern: ${{ matrix.assetName }}
