@@ -122,8 +122,18 @@ pub fn run() {
             let app_menu = SubmenuBuilder::new(app, "EquityJournal")
                 .item(&settings)
                 .build()?;
+            let edit = SubmenuBuilder::new(app, "Edit")
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
+                .build()?;
             let menu = MenuBuilder::new(app)
                 .item(&app_menu)
+                .item(&edit)
                 .item(&view)
                 .build()?;
             app.set_menu(menu)?;
