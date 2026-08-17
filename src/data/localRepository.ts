@@ -80,6 +80,14 @@ export class LocalRepository implements EquityRepository {
     this.persist()
   }
   async listTags(taxonomyId: string) { return this.data.tags.filter((x) => x.taxonomyId === taxonomyId).toSorted((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)) }
+  async listTaggedSecurities(taxonomyId: string) {
+    const tagIds = new Set(this.data.tags.filter((tag) => tag.taxonomyId === taxonomyId).map((tag) => tag.id))
+    return this.data.securityTags.flatMap((assignment) => {
+      if (!tagIds.has(assignment.tagId)) return []
+      const security = this.data.securities.find((item) => item.id === assignment.securityId)
+      return security ? [{ ...security, tagId: assignment.tagId }] : []
+    }).toSorted((left, right) => left.symbol.localeCompare(right.symbol) || left.id.localeCompare(right.id))
+  }
   async addTag(input: Omit<Tag, 'id' | 'sortOrder'>) {
     const name = cleanRequired(input.name, 'a tag name')
     if (this.data.tags.some((x) => x.taxonomyId === input.taxonomyId && x.parentId === input.parentId && x.name.toLowerCase() === name.toLowerCase())) throw new Error('A tag with this name already exists at this level.')

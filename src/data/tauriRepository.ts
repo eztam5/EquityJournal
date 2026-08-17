@@ -1,5 +1,5 @@
 import Database from '@tauri-apps/plugin-sql'
-import type { Security, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
+import type { Security, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 import { cleanRequired, type EquityRepository, uuid } from './repository'
 
 type DbRow = Record<string, string | number | null>
@@ -55,6 +55,10 @@ export class TauriRepository implements EquityRepository {
   async listTags(taxonomyId: string): Promise<Tag[]> {
     const rows = await this.db.select<DbRow[]>('SELECT id,taxonomy_id,parent_id,name,COALESCE(description,\'\') description,COALESCE(color,\'\') color,sort_order FROM tags WHERE taxonomy_id=$1 AND archived_at IS NULL ORDER BY sort_order,lower(name),id', [taxonomyId])
     return rows.map((x) => ({ id:String(x.id),taxonomyId:String(x.taxonomy_id),parentId:x.parent_id ? String(x.parent_id):null,name:String(x.name),description:String(x.description),color:String(x.color),sortOrder:Number(x.sort_order) }))
+  }
+  async listTaggedSecurities(taxonomyId: string): Promise<TaggedSecurity[]> {
+    const rows = await this.db.select<DbRow[]>('SELECT st.tag_id,s.id,s.name,s.symbol,s.currency FROM security_tags st JOIN tags t ON t.id=st.tag_id JOIN securities s ON s.id=st.security_id WHERE t.taxonomy_id=$1 AND t.archived_at IS NULL ORDER BY lower(s.symbol),s.id', [taxonomyId])
+    return rows.map((row) => ({ tagId:String(row.tag_id),id:String(row.id),name:String(row.name),symbol:String(row.symbol),currency:String(row.currency) }))
   }
   async addTag(input: Omit<Tag, 'id' | 'sortOrder'>) {
     const name = cleanRequired(input.name, 'a tag name')

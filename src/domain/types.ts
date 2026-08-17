@@ -7,6 +7,10 @@ export interface Security {
   currency: string
 }
 
+export interface TaggedSecurity extends Security {
+  tagId: string
+}
+
 export interface Watchlist {
   id: string
   name: string

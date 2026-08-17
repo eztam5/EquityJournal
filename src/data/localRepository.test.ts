@@ -35,6 +35,7 @@ describe('LocalRepository',()=>{
     const taxonomy=await repository.addTaxonomy({name:'Thesis',description:'',color:'#4F7CAC'})
     const tag=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Moat',description:'',color:taxonomy.color})
     await repository.setAssignedTags(security.id,[tag.id]);expect(await repository.assignedTagIds(security.id)).toEqual([tag.id])
+    expect(await repository.listTaggedSecurities(taxonomy.id)).toEqual([{...security,tagId:tag.id}])
     await repository.saveNote(security.id,'<h1>Thesis</h1>');expect((await repository.loadNote(security.id)).contentHtml).toBe('<h1>Thesis</h1>')
   })
   it('deletes a taxonomy with its nested tags and assignments',async()=>{

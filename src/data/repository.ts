@@ -1,4 +1,4 @@
-import type { Security, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
+import type { Security, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 
 export interface EquityRepository {
   initialize(): Promise<void>
@@ -14,6 +14,7 @@ export interface EquityRepository {
   addTaxonomy(input: Pick<Taxonomy, 'name' | 'description' | 'color'>): Promise<Taxonomy>
   deleteTaxonomy(id: string): Promise<void>
   listTags(taxonomyId: string): Promise<Tag[]>
+  listTaggedSecurities(taxonomyId: string): Promise<TaggedSecurity[]>
   addTag(input: Omit<Tag, 'id' | 'sortOrder'>): Promise<Tag>
   updateTag(tag: Pick<Tag, 'id' | 'taxonomyId' | 'name' | 'description' | 'color'>): Promise<void>
   deleteTag(taxonomyId: string, id: string): Promise<void>
