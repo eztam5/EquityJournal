@@ -30,6 +30,15 @@
 .nav-item.bp6-button.active { background: var(--selected); font-weight: 600; }
 .nav-item.bp6-button:hover { background: var(--hover); }
 
+.notes-card { padding: 18px 0; }
+.notes-card > header { padding: 0 20px; margin-bottom: 12px; }
+.notes-card .rich-editor { padding: 0 20px; }
+
+.editor-shell { border: 0; border-radius: 0; }
+.editor-shell:focus-within { outline: none; border: 0; box-shadow: none; }
+.rich-editor:focus { outline: none; }
+.ProseMirror:focus { outline: none; }
+
 .security-table.bp6-html-table { width: 100%; font-size: 12px; }
 .security-table.bp6-html-table th { padding: 2px 12px; font-size: 11px; line-height: 1.1; vertical-align: middle; }
 .security-table.bp6-html-table td { padding: 2px 12px; font-size: 12px; line-height: 1.1; vertical-align: middle; }
