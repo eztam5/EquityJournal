@@ -4,7 +4,7 @@ import { useApp } from '../app/AppContext'
 import { buildTagTree, type Tag, type TagNode } from '../domain/types'
 import { DialogActions, DraggableDialog } from './DraggableDialog'
 
-function Choice({node,selected,onChange,depth=0}:{node:TagNode;selected:Set<string>;onChange(id:string,checked:boolean):void;depth?:number}){return <><Checkbox className="tag-choice" style={{paddingLeft:depth*22}} checked={selected.has(node.id)} onChange={(e)=>onChange(node.id,e.currentTarget.checked)} labelElement={<span className="tag-choice-label"><i style={{background:node.color}}/>{node.name}</span>}/>{node.children.map((child)=><Choice key={child.id} node={child} selected={selected} onChange={onChange} depth={depth+1}/>)}</>}
+function Choice({node,selected,onChange,depth=0}:{node:TagNode;selected:Set<string>;onChange(id:string,checked:boolean):void;depth?:number}){return <><Checkbox className="tag-choice" style={{marginInlineStart:depth*22}} checked={selected.has(node.id)} onChange={(e)=>onChange(node.id,e.currentTarget.checked)} labelElement={<span className="tag-choice-label"><i style={{background:node.color}}/>{node.name}</span>}/>{node.children.map((child)=><Choice key={child.id} node={child} selected={selected} onChange={onChange} depth={depth+1}/>)}</>}
 
 export function TagAssignmentDialog({securityId,onClose,onSaved}:{securityId:string;onClose():void;onSaved():void}){
   const app=useApp();const[tags,setTags]=useState<Map<string,Tag[]>>(new Map());const[selected,setSelected]=useState<Set<string>>(new Set());const[error,setError]=useState('')

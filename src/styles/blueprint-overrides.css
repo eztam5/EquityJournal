@@ -48,7 +48,7 @@ table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-com
 .taxonomy-card .bp6-tree-node-content { height: 42px; font-size: 12px; }
 .taxonomy-card .bp6-tree-node-label { color: var(--text); font-size: 12px; }
 .taxonomy-card > .bp6-tree > .bp6-tree-node > .bp6-tree-node-content { height: 52px; background: var(--selected); }
-.taxonomy-node-label { display: inline-flex; align-items: center; gap: 9px; }
+.taxonomy-card .bp6-tree-node-label .taxonomy-node-label { display: inline-flex; align-items: center; gap: 9px; }
 .taxonomy-node-label i,
 .tag-choice-label i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
 
