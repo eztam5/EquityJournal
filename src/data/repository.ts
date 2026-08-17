@@ -8,9 +8,11 @@ export interface EquityRepository {
   deleteSecurity(id: string): Promise<void>
   listWatchlists(): Promise<Watchlist[]>
   addWatchlist(name: string): Promise<Watchlist>
+  deleteWatchlist(id: string): Promise<void>
   setWatchlistSecurity(watchlistId: string, securityId: string, assigned: boolean): Promise<void>
   listTaxonomies(): Promise<Taxonomy[]>
   addTaxonomy(input: Pick<Taxonomy, 'name' | 'description' | 'color'>): Promise<Taxonomy>
+  deleteTaxonomy(id: string): Promise<void>
   listTags(taxonomyId: string): Promise<Tag[]>
   addTag(input: Omit<Tag, 'id' | 'sortOrder'>): Promise<Tag>
   updateTag(tag: Pick<Tag, 'id' | 'taxonomyId' | 'name' | 'description' | 'color'>): Promise<void>

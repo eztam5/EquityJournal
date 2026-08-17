@@ -33,6 +33,7 @@ export class TauriRepository implements EquityRepository {
     catch { throw new Error('A watchlist with this name already exists.') }
     return result
   }
+  async deleteWatchlist(id: string) { await this.db.execute('DELETE FROM watchlists WHERE id=$1', [id]) }
   async setWatchlistSecurity(watchlistId: string, securityId: string, assigned: boolean) {
     if (assigned) await this.db.execute('INSERT OR IGNORE INTO watchlist_securities (watchlist_id,security_id) VALUES ($1,$2)', [watchlistId, securityId])
     else await this.db.execute('DELETE FROM watchlist_securities WHERE watchlist_id=$1 AND security_id=$2', [watchlistId, securityId])
@@ -47,6 +48,9 @@ export class TauriRepository implements EquityRepository {
     try { await this.db.execute('INSERT INTO taxonomies (id,name,description,color,sort_order) VALUES ($1,$2,$3,$4,$5)', [result.id,result.name,result.description,result.color,result.sortOrder]) }
     catch { throw new Error('A taxonomy with this name already exists.') }
     return result
+  }
+  async deleteTaxonomy(id: string) {
+    await this.db.execute('DELETE FROM taxonomies WHERE id=$1', [id])
   }
   async listTags(taxonomyId: string): Promise<Tag[]> {
     const rows = await this.db.select<DbRow[]>('SELECT id,taxonomy_id,parent_id,name,COALESCE(description,\'\') description,COALESCE(color,\'\') color,sort_order FROM tags WHERE taxonomy_id=$1 AND archived_at IS NULL ORDER BY sort_order,lower(name),id', [taxonomyId])

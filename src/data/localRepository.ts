@@ -56,6 +56,11 @@ export class LocalRepository implements EquityRepository {
     if (this.data.watchlists.some((x) => x.name.toLowerCase() === name.toLowerCase())) throw new Error('A watchlist with this name already exists.')
     const result = { id: uuid(), name }; this.data.watchlists.push(result); this.persist(); return result
   }
+  async deleteWatchlist(id: string) {
+    this.data.watchlists = this.data.watchlists.filter((watchlist) => watchlist.id !== id)
+    this.data.watchlistSecurities = this.data.watchlistSecurities.filter((membership) => membership.watchlistId !== id)
+    this.persist()
+  }
   async setWatchlistSecurity(watchlistId: string, securityId: string, assigned: boolean) {
     this.data.watchlistSecurities = this.data.watchlistSecurities.filter((x) => x.watchlistId !== watchlistId || x.securityId !== securityId)
     if (assigned) this.data.watchlistSecurities.push({ watchlistId, securityId }); this.persist()
@@ -66,6 +71,13 @@ export class LocalRepository implements EquityRepository {
     if (this.data.taxonomies.some((x) => x.name.toLowerCase() === name.toLowerCase())) throw new Error('A taxonomy with this name already exists.')
     const result = { id: uuid(), name, description: input.description.trim(), color: input.color.toUpperCase(), sortOrder: this.data.taxonomies.length }
     this.data.taxonomies.push(result); this.persist(); return result
+  }
+  async deleteTaxonomy(id: string) {
+    const tagIds = new Set(this.data.tags.filter((tag) => tag.taxonomyId === id).map((tag) => tag.id))
+    this.data.taxonomies = this.data.taxonomies.filter((taxonomy) => taxonomy.id !== id)
+    this.data.tags = this.data.tags.filter((tag) => tag.taxonomyId !== id)
+    this.data.securityTags = this.data.securityTags.filter((assignment) => !tagIds.has(assignment.tagId))
+    this.persist()
   }
   async listTags(taxonomyId: string) { return this.data.tags.filter((x) => x.taxonomyId === taxonomyId).toSorted((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)) }
   async addTag(input: Omit<Tag, 'id' | 'sortOrder'>) {

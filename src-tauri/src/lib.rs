@@ -10,8 +10,6 @@ use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Clone)]
 struct DatabaseConfig {
     path: String,
-    username: String,
-    password: String,
 }
 
 struct ThemeMenu {
@@ -40,8 +38,6 @@ fn get_database_config() -> DatabaseConfig {
     
     DatabaseConfig {
         path: get_default_db_path(),
-        username: String::from(""),
-        password: String::from(""),
     }
 }
 
@@ -71,8 +67,7 @@ fn change_database_path(new_path: String, copy_existing: bool) -> Result<(), Str
     }
     
     // Save the new path to config
-    let config = get_database_config();
-    save_database_config(DatabaseConfig { path: new_path, ..config })?;
+    save_database_config(DatabaseConfig { path: new_path })?;
     
     Ok(())
 }
@@ -99,6 +94,11 @@ pub fn run() {
         version: 1,
         description: "initial_equity_journal_schema",
         sql: include_str!("../migrations/001_initial_schema.sql"),
+        kind: MigrationKind::Up,
+    }, Migration {
+        version: 2,
+        description: "cascade_nested_tag_deletion",
+        sql: include_str!("../migrations/002_tags_parent_cascade.sql"),
         kind: MigrationKind::Up,
     }];
 

@@ -10,6 +10,18 @@ describe('LocalRepository',()=>{
     await expect(repository.addSecurity({symbol:'Aapl',currency:'USD',name:'Other'})).rejects.toThrow('already exists')
     const next=new LocalRepository();await next.initialize();expect(await next.listSecurities()).toEqual([security])
   })
+  it('deletes a watchlist and its memberships without deleting securities',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'NESN',currency:'CHF',name:'Nestlé'})
+    const watchlist=await repository.addWatchlist('Swiss shares')
+    await repository.setWatchlistSecurity(watchlist.id,security.id,true)
+
+    await repository.deleteWatchlist(watchlist.id)
+
+    expect(await repository.listWatchlists()).toEqual([])
+    expect(await repository.listSecurities(watchlist.id)).toEqual([])
+    expect(await repository.listSecurities()).toEqual([security])
+  })
   it('creates nested tags and rejects deleting a parent with children',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const taxonomy=await repository.addTaxonomy({name:'Risks',description:'',color:'#C25555'})
@@ -24,5 +36,19 @@ describe('LocalRepository',()=>{
     const tag=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Moat',description:'',color:taxonomy.color})
     await repository.setAssignedTags(security.id,[tag.id]);expect(await repository.assignedTagIds(security.id)).toEqual([tag.id])
     await repository.saveNote(security.id,'<h1>Thesis</h1>');expect((await repository.loadNote(security.id)).contentHtml).toBe('<h1>Thesis</h1>')
+  })
+  it('deletes a taxonomy with its nested tags and assignments',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'NVDA',currency:'USD',name:'NVIDIA'})
+    const taxonomy=await repository.addTaxonomy({name:'Quality',description:'',color:'#2E8B78'})
+    const parent=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Management',description:'',color:taxonomy.color})
+    const child=await repository.addTag({taxonomyId:taxonomy.id,parentId:parent.id,name:'Execution',description:'',color:taxonomy.color})
+    await repository.setAssignedTags(security.id,[parent.id,child.id])
+
+    await repository.deleteTaxonomy(taxonomy.id)
+
+    expect(await repository.listTaxonomies()).toEqual([])
+    expect(await repository.listTags(taxonomy.id)).toEqual([])
+    expect(await repository.assignedTagIds(security.id)).toEqual([])
   })
 })
