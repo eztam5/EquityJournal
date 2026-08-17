@@ -43,6 +43,7 @@
 .security-table.bp6-html-table th { padding: 2px 12px; font-size: 11px; line-height: 1.1; vertical-align: middle; }
 .security-table.bp6-html-table td { padding: 2px 12px; font-size: 12px; line-height: 1.1; vertical-align: middle; }
 table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-compact.security-table td { padding-bottom: 2px; padding-top: 2px; }
+.security-table .sort-header.bp6-button { min-height: 24px; padding: 0; color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; }
 
 .taxonomy-card .bp6-tree { background: transparent; font-size: 12px; }
 .taxonomy-card .bp6-tree-node-content { height: 42px; font-size: 12px; }
