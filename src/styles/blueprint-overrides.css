@@ -1,5 +1,5 @@
 /* Blueprint owns component structure; these rules connect it to EquityJournal's tokens and compact layout. */
-.bp6-button { font-size: 13px; }
+.bp6-button { font-size: 12px; }
 .bp6-menu { min-width: 170px; }
 .bp6-card { background: var(--window); color: var(--text); }
 .page h1,
@@ -18,14 +18,14 @@
 .color-picker .bp6-button { width: 31px; height: 31px; min-width: 31px; min-height: 31px; padding: 0; border-radius: 50%; }
 .color-picker .bp6-button .bp6-icon { color: #fff; filter: drop-shadow(0 1px 1px #0008); }
 
-.nav-item.bp6-button { min-height: 38px; padding: 0 10px; justify-content: flex-start; }
+.nav-item.bp6-button { min-height: 30px; padding: 0 8px; justify-content: flex-start; }
 .nav-item.bp6-button .bp6-button-text { overflow: hidden; text-overflow: ellipsis; }
 .nav-item.bp6-button.active { background: var(--selected); font-weight: 600; }
 .nav-item.bp6-button:hover { background: var(--hover); }
 
 .security-table.bp6-html-table { width: 100%; }
-.security-table.bp6-html-table th { padding: 12px 18px; }
-.security-table.bp6-html-table td { padding: 12px 18px; }
+.security-table.bp6-html-table th { padding: 9px 12px; }
+.security-table.bp6-html-table td { padding: 9px 12px; }
 
 .taxonomy-card .bp6-tree { background: transparent; }
 .taxonomy-card .bp6-tree-node-content { height: 42px; }
