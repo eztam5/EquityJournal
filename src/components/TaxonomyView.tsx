@@ -14,7 +14,7 @@ export function TaxonomyView({ id }: { id:string }) {
   const convert=(node:TagNode):TreeNodeInfo<Tag>=>({id:node.id,nodeData:node,label:<span className="taxonomy-node-label"><i style={{background:node.color}}/>{node.name}</span>,isExpanded:expanded.has(node.id),hasCaret:node.children.length>0,childNodes:node.children.map(convert)})
   const contents=useMemo<TreeNodeInfo<Tag|undefined>[]>(()=>[{id:'root',nodeData:undefined,label:<span className="taxonomy-node-label"><i style={{background:taxonomy.color}}/>{taxonomy.name}</span>,icon:'diagram-tree',isExpanded:expanded.has('root'),hasCaret:true,isSelected:true,childNodes:tree.map(convert)}],[taxonomy,tree,expanded])
   return <main className="content page"><header className="page-header"><div><h1>{taxonomy.name}</h1><p>{taxonomy.description||'Build a hierarchical classification for your research.'}</p></div></header>
-    <div className="taxonomy-card"><Tree compact contents={contents} onNodeExpand={(node)=>toggle(String(node.id))} onNodeCollapse={(node)=>toggle(String(node.id))} onNodeContextMenu={(node,_path,event)=>openMenu(event,node.nodeData)}/></div>
+    <div className="content-panel taxonomy-card"><Tree compact contents={contents} onNodeExpand={(node)=>toggle(String(node.id))} onNodeCollapse={(node)=>toggle(String(node.id))} onNodeContextMenu={(node,_path,event)=>openMenu(event,node.nodeData)}/></div>
     {form&&<TagForm taxonomy={taxonomy} parent={form.parent} tag={form.tag} onSaved={load} onClose={()=>setForm(null)}/>} {deleting&&<ConfirmDialog title="Delete tag" message={`Do you really want to delete ${deleting.name}?`} onClose={()=>setDeleting(undefined)} onConfirm={async()=>{await app.repository.deleteTag(id,deleting.id);await load()}}/>}
   </main>
 }

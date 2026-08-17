@@ -1,10 +1,17 @@
 /* Blueprint owns component structure; these rules connect it to EquityJournal's tokens and compact layout. */
 .bp6-button { font-size: 12px; }
 .bp6-menu { min-width: 170px; }
-.bp6-card { background: var(--window); color: var(--text); border: 1px solid var(--border); border-radius: 8px; box-shadow: none !important; }
+.bp6-card { background: var(--window); color: var(--text); border-radius: 0; border: 1px solid var(--border); box-shadow: none !important; }
+.content-panel.bp6-card { border-left: 0; border-right: 0; }
 .page h1,
 .page h2,
 .page h3 { color: var(--text); }
+.bp6-html-table,
+.bp6-tree,
+.bp6-tree-node-label,
+.bp6-tree-node-content,
+.bp6-html-table td,
+.bp6-html-table th { font-size: 12px; }
 .bp6-form-group { margin-bottom: 0; }
 .bp6-label { color: var(--secondary); }
 .bp6-input:focus-visible,
@@ -23,13 +30,14 @@
 .nav-item.bp6-button.active { background: var(--selected); font-weight: 600; }
 .nav-item.bp6-button:hover { background: var(--hover); }
 
-.security-table.bp6-html-table { width: 100%; }
-.security-table.bp6-html-table th { padding: 9px 12px; }
-.security-table.bp6-html-table td { padding: 9px 12px; }
+.security-table.bp6-html-table { width: 100%; font-size: 12px; }
+.security-table.bp6-html-table th { padding: 2px 12px; font-size: 11px; line-height: 1.1; vertical-align: middle; }
+.security-table.bp6-html-table td { padding: 2px 12px; font-size: 12px; line-height: 1.1; vertical-align: middle; }
+table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-compact.security-table td { padding-bottom: 2px; padding-top: 2px; }
 
-.taxonomy-card .bp6-tree { background: transparent; }
-.taxonomy-card .bp6-tree-node-content { height: 42px; }
-.taxonomy-card .bp6-tree-node-label { color: var(--text); }
+.taxonomy-card .bp6-tree { background: transparent; font-size: 12px; }
+.taxonomy-card .bp6-tree-node-content { height: 42px; font-size: 12px; }
+.taxonomy-card .bp6-tree-node-label { color: var(--text); font-size: 12px; }
 .taxonomy-card > .bp6-tree > .bp6-tree-node > .bp6-tree-node-content { height: 52px; background: var(--selected); }
 .taxonomy-node-label { display: inline-flex; align-items: center; gap: 9px; }
 .taxonomy-node-label i,
