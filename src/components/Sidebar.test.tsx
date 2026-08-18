@@ -34,4 +34,31 @@ describe('Sidebar taxonomy navigation',()=>{
     fireEvent.click(screen.getByRole('button',{name:'Collapse Industry'}))
     expect(screen.queryByText('Software')).not.toBeInTheDocument()
   })
+
+  it('uses the configured company-name-only labels in its taxonomy tree',async()=>{
+    localStorage.setItem('equity-journal.security-display-mode','name-only')
+    const repository=new LocalRepository();await repository.initialize()
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const software=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Software',description:'',color:taxonomy.color})
+    const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    await repository.setAssignedTags(security.id,[software.id])
+
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()}/></AppProvider>)
+    fireEvent.click(await screen.findByRole('button',{name:'Expand Industry'}))
+    fireEvent.click(await screen.findByRole('button',{name:'Expand Software'}))
+
+    expect(await screen.findByRole('button',{name:'Apple Inc.'})).toBeInTheDocument()
+    expect(screen.queryByText('AAPL — Apple Inc.')).not.toBeInTheDocument()
+  })
+
+  it('uses the configured label in Recently Viewed',async()=>{
+    localStorage.setItem('equity-journal.security-display-mode','name-first')
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    localStorage.setItem('equity-journal.recent-securities',JSON.stringify([security.id]))
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()}/></AppProvider>)
+
+    expect(await screen.findByText('Recently Viewed')).toBeInTheDocument()
+    expect(screen.getByRole('button',{name:'Apple Inc. — AAPL'})).toBeInTheDocument()
+  })
 })

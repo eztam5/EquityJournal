@@ -6,6 +6,7 @@ import { ConfirmDialog, TagForm } from './Forms'
 import { showTaxonomySecurityMenu, showTaxonomyTagMenu } from './taxonomyContextMenus'
 import { buildTaxonomyTreeModel, filterTaxonomyTreeModel, resolveTagDrop, type TaxonomyTreeModelNode } from './taxonomyTreeModel'
 import { useTaxonomyDragAndDrop, type TaxonomyDropOperation } from './useTaxonomyDragAndDrop'
+import { formatSecurityLabel } from '../utils/securityLabels'
 
 export function TaxonomyView({ id }: { id: string }) {
   const app = useApp()
@@ -98,7 +99,7 @@ export function TaxonomyView({ id }: { id: string }) {
         data-security-id={node.security.id}
         data-tag-id={node.tagId}
         title="Drag to move; hold the copy modifier to copy"
-      >{node.security.symbol} — {node.security.name}</span>,
+      >{formatSecurityLabel(node.security,app.securityDisplayMode)}</span>,
       secondaryLabel: node.security.currency,
       icon: 'briefcase',
     }

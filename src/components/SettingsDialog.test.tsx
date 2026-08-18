@@ -5,7 +5,7 @@ import { LocalRepository } from '../data/localRepository'
 import { SettingsDialog } from './SettingsDialog'
 
 describe('SettingsDialog navigation',()=>{
-  afterEach(cleanup)
+  afterEach(()=>{cleanup();localStorage.clear()})
 
   it('opens on General and navigates to Database Connection',()=>{
     render(<AppProvider repository={new LocalRepository()}><SettingsDialog isOpen onClose={vi.fn()}/></AppProvider>)
@@ -31,5 +31,16 @@ describe('SettingsDialog navigation',()=>{
 
     await waitFor(()=>expect(onClose).toHaveBeenCalled())
     expect(await repository.listSecurityLinkTemplates()).toEqual([expect.objectContaining({linkText:'Yahoo Finance',urlPattern:'https://finance.yahoo.com/quote/{SYMBOL}',sortOrder:0})])
+  })
+
+  it('persists the security-name display mode from General settings',async()=>{
+    const repository=new LocalRepository();await repository.initialize();const onClose=vi.fn()
+    render(<AppProvider repository={repository}><SettingsDialog isOpen onClose={onClose}/></AppProvider>)
+
+    fireEvent.change(screen.getByLabelText('Security names'),{target:{value:'name-only'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save'}))
+
+    await waitFor(()=>expect(onClose).toHaveBeenCalled())
+    await waitFor(()=>expect(localStorage.getItem('equity-journal.security-display-mode')).toBe('name-only'))
   })
 })

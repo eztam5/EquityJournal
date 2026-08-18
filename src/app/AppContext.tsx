@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { createRepository, type EquityRepository } from '../data'
 import type { SecurityInput } from '../data/repository'
 import type { Security, SecurityLinkTemplate, Tag, Taxonomy, ThemeMode, View, Watchlist } from '../domain/types'
+import { loadSecurityDisplayMode, SECURITY_DISPLAY_MODE_KEY, type SecurityDisplayMode } from '../utils/securityLabels'
 
 interface AppContextValue {
   repository: EquityRepository
@@ -14,8 +15,10 @@ interface AppContextValue {
   recent: Security[]
   view: View
   theme: ThemeMode
+  securityDisplayMode: SecurityDisplayMode
   setView(view: View): void
   setTheme(theme: ThemeMode): void
+  setSecurityDisplayMode(mode: SecurityDisplayMode): void
   openSecurity(id: string): void
   refresh(): Promise<void>
   addSecurity(input: SecurityInput): Promise<Security>
@@ -42,6 +45,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const [securityLinkTemplates, setSecurityLinkTemplates] = useState<SecurityLinkTemplate[]>([])
   const [view, setView] = useState<View>({ type: 'all-securities' })
   const [theme, setThemeState] = useState<ThemeMode>(() => (localStorage.getItem(THEME_KEY) as ThemeMode | null) ?? 'dark')
+  const [securityDisplayMode, setSecurityDisplayModeState] = useState<SecurityDisplayMode>(loadSecurityDisplayMode)
   const [recentIds, setRecentIds] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') }
     catch { return [] }
@@ -68,8 +72,10 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   }, [theme])
 
   useEffect(() => { localStorage.setItem(RECENT_KEY, JSON.stringify(recentIds)) }, [recentIds])
+  useEffect(() => { localStorage.setItem(SECURITY_DISPLAY_MODE_KEY, securityDisplayMode) }, [securityDisplayMode])
 
   const setTheme = (next: ThemeMode) => setThemeState(next)
+  const setSecurityDisplayMode = (next: SecurityDisplayMode) => setSecurityDisplayModeState(next)
   const openSecurity = (id: string) => {
     if (!securities.some((security) => security.id === id)) return
     setRecentIds((ids) => [id, ...ids.filter((value) => value !== id)].slice(0, 5))
@@ -96,7 +102,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   }
 
   const recent = recentIds.map((id) => securities.find((security) => security.id === id)).filter((value): value is Security => Boolean(value))
-  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, recent, view, theme, setView, setTheme, openSecurity, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, recent, view, theme, refresh])
+  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, recent, view, theme, securityDisplayMode, setView, setTheme, setSecurityDisplayMode, openSecurity, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, recent, view, theme, securityDisplayMode, refresh])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
 

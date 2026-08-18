@@ -59,4 +59,19 @@ describe('TaxonomyView drag and drop',()=>{
     expect(screen.queryByText('Regions')).not.toBeInTheDocument()
     expect(screen.queryByText('SAP SE',{exact:false})).not.toBeInTheDocument()
   })
+
+  it('uses the configured company-name-first labels in the editor tree',async()=>{
+    localStorage.setItem('equity-journal.security-display-mode','name-first')
+    const repository=new LocalRepository();await repository.initialize()
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const software=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Software',description:'',color:taxonomy.color})
+    const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    await repository.setAssignedTags(security.id,[software.id])
+
+    render(<AppProvider repository={repository}><TaxonomyView id={taxonomy.id}/></AppProvider>)
+    fireEvent.change(await screen.findByLabelText('Search tags or securities'),{target:{value:'apple'}})
+
+    expect(await screen.findByText('Apple Inc. — AAPL')).toBeInTheDocument()
+    expect(screen.queryByText('AAPL — Apple Inc.')).not.toBeInTheDocument()
+  })
 })

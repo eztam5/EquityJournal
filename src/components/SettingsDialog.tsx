@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Button, Callout, Card, FormGroup, InputGroup, Dialog } from '@blueprintjs/core'
+import { Button, Callout, Card, FormGroup, HTMLSelect, InputGroup, Dialog } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { SecurityLinkTemplate } from '../domain/types'
+import type { SecurityDisplayMode } from '../utils/securityLabels'
 
 interface DatabaseConfig {
   path: string
@@ -16,11 +17,12 @@ export function SettingsDialog({ isOpen, onClose }: { isOpen: boolean; onClose: 
   const [defaultConfig, setDefaultConfig] = useState<DatabaseConfig | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [linkTemplates, setLinkTemplates] = useState<SecurityLinkTemplate[]>([])
+  const [securityDisplayMode, setSecurityDisplayMode] = useState<SecurityDisplayMode>(app.securityDisplayMode)
   const [settingsError, setSettingsError] = useState('')
 
   useEffect(() => {
     if (isOpen) {
-      setSection('general'); setSettingsError('')
+      setSection('general'); setSettingsError(''); setSecurityDisplayMode(app.securityDisplayMode)
       app.repository.listSecurityLinkTemplates().then(setLinkTemplates).catch((reason) => setSettingsError(reason instanceof Error ? reason.message : String(reason)))
     }
     if (isOpen && '__TAURI_INTERNALS__' in window) {
@@ -55,6 +57,7 @@ export function SettingsDialog({ isOpen, onClose }: { isOpen: boolean; onClose: 
           )
         }
       }
+      app.setSecurityDisplayMode(securityDisplayMode)
       onClose()
     } catch (error) {
       setSettingsError(error instanceof Error ? error.message : String(error))
@@ -76,7 +79,7 @@ export function SettingsDialog({ isOpen, onClose }: { isOpen: boolean; onClose: 
         </nav>
         <div className="settings-main">
           <div className="settings-content">
-            {section==='general'?<section aria-labelledby="general-settings-heading"><h2 id="general-settings-heading">General</h2><p className="muted">General application settings will appear here.</p></section>:section==='links'?<section aria-labelledby="link-settings-heading"><div className="settings-section-heading"><div><h2 id="link-settings-heading">Security Links</h2><p className="muted">Create links to external research websites for every security.</p></div><Button icon="add" text="Add link" onClick={addLinkTemplate}/></div><Callout className="link-placeholder-help" icon="info-sign">Use <code>{'{SYMBOL}'}</code> and <code>{'{ALTERNATIVE_ID}'}</code> in URL patterns. Links requiring an empty Alternative ID are hidden.</Callout><div className="link-template-list">{linkTemplates.length===0?<div className="empty-state">No external links configured yet.</div>:linkTemplates.map((template, index)=><Card className="link-template-card" elevation={0} key={template.id}><div className="link-template-number">{index+1}</div><FormGroup label="Link text" labelFor={`link-text-${template.id}`}><InputGroup id={`link-text-${template.id}`} value={template.linkText} onChange={(event)=>updateLinkTemplate(template.id,'linkText',event.target.value)} placeholder="Yahoo Finance"/></FormGroup><FormGroup label="URL pattern" labelFor={`link-pattern-${template.id}`}><InputGroup id={`link-pattern-${template.id}`} value={template.urlPattern} onChange={(event)=>updateLinkTemplate(template.id,'urlPattern',event.target.value)} placeholder="https://finance.yahoo.com/quote/{SYMBOL}"/></FormGroup><Button minimal intent="danger" icon="trash" aria-label={`Remove link ${index+1}`} onClick={()=>setLinkTemplates((templates)=>templates.filter((item)=>item.id!==template.id))}/></Card>)}</div></section>:<section aria-labelledby="database-settings-heading"><h2 id="database-settings-heading">Database Connection</h2><p className="muted">Choose where EquityJournal stores its SQLite database.</p><Card className="settings-card" elevation={0}><FormGroup label="Database Path" labelFor="db-path"><InputGroup
+            {section==='general'?<section aria-labelledby="general-settings-heading"><h2 id="general-settings-heading">General</h2><p className="muted">Configure how EquityJournal presents information throughout the application.</p><Card className="settings-card" elevation={0}><FormGroup label="Security names" helperText="Choose how security names are displayed throughout the application." labelFor="security-display-mode"><HTMLSelect id="security-display-mode" fill value={securityDisplayMode} onChange={(event)=>setSecurityDisplayMode(event.currentTarget.value as SecurityDisplayMode)} options={[{value:'symbol-first',label:'Symbol first — AAPL — Apple Inc.'},{value:'name-first',label:'Company name first — Apple Inc. — AAPL'},{value:'name-only',label:'Company name only — Apple Inc.'}]}/></FormGroup></Card></section>:section==='links'?<section aria-labelledby="link-settings-heading"><div className="settings-section-heading"><div><h2 id="link-settings-heading">Security Links</h2><p className="muted">Create links to external research websites for every security.</p></div><Button icon="add" text="Add link" onClick={addLinkTemplate}/></div><Callout className="link-placeholder-help" icon="info-sign">Use <code>{'{SYMBOL}'}</code> and <code>{'{ALTERNATIVE_ID}'}</code> in URL patterns. Links requiring an empty Alternative ID are hidden.</Callout><div className="link-template-list">{linkTemplates.length===0?<div className="empty-state">No external links configured yet.</div>:linkTemplates.map((template, index)=><Card className="link-template-card" elevation={0} key={template.id}><div className="link-template-number">{index+1}</div><FormGroup label="Link text" labelFor={`link-text-${template.id}`}><InputGroup id={`link-text-${template.id}`} value={template.linkText} onChange={(event)=>updateLinkTemplate(template.id,'linkText',event.target.value)} placeholder="Yahoo Finance"/></FormGroup><FormGroup label="URL pattern" labelFor={`link-pattern-${template.id}`}><InputGroup id={`link-pattern-${template.id}`} value={template.urlPattern} onChange={(event)=>updateLinkTemplate(template.id,'urlPattern',event.target.value)} placeholder="https://finance.yahoo.com/quote/{SYMBOL}"/></FormGroup><Button minimal intent="danger" icon="trash" aria-label={`Remove link ${index+1}`} onClick={()=>setLinkTemplates((templates)=>templates.filter((item)=>item.id!==template.id))}/></Card>)}</div></section>:<section aria-labelledby="database-settings-heading"><h2 id="database-settings-heading">Database Connection</h2><p className="muted">Choose where EquityJournal stores its SQLite database.</p><Card className="settings-card" elevation={0}><FormGroup label="Database Path" labelFor="db-path"><InputGroup
               id="db-path"
               value={config.path}
               onChange={(e) => setConfig({ ...config, path: e.currentTarget.value })}
