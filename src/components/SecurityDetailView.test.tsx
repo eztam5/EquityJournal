@@ -51,4 +51,20 @@ describe('SecurityDetailView research notes',()=>{
     expect(await screen.findByRole('button',{name:'Yahoo Finance'})).toBeInTheDocument()
     expect(screen.getByText('US0378331005')).toBeInTheDocument()
   })
+
+  it('shows assigned tags with their parent path but without the taxonomy name',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'NEM',name:'Newmont',currency:'USD'})
+    const taxonomy=await repository.addTaxonomy({name:'Asset Allocation',description:'',color:'#4F7CAC'})
+    const materials=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Materials',description:'',color:taxonomy.color})
+    const metals=await repository.addTag({taxonomyId:taxonomy.id,parentId:materials.id,name:'Precious Metals',description:'',color:taxonomy.color})
+    const gold=await repository.addTag({taxonomyId:taxonomy.id,parentId:metals.id,name:'Gold',description:'',color:taxonomy.color})
+    await repository.setAssignedTags(security.id,[gold.id])
+
+    render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
+
+    expect(await screen.findByText('Materials ▸ Precious Metals ▸ Gold')).toBeInTheDocument()
+    expect(screen.getByRole('heading',{name:'Asset Allocation'})).toBeInTheDocument()
+    expect(screen.queryByText('Asset Allocation › Materials › Precious Metals › Gold')).not.toBeInTheDocument()
+  })
 })
