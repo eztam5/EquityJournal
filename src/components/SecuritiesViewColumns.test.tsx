@@ -22,12 +22,16 @@ describe('SecuritiesView visible columns',()=>{
     expect(screen.queryByText('US0378331005')).not.toBeInTheDocument()
     fireEvent.click(await within(menu).findByRole('menuitemcheckbox',{name:'Yahoo Finance'}))
     expect(await screen.findByRole('columnheader',{name:'Yahoo Finance'})).toBeInTheDocument()
-    expect(screen.getByRole('button',{name:'Open'})).toBeInTheDocument()
-    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'[]')).toEqual(['symbol','name','currency','link:yahoo'])
+    expect(screen.getByRole('button',{name:'Open Yahoo Finance'})).toBeInTheDocument()
+
+    fireEvent.click(within(menu).getByRole('button',{name:'Move Yahoo Finance up'}))
+    fireEvent.click(within(menu).getByRole('button',{name:'Move Yahoo Finance up'}))
+    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Yahoo Finance','Company','Currency',''])
+    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','link:yahoo','name','currency'],visible:['symbol','name','currency','link:yahoo']})
   })
 
   it('does not allow hiding the final visible column',async()=>{
-    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify(['symbol']))
+    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['symbol','alternativeId','name','currency'],visible:['symbol']}))
     const repository=new LocalRepository();await repository.initialize()
     render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
 
@@ -35,4 +39,5 @@ describe('SecuritiesView visible columns',()=>{
     const menu=await screen.findByRole('menu',{name:'Visible columns'})
     expect(within(menu).getByRole('menuitemcheckbox',{name:'Symbol'})).toHaveAttribute('aria-disabled','true')
   })
+
 })

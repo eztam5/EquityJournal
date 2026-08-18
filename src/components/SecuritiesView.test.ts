@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Security } from '../domain/types'
-import { loadVisibleSecurityColumns, sortSecurities } from './SecuritiesView'
+import { loadSecurityColumnPreferences, loadVisibleSecurityColumns, sortSecurities } from './SecuritiesView'
 
 const rows:Security[]=[
   {id:'2',symbol:'MSFT',alternativeId:'US5949181045',name:'Microsoft',currency:'USD'},
@@ -16,7 +16,11 @@ describe('sortSecurities',()=>{
     expect(sortSecurities(rows,'currency','asc').map((row)=>row.currency)).toEqual(['CHF','USD','USD'])
   })
   it('loads valid visible-column preferences in table order',()=>{
-    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify(['currency','link:yahoo','unknown','symbol']))
-    expect(loadVisibleSecurityColumns()).toEqual(['symbol','currency','link:yahoo'])
+    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['currency','link:yahoo','symbol'],visible:['currency','link:yahoo','symbol']}))
+    expect(loadVisibleSecurityColumns()).toEqual(['currency','link:yahoo','symbol'])
+  })
+  it('loads ordered column preferences',()=>{
+    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['name','link:yahoo','symbol'],visible:['link:yahoo','name']}))
+    expect(loadSecurityColumnPreferences()).toEqual({order:['name','link:yahoo','symbol','alternativeId','currency'],visible:['link:yahoo','name']})
   })
 })
