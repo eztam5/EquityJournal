@@ -33,13 +33,15 @@
 .taxonomy-sidebar-row .taxonomy-sidebar-label { flex: 1; min-width: 0; padding-left: 2px; }
 .taxonomy-sidebar-toggle.bp6-button { width: 22px; min-width: 22px; min-height: 30px; padding: 0; }
 .taxonomy-sidebar-toggle-spacer { width: 22px; min-width: 22px; height: 30px; display: grid; place-items: center; }
-.taxonomy-sidebar-tag { padding-left: calc(8px + var(--taxonomy-depth, 0) * 14px) !important; gap: 8px; }
-.taxonomy-sidebar-leaf { cursor: default; }
+.taxonomy-sidebar-tag { padding-left: calc(8px + var(--taxonomy-depth, 0) * 14px) !important; gap: 0; }
+.taxonomy-sidebar-tag.bp6-button > :first-child,
+.taxonomy-security-item.bp6-button > :first-child { margin-right: 6px; }
+.taxonomy-sidebar-leaf { cursor: default; gap: 6px; }
 .taxonomy-sidebar-marker { width: 14px; height: 14px; flex: none; display: inline-grid; place-items: center; }
 .taxonomy-sidebar-marker.expandable { border: 1px solid var(--tag-color); border-radius: 50%; color: var(--tag-color); background: transparent; }
 .taxonomy-sidebar-marker.expandable .bp6-icon { color: inherit; }
 .taxonomy-sidebar-marker.leaf::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--tag-color); }
-.taxonomy-security-item.bp6-button { padding-left: calc(24px + var(--taxonomy-depth, 0) * 14px); }
+.taxonomy-security-item.bp6-button { padding-left: calc(24px + var(--taxonomy-depth, 0) * 14px); gap: 0; }
 .taxonomy-security-item .bp6-icon { color: var(--muted); }
 .taxonomy-sidebar-error { padding: 4px 8px 4px 24px; color: var(--danger); font-size: 11px; }
 

@@ -36,7 +36,7 @@ export function Sidebar({ onNewSecurity, onNewWatchlist, onNewTaxonomy }: { onNe
     }
   }
   const renderTaxonomyNode=(node:TaxonomyTreeModelNode,depth:number):React.ReactNode=>{
-    if(node.kind==='security')return <Button key={node.id} fill alignText="start" variant="minimal" className={`nav-item taxonomy-sidebar-label taxonomy-security-item ${app.view.type==='security'&&app.view.id===node.security.id?'active':''}`} style={{'--taxonomy-depth':depth} as React.CSSProperties} icon="briefcase" text={`${node.security.symbol} — ${node.security.name}`} title={`${node.security.symbol} — ${node.security.name}`} onClick={()=>app.openSecurity(node.security.id)}/>
+    if(node.kind==='security')return <Button key={node.id} fill alignText="start" variant="minimal" className={`nav-item taxonomy-sidebar-label taxonomy-security-item ${app.view.type==='security'&&app.view.id===node.security.id?'active':''}`} style={{'--taxonomy-depth':depth} as React.CSSProperties} icon="chart" text={`${node.security.symbol} — ${node.security.name}`} title={`${node.security.symbol} — ${node.security.name}`} onClick={()=>app.openSecurity(node.security.id)}/>
     const key=tagNodeKey(node.id),isExpanded=expandedTaxonomyNodes.has(key),hasChildren=node.children.length>0
     const style={'--taxonomy-depth':depth} as React.CSSProperties
     const marker=<TaxonomyMarker color={node.tag.color} expanded={isExpanded} expandable={hasChildren}/>
