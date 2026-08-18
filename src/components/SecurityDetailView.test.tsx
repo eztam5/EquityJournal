@@ -40,4 +40,15 @@ describe('SecurityDetailView research notes',()=>{
     expect(screen.queryByText('Current thesis text')).not.toBeInTheDocument()
     expect(screen.getByDisplayValue('2026-08-18')).toBeInTheDocument()
   })
+
+  it('shows configured external links with the security alternative ID',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'AAPL',alternativeId:'US0378331005',name:'Apple Inc.',currency:'USD'})
+    await repository.saveSecurityLinkTemplates([{id:'yahoo',linkText:'Yahoo Finance',urlPattern:'https://finance.yahoo.com/quote/{SYMBOL}',sortOrder:0}])
+
+    render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
+
+    expect(await screen.findByRole('button',{name:'Yahoo Finance'})).toBeInTheDocument()
+    expect(screen.getByText('US0378331005')).toBeInTheDocument()
+  })
 })

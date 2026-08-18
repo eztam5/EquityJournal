@@ -1,8 +1,9 @@
 import Database from '@tauri-apps/plugin-sql'
-import type { Security, SecurityJournalEntry, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
-import { cleanJournalDate, cleanRequired, type EquityRepository, type JournalEntryInput, uuid } from './repository'
+import type { Security, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import { cleanJournalDate, cleanRequired, cleanSecurityLinkTemplate, type EquityRepository, type JournalEntryInput, type SecurityInput, uuid } from './repository'
 
 type DbRow = Record<string, string | number | null>
+const mapSecurity = (row: DbRow): Security => ({ id:String(row.id),name:String(row.name),symbol:String(row.symbol),alternativeId:String(row.alternative_id ?? ''),currency:String(row.currency) })
 
 export class TauriRepository implements EquityRepository {
   private db!: Database
@@ -11,18 +12,18 @@ export class TauriRepository implements EquityRepository {
     await this.db.execute('PRAGMA foreign_keys = ON')
   }
   async listSecurities(watchlistId?: string): Promise<Security[]> {
-    if (watchlistId) return this.db.select<Security[]>('SELECT s.id, s.name, s.symbol, s.currency FROM securities s JOIN watchlist_securities ws ON ws.security_id=s.id WHERE ws.watchlist_id=$1 ORDER BY lower(s.symbol), s.id', [watchlistId])
-    return this.db.select('SELECT id, name, symbol, currency FROM securities ORDER BY lower(symbol), id')
+    if (watchlistId) return (await this.db.select<DbRow[]>('SELECT s.id,s.name,s.symbol,s.alternative_id,s.currency FROM securities s JOIN watchlist_securities ws ON ws.security_id=s.id WHERE ws.watchlist_id=$1 ORDER BY lower(s.symbol),s.id', [watchlistId])).map(mapSecurity)
+    return (await this.db.select<DbRow[]>('SELECT id,name,symbol,alternative_id,currency FROM securities ORDER BY lower(symbol),id')).map(mapSecurity)
   }
-  async addSecurity(input: Omit<Security, 'id'>) {
-    const result = { id: uuid(), name: cleanRequired(input.name, 'a company name'), symbol: cleanRequired(input.symbol, 'a symbol').toUpperCase(), currency: cleanRequired(input.currency, 'a currency').toUpperCase() }
-    try { await this.db.execute('INSERT INTO securities (id,name,symbol,currency) VALUES ($1,$2,$3,$4)', [result.id, result.name, result.symbol, result.currency]) }
+  async addSecurity(input: SecurityInput) {
+    const result = { id: uuid(), name: cleanRequired(input.name, 'a company name'), symbol: cleanRequired(input.symbol, 'a symbol').toUpperCase(), alternativeId: input.alternativeId?.trim() ?? '', currency: cleanRequired(input.currency, 'a currency').toUpperCase() }
+    try { await this.db.execute('INSERT INTO securities (id,name,symbol,alternative_id,currency) VALUES ($1,$2,$3,$4,$5)', [result.id,result.name,result.symbol,result.alternativeId,result.currency]) }
     catch { throw new Error('A security with this symbol already exists.') }
     return result
   }
   async updateSecurity(s: Security) {
-    const name = cleanRequired(s.name, 'a company name'), symbol = cleanRequired(s.symbol, 'a symbol').toUpperCase(), currency = cleanRequired(s.currency, 'a currency').toUpperCase()
-    try { await this.db.execute('UPDATE securities SET name=$1,symbol=$2,currency=$3 WHERE id=$4', [name, symbol, currency, s.id]) }
+    const name = cleanRequired(s.name, 'a company name'), symbol = cleanRequired(s.symbol, 'a symbol').toUpperCase(), alternativeId=s.alternativeId.trim(), currency = cleanRequired(s.currency, 'a currency').toUpperCase()
+    try { await this.db.execute('UPDATE securities SET name=$1,symbol=$2,alternative_id=$3,currency=$4 WHERE id=$5', [name,symbol,alternativeId,currency,s.id]) }
     catch { throw new Error('A security with this symbol already exists.') }
   }
   async deleteSecurity(id: string) { await this.db.execute('DELETE FROM securities WHERE id=$1', [id]) }
@@ -57,8 +58,8 @@ export class TauriRepository implements EquityRepository {
     return rows.map((x) => ({ id:String(x.id),taxonomyId:String(x.taxonomy_id),parentId:x.parent_id ? String(x.parent_id):null,name:String(x.name),description:String(x.description),color:String(x.color),sortOrder:Number(x.sort_order) }))
   }
   async listTaggedSecurities(taxonomyId: string): Promise<TaggedSecurity[]> {
-    const rows = await this.db.select<DbRow[]>('SELECT st.tag_id,s.id,s.name,s.symbol,s.currency FROM security_tags st JOIN tags t ON t.id=st.tag_id JOIN securities s ON s.id=st.security_id WHERE t.taxonomy_id=$1 AND t.archived_at IS NULL ORDER BY lower(s.symbol),s.id', [taxonomyId])
-    return rows.map((row) => ({ tagId:String(row.tag_id),id:String(row.id),name:String(row.name),symbol:String(row.symbol),currency:String(row.currency) }))
+    const rows = await this.db.select<DbRow[]>('SELECT st.tag_id,s.id,s.name,s.symbol,s.alternative_id,s.currency FROM security_tags st JOIN tags t ON t.id=st.tag_id JOIN securities s ON s.id=st.security_id WHERE t.taxonomy_id=$1 AND t.archived_at IS NULL ORDER BY lower(s.symbol),s.id', [taxonomyId])
+    return rows.map((row) => ({ ...mapSecurity(row), tagId:String(row.tag_id) }))
   }
   async copySecurityTag(securityId: string, toTagId: string) {
     await this.db.execute('INSERT OR IGNORE INTO security_tags (security_id,tag_id) VALUES ($1,$2)', [securityId,toTagId])
@@ -144,4 +145,16 @@ export class TauriRepository implements EquityRepository {
     return result
   }
   async deleteJournalEntry(id:string) { await this.db.execute('DELETE FROM security_journal_entries WHERE id=$1',[id]) }
+  async listSecurityLinkTemplates():Promise<SecurityLinkTemplate[]> {
+    const rows=await this.db.select<DbRow[]>('SELECT id,link_text,url_pattern,sort_order FROM security_link_templates ORDER BY sort_order,id')
+    return rows.map((row)=>({id:String(row.id),linkText:String(row.link_text),urlPattern:String(row.url_pattern),sortOrder:Number(row.sort_order)}))
+  }
+  async saveSecurityLinkTemplates(templates:SecurityLinkTemplate[]) {
+    const cleaned=templates.map(cleanSecurityLinkTemplate)
+    const existing=await this.listSecurityLinkTemplates()
+    for (const template of cleaned) await this.db.execute('INSERT INTO security_link_templates (id,link_text,url_pattern,sort_order) VALUES ($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET link_text=excluded.link_text,url_pattern=excluded.url_pattern,sort_order=excluded.sort_order',[template.id,template.linkText,template.urlPattern,template.sortOrder])
+    const retained=new Set(cleaned.map((template)=>template.id))
+    for (const template of existing) if (!retained.has(template.id)) await this.db.execute('DELETE FROM security_link_templates WHERE id=$1',[template.id])
+    return cleaned
+  }
 }

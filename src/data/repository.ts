@@ -1,11 +1,12 @@
-import type { Security, SecurityJournalEntry, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import type { Security, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 
 export type JournalEntryInput = Pick<SecurityJournalEntry, 'securityId' | 'entryDate' | 'contentHtml'> & { id?: string }
+export type SecurityInput = Omit<Security, 'id' | 'alternativeId'> & { alternativeId?: string }
 
 export interface EquityRepository {
   initialize(): Promise<void>
   listSecurities(watchlistId?: string): Promise<Security[]>
-  addSecurity(input: Omit<Security, 'id'>): Promise<Security>
+  addSecurity(input: SecurityInput): Promise<Security>
   updateSecurity(security: Security): Promise<void>
   deleteSecurity(id: string): Promise<void>
   listWatchlists(): Promise<Watchlist[]>
@@ -31,6 +32,8 @@ export interface EquityRepository {
   listJournalEntries(securityId: string): Promise<SecurityJournalEntry[]>
   saveJournalEntry(input: JournalEntryInput): Promise<SecurityJournalEntry>
   deleteJournalEntry(id: string): Promise<void>
+  listSecurityLinkTemplates(): Promise<SecurityLinkTemplate[]>
+  saveSecurityLinkTemplates(templates: SecurityLinkTemplate[]): Promise<SecurityLinkTemplate[]>
 }
 
 export function cleanRequired(value: string, label: string): string {
@@ -46,6 +49,24 @@ export function cleanJournalDate(value: string): string {
     throw new Error('Enter a valid journal date.')
   }
   return result
+}
+
+export function cleanSecurityLinkTemplate(template: SecurityLinkTemplate, sortOrder: number): SecurityLinkTemplate {
+  const linkText = cleanRequired(template.linkText, 'link text')
+  const urlPattern = cleanRequired(template.urlPattern, 'a URL pattern')
+  const placeholders = [...urlPattern.matchAll(/\{([^}]+)\}/g)].map((match) => match[1])
+  if (!placeholders.length) throw new Error(`The URL pattern for “${linkText}” must contain {SYMBOL} or {ALTERNATIVE_ID}.`)
+  if (placeholders.some((value) => value !== 'SYMBOL' && value !== 'ALTERNATIVE_ID')) throw new Error(`The URL pattern for “${linkText}” contains an unknown placeholder.`)
+  try {
+    const example = new URL(urlPattern.replaceAll('{SYMBOL}', 'AAPL').replaceAll('{ALTERNATIVE_ID}', 'US0378331005'))
+    if (example.protocol !== 'https:' && example.protocol !== 'http:') throw new Error()
+  } catch { throw new Error(`Enter a valid HTTP or HTTPS URL pattern for “${linkText}”.`) }
+  return { ...template, linkText, urlPattern, sortOrder }
+}
+
+export function resolveSecurityLink(template: SecurityLinkTemplate, security: Security): string | null {
+  if (template.urlPattern.includes('{ALTERNATIVE_ID}') && !security.alternativeId.trim()) return null
+  return template.urlPattern.replaceAll('{SYMBOL}', encodeURIComponent(security.symbol)).replaceAll('{ALTERNATIVE_ID}', encodeURIComponent(security.alternativeId))
 }
 
 export function uuid(): string {

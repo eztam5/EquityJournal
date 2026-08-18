@@ -10,9 +10,9 @@ describe('buildTaxonomyTreeModel', () => {
       { id:'other',taxonomyId:'taxonomy',parentId:null,name:'Other',description:'',color:'#222222',sortOrder:1 },
     ]
     const assignments: TaggedSecurity[] = [
-      { id:'two',tagId:'child',symbol:'ZZZ',name:'Second',currency:'USD' },
-      { id:'one',tagId:'child',symbol:'AAA',name:'First',currency:'USD' },
-      { id:'one',tagId:'other',symbol:'AAA',name:'First',currency:'USD' },
+      { id:'two',tagId:'child',symbol:'ZZZ',alternativeId:'',name:'Second',currency:'USD' },
+      { id:'one',tagId:'child',symbol:'AAA',alternativeId:'',name:'First',currency:'USD' },
+      { id:'one',tagId:'other',symbol:'AAA',alternativeId:'',name:'First',currency:'USD' },
     ]
     const originalTags=structuredClone(tags),originalAssignments=structuredClone(assignments)
 
@@ -48,8 +48,8 @@ describe('buildTaxonomyTreeModel', () => {
       {id:'other',taxonomyId:'taxonomy',parentId:null,name:'Regions',description:'',color:'#111',sortOrder:1},
     ]
     const assignments:TaggedSecurity[]=[
-      {id:'apple',tagId:'child',symbol:'AAPL',name:'Apple Inc.',currency:'USD'},
-      {id:'sap',tagId:'child',symbol:'SAP',name:'SAP SE',currency:'EUR'},
+      {id:'apple',tagId:'child',symbol:'AAPL',alternativeId:'',name:'Apple Inc.',currency:'USD'},
+      {id:'sap',tagId:'child',symbol:'SAP',alternativeId:'',name:'SAP SE',currency:'EUR'},
     ]
     const model=buildTaxonomyTreeModel(tags,assignments)
 

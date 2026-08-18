@@ -4,7 +4,15 @@ export interface Security {
   id: string
   name: string
   symbol: string
+  alternativeId: string
   currency: string
+}
+
+export interface SecurityLinkTemplate {
+  id: string
+  linkText: string
+  urlPattern: string
+  sortOrder: number
 }
 
 export interface TaggedSecurity extends Security {

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createRepository, type EquityRepository } from '../data'
-import type { Security, Tag, Taxonomy, ThemeMode, View, Watchlist } from '../domain/types'
+import type { SecurityInput } from '../data/repository'
+import type { Security, SecurityLinkTemplate, Tag, Taxonomy, ThemeMode, View, Watchlist } from '../domain/types'
 
 interface AppContextValue {
   repository: EquityRepository
@@ -9,6 +10,7 @@ interface AppContextValue {
   securities: Security[]
   watchlists: Watchlist[]
   taxonomies: Taxonomy[]
+  securityLinkTemplates: SecurityLinkTemplate[]
   recent: Security[]
   view: View
   theme: ThemeMode
@@ -16,7 +18,7 @@ interface AppContextValue {
   setTheme(theme: ThemeMode): void
   openSecurity(id: string): void
   refresh(): Promise<void>
-  addSecurity(input: Omit<Security, 'id'>): Promise<Security>
+  addSecurity(input: SecurityInput): Promise<Security>
   updateSecurity(input: Security): Promise<void>
   deleteSecurity(id: string): Promise<void>
   addWatchlist(name: string): Promise<void>
@@ -37,6 +39,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const [securities, setSecurities] = useState<Security[]>([])
   const [watchlists, setWatchlists] = useState<Watchlist[]>([])
   const [taxonomies, setTaxonomies] = useState<Taxonomy[]>([])
+  const [securityLinkTemplates, setSecurityLinkTemplates] = useState<SecurityLinkTemplate[]>([])
   const [view, setView] = useState<View>({ type: 'all-securities' })
   const [theme, setThemeState] = useState<ThemeMode>(() => (localStorage.getItem(THEME_KEY) as ThemeMode | null) ?? 'dark')
   const [recentIds, setRecentIds] = useState<string[]>(() => {
@@ -45,10 +48,10 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   })
 
   const refresh = useCallback(async () => {
-    const [nextSecurities, nextWatchlists, nextTaxonomies] = await Promise.all([
-      repository.listSecurities(), repository.listWatchlists(), repository.listTaxonomies(),
+    const [nextSecurities, nextWatchlists, nextTaxonomies, nextSecurityLinkTemplates] = await Promise.all([
+      repository.listSecurities(), repository.listWatchlists(), repository.listTaxonomies(), repository.listSecurityLinkTemplates(),
     ])
-    setSecurities(nextSecurities); setWatchlists(nextWatchlists); setTaxonomies(nextTaxonomies)
+    setSecurities(nextSecurities); setWatchlists(nextWatchlists); setTaxonomies(nextTaxonomies); setSecurityLinkTemplates(nextSecurityLinkTemplates)
     setRecentIds((ids) => ids.filter((id) => nextSecurities.some((security) => security.id === id)).slice(0, 5))
   }, [repository])
 
@@ -72,7 +75,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
     setRecentIds((ids) => [id, ...ids.filter((value) => value !== id)].slice(0, 5))
     setView({ type: 'security', id })
   }
-  const addSecurity = async (input: Omit<Security, 'id'>) => { const result = await repository.addSecurity(input); await refresh(); return result }
+  const addSecurity = async (input: SecurityInput) => { const result = await repository.addSecurity(input); await refresh(); return result }
   const updateSecurity = async (input: Security) => { await repository.updateSecurity(input); await refresh() }
   const deleteSecurity = async (id: string) => {
     await repository.deleteSecurity(id); setRecentIds((ids) => ids.filter((value) => value !== id))
@@ -93,7 +96,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   }
 
   const recent = recentIds.map((id) => securities.find((security) => security.id === id)).filter((value): value is Security => Boolean(value))
-  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, recent, view, theme, setView, setTheme, openSecurity, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, recent, view, theme, refresh])
+  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, recent, view, theme, setView, setTheme, openSecurity, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, recent, view, theme, refresh])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
 

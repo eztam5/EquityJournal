@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { LocalRepository } from './localRepository'
+import { resolveSecurityLink } from './repository'
 
 describe('LocalRepository',()=>{
   beforeEach(()=>localStorage.clear())
@@ -9,6 +10,21 @@ describe('LocalRepository',()=>{
     expect(security.symbol).toBe('AAPL')
     await expect(repository.addSecurity({symbol:'Aapl',currency:'USD',name:'Other'})).rejects.toThrow('already exists')
     const next=new LocalRepository();await next.initialize();expect(await next.listSecurities()).toEqual([security])
+  })
+  it('stores alternative IDs and resolves global security link templates',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'aapl',alternativeId:'US0378331005',currency:'usd',name:'Apple Inc.'})
+    const templates=await repository.saveSecurityLinkTemplates([
+      {id:'symbol-link',linkText:'Yahoo Finance',urlPattern:'https://finance.yahoo.com/quote/{SYMBOL}',sortOrder:0},
+      {id:'id-link',linkText:'Identifier lookup',urlPattern:'https://example.com/security/{ALTERNATIVE_ID}',sortOrder:1},
+    ])
+
+    expect(security.alternativeId).toBe('US0378331005')
+    expect(resolveSecurityLink(templates[0],security)).toBe('https://finance.yahoo.com/quote/AAPL')
+    expect(resolveSecurityLink(templates[1],security)).toBe('https://example.com/security/US0378331005')
+    expect(resolveSecurityLink(templates[1],{...security,alternativeId:''})).toBeNull()
+    expect(await repository.listSecurityLinkTemplates()).toEqual(templates)
+    await expect(repository.saveSecurityLinkTemplates([{id:'bad',linkText:'Bad',urlPattern:'javascript:{SYMBOL}',sortOrder:0}])).rejects.toThrow('HTTP or HTTPS')
   })
   it('deletes a watchlist and its memberships without deleting securities',async()=>{
     const repository=new LocalRepository();await repository.initialize()

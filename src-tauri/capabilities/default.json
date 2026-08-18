@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default permissions for EquityJournal",
   "windows": ["main"],
-  "permissions": ["core:default","sql:default","sql:allow-execute","sql:allow-select","sql:allow-load"]
+  "permissions": ["core:default","sql:default","sql:allow-execute","sql:allow-select","sql:allow-load","opener:default"]
 }

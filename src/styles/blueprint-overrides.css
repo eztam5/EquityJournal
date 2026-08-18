@@ -33,6 +33,14 @@
 .settings-content > section > p { margin: 0 0 18px; }
 .settings-card.bp6-card { padding: 16px; }
 .settings-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+.settings-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.link-placeholder-help.bp6-callout { margin: 14px 0; }
+.link-placeholder-help code { color: var(--text); }
+.link-template-list { max-height: 350px; overflow: auto; display: grid; gap: 8px; }
+.link-template-card.bp6-card { display: grid; grid-template-columns: 24px 150px minmax(260px, 1fr) 30px; align-items: end; gap: 10px; padding: 12px; }
+.link-template-number { align-self: center; color: var(--muted); font-size: 12px; text-align: center; }
+.link-template-card .bp6-button { margin-bottom: 1px; }
+.settings-error.bp6-callout { margin-top: 12px; }
 .color-picker .bp6-popover-wrapper { display: inline-flex; }
 .color-picker .bp6-button { width: 31px; height: 31px; min-width: 31px; min-height: 31px; padding: 0; border-radius: 50%; }
 .color-picker .bp6-button .bp6-icon { color: #fff; filter: drop-shadow(0 1px 1px #0008); }
@@ -58,6 +66,10 @@
 .taxonomy-sidebar-error { padding: 4px 8px 4px 24px; color: var(--danger); font-size: 11px; }
 
 .notes-card { padding: 18px 0; }
+.info-card { grid-template-columns: 110px 150px 90px minmax(160px, 1.4fr) minmax(150px, 1fr); gap: 18px; }
+.info-card > div { min-width: 0; }
+.security-links > div { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.security-links .bp6-button { min-height: 22px; padding: 0 4px; justify-content: flex-start; }
 .notes-card > header { padding: 0 20px; margin-bottom: 12px; }
 .notes-card .rich-editor { padding: 0 20px; }
 .research-tabs { margin-left: 8px; }

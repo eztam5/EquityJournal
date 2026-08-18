@@ -1,5 +1,5 @@
-import type { Security, SecurityJournalEntry, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
-import { cleanJournalDate, cleanRequired, type EquityRepository, type JournalEntryInput, uuid } from './repository'
+import type { Security, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
+import { cleanJournalDate, cleanRequired, cleanSecurityLinkTemplate, type EquityRepository, type JournalEntryInput, type SecurityInput, uuid } from './repository'
 
 interface LocalData {
   securities: Security[]
@@ -10,11 +10,12 @@ interface LocalData {
   securityTags: Array<{ securityId: string; tagId: string }>
   notes: SecurityNote[]
   journalEntries: SecurityJournalEntry[]
+  securityLinkTemplates: SecurityLinkTemplate[]
 }
 
 const STORAGE_KEY = 'equity-journal.development-database.v1'
 const emptyData = (): LocalData => ({
-  securities: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [],
+  securities: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [], securityLinkTemplates: [],
 })
 
 export class LocalRepository implements EquityRepository {
@@ -22,7 +23,10 @@ export class LocalRepository implements EquityRepository {
 
   async initialize() {
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) this.data = { ...emptyData(), ...JSON.parse(stored) }
+    if (stored) {
+      this.data = { ...emptyData(), ...JSON.parse(stored) }
+      this.data.securities = this.data.securities.map((security) => ({ ...security, alternativeId: security.alternativeId ?? '' }))
+    }
   }
 
   private persist() { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data)) }
@@ -35,13 +39,13 @@ export class LocalRepository implements EquityRepository {
     const ids = watchlistId ? new Set(this.data.watchlistSecurities.filter((x) => x.watchlistId === watchlistId).map((x) => x.securityId)) : null
     return this.data.securities.filter((x) => !ids || ids.has(x.id)).toSorted((a, b) => a.symbol.localeCompare(b.symbol))
   }
-  async addSecurity(input: Omit<Security, 'id'>) {
-    const security = { id: uuid(), symbol: cleanRequired(input.symbol, 'a symbol').toUpperCase(), currency: cleanRequired(input.currency, 'a currency').toUpperCase(), name: cleanRequired(input.name, 'a company name') }
+  async addSecurity(input: SecurityInput) {
+    const security = { id: uuid(), symbol: cleanRequired(input.symbol, 'a symbol').toUpperCase(), alternativeId: input.alternativeId?.trim() ?? '', currency: cleanRequired(input.currency, 'a currency').toUpperCase(), name: cleanRequired(input.name, 'a company name') }
     if (this.data.securities.some((x) => x.symbol.toLowerCase() === security.symbol.toLowerCase())) throw new Error('A security with this symbol already exists.')
     this.data.securities.push(security); this.persist(); return security
   }
   async updateSecurity(security: Security) {
-    const next = { ...security, symbol: cleanRequired(security.symbol, 'a symbol').toUpperCase(), currency: cleanRequired(security.currency, 'a currency').toUpperCase(), name: cleanRequired(security.name, 'a company name') }
+    const next = { ...security, symbol: cleanRequired(security.symbol, 'a symbol').toUpperCase(), alternativeId: security.alternativeId.trim(), currency: cleanRequired(security.currency, 'a currency').toUpperCase(), name: cleanRequired(security.name, 'a company name') }
     if (this.data.securities.some((x) => x.id !== next.id && x.symbol.toLowerCase() === next.symbol.toLowerCase())) throw new Error('A security with this symbol already exists.')
     this.data.securities = this.data.securities.map((x) => x.id === next.id ? next : x); this.persist()
   }
@@ -167,5 +171,10 @@ export class LocalRepository implements EquityRepository {
   }
   async deleteJournalEntry(id: string) {
     this.data.journalEntries = this.data.journalEntries.filter((entry) => entry.id !== id); this.persist()
+  }
+  async listSecurityLinkTemplates() { return this.data.securityLinkTemplates.toSorted((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id)) }
+  async saveSecurityLinkTemplates(templates: SecurityLinkTemplate[]) {
+    const cleaned = templates.map(cleanSecurityLinkTemplate)
+    this.data.securityLinkTemplates = cleaned; this.persist(); return cleaned
   }
 }

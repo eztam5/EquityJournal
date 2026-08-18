@@ -14,6 +14,7 @@
   "dependencies": {
     "@blueprintjs/core": "^6.18.0",
     "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-opener": "^2.5.4",
     "@tauri-apps/plugin-sql": "^2.4.0",
     "@tiptap/extension-color": "^3.30.0",
     "@tiptap/extension-highlight": "^3.30.0",

@@ -105,9 +105,15 @@ pub fn run() {
         description: "security_journal_entries",
         sql: include_str!("../migrations/003_security_journal_entries.sql"),
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 4,
+        description: "security_alternative_id_and_link_templates",
+        sql: include_str!("../migrations/004_security_links.sql"),
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:equity-journal.sqlite3", migrations)
