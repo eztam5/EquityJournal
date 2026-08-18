@@ -60,6 +60,11 @@ export class TauriRepository implements EquityRepository {
     const rows = await this.db.select<DbRow[]>('SELECT st.tag_id,s.id,s.name,s.symbol,s.currency FROM security_tags st JOIN tags t ON t.id=st.tag_id JOIN securities s ON s.id=st.security_id WHERE t.taxonomy_id=$1 AND t.archived_at IS NULL ORDER BY lower(s.symbol),s.id', [taxonomyId])
     return rows.map((row) => ({ tagId:String(row.tag_id),id:String(row.id),name:String(row.name),symbol:String(row.symbol),currency:String(row.currency) }))
   }
+  async moveSecurityTag(securityId: string, fromTagId: string, toTagId: string) {
+    if (fromTagId === toTagId) return
+    await this.db.execute('INSERT OR IGNORE INTO security_tags (security_id,tag_id) VALUES ($1,$2)', [securityId,toTagId])
+    await this.db.execute('DELETE FROM security_tags WHERE security_id=$1 AND tag_id=$2', [securityId,fromTagId])
+  }
   async addTag(input: Omit<Tag, 'id' | 'sortOrder'>) {
     const name = cleanRequired(input.name, 'a tag name')
     const rows = await this.db.select<Array<{ next_order: number }>>(`SELECT COALESCE(MAX(sort_order),-1)+1 next_order FROM tags WHERE taxonomy_id=$1 AND ${input.parentId ? 'parent_id=$2' : 'parent_id IS NULL'}`, input.parentId ? [input.taxonomyId,input.parentId] : [input.taxonomyId])

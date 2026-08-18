@@ -38,6 +38,19 @@ describe('LocalRepository',()=>{
     expect(await repository.listTaggedSecurities(taxonomy.id)).toEqual([{...security,tagId:tag.id}])
     await repository.saveNote(security.id,'<h1>Thesis</h1>');expect((await repository.loadNote(security.id)).contentHtml).toBe('<h1>Thesis</h1>')
   })
+  it('moves a security between tags without changing its other assignments',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'ASML',currency:'EUR',name:'ASML'})
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const source=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Technology',description:'',color:taxonomy.color})
+    const target=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Semiconductors',description:'',color:taxonomy.color})
+    const retained=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Europe',description:'',color:taxonomy.color})
+    await repository.setAssignedTags(security.id,[source.id,retained.id])
+
+    await repository.moveSecurityTag(security.id,source.id,target.id)
+
+    expect(new Set(await repository.assignedTagIds(security.id))).toEqual(new Set([target.id,retained.id]))
+  })
   it('deletes a taxonomy with its nested tags and assignments',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'NVDA',currency:'USD',name:'NVIDIA'})

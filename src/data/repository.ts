@@ -15,6 +15,7 @@ export interface EquityRepository {
   deleteTaxonomy(id: string): Promise<void>
   listTags(taxonomyId: string): Promise<Tag[]>
   listTaggedSecurities(taxonomyId: string): Promise<TaggedSecurity[]>
+  moveSecurityTag(securityId: string, fromTagId: string, toTagId: string): Promise<void>
   addTag(input: Omit<Tag, 'id' | 'sortOrder'>): Promise<Tag>
   updateTag(tag: Pick<Tag, 'id' | 'taxonomyId' | 'name' | 'description' | 'color'>): Promise<void>
   deleteTag(taxonomyId: string, id: string): Promise<void>
