@@ -23,7 +23,10 @@ describe('Sidebar taxonomy navigation',()=>{
     expect(await screen.findByText('Software')).toBeInTheDocument()
     expect(screen.queryByText('AAPL — Apple Inc.')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button',{name:'Expand Software'}))
+    const softwareButton=screen.getByRole('button',{name:'Expand Software'})
+    expect(softwareButton.querySelectorAll('.taxonomy-sidebar-marker')).toHaveLength(1)
+    expect(softwareButton.querySelector('.nav-marker')).toBeNull()
+    fireEvent.click(softwareButton)
     const securityButton=await screen.findByRole('button',{name:'AAPL — Apple Inc.'})
     fireEvent.click(securityButton)
     await waitFor(()=>expect(securityButton).toHaveClass('active'))
