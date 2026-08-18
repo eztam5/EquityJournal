@@ -52,6 +52,18 @@ describe('SecurityDetailView research notes',()=>{
     expect(screen.getByText('US0378331005')).toBeInTheDocument()
   })
 
+  it('opens the existing edit-security dialog from the detail header',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
+
+    fireEvent.click(await screen.findByRole('button',{name:'Edit security'}))
+
+    expect(screen.getByRole('dialog',{name:'Edit security'})).toBeInTheDocument()
+    expect(screen.getByLabelText('Symbol')).toHaveValue('AAPL')
+    expect(screen.getByLabelText('Company name')).toHaveValue('Apple Inc.')
+  })
+
   it('shows assigned tags with their parent path but without the taxonomy name',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'NEM',name:'Newmont',currency:'USD'})
