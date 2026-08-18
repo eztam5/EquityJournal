@@ -1,5 +1,5 @@
-import type { Security, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
-import { cleanRequired, type EquityRepository, uuid } from './repository'
+import type { Security, SecurityJournalEntry, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
+import { cleanJournalDate, cleanRequired, type EquityRepository, type JournalEntryInput, uuid } from './repository'
 
 interface LocalData {
   securities: Security[]
@@ -9,11 +9,12 @@ interface LocalData {
   tags: Tag[]
   securityTags: Array<{ securityId: string; tagId: string }>
   notes: SecurityNote[]
+  journalEntries: SecurityJournalEntry[]
 }
 
 const STORAGE_KEY = 'equity-journal.development-database.v1'
 const emptyData = (): LocalData => ({
-  securities: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [],
+  securities: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [],
 })
 
 export class LocalRepository implements EquityRepository {
@@ -48,7 +49,8 @@ export class LocalRepository implements EquityRepository {
     this.data.securities = this.data.securities.filter((x) => x.id !== id)
     this.data.securityTags = this.data.securityTags.filter((x) => x.securityId !== id)
     this.data.watchlistSecurities = this.data.watchlistSecurities.filter((x) => x.securityId !== id)
-    this.data.notes = this.data.notes.filter((x) => x.securityId !== id); this.persist()
+    this.data.notes = this.data.notes.filter((x) => x.securityId !== id)
+    this.data.journalEntries = this.data.journalEntries.filter((x) => x.securityId !== id); this.persist()
   }
   async listWatchlists() { return this.data.watchlists.toSorted((a, b) => a.name.localeCompare(b.name)) }
   async addWatchlist(value: string) {
@@ -148,5 +150,22 @@ export class LocalRepository implements EquityRepository {
   async saveNote(securityId: string, contentHtml: string) {
     const result = { securityId, contentHtml, updatedAt: new Date().toISOString() }
     this.data.notes = this.data.notes.filter((x) => x.securityId !== securityId); this.data.notes.push(result); this.persist(); return result
+  }
+  async listJournalEntries(securityId: string) {
+    return this.data.journalEntries.filter((entry) => entry.securityId === securityId).toSorted((left, right) => right.entryDate.localeCompare(left.entryDate) || right.updatedAt.localeCompare(left.updatedAt))
+  }
+  async saveJournalEntry(input: JournalEntryInput) {
+    const entryDate = cleanJournalDate(input.entryDate)
+    const duplicate = this.data.journalEntries.find((entry) => entry.securityId === input.securityId && entry.entryDate === entryDate && entry.id !== input.id)
+    if (duplicate) throw new Error('A journal entry already exists for this date.')
+    const existing = input.id ? this.data.journalEntries.find((entry) => entry.id === input.id) : undefined
+    if (existing && existing.securityId !== input.securityId) throw new Error('The selected journal entry does not belong to this security.')
+    const now = new Date().toISOString()
+    const result: SecurityJournalEntry = { id: existing?.id ?? uuid(), securityId: input.securityId, entryDate, contentHtml: input.contentHtml, createdAt: existing?.createdAt ?? now, updatedAt: now }
+    this.data.journalEntries = this.data.journalEntries.filter((entry) => entry.id !== result.id)
+    this.data.journalEntries.push(result); this.persist(); return result
+  }
+  async deleteJournalEntry(id: string) {
+    this.data.journalEntries = this.data.journalEntries.filter((entry) => entry.id !== id); this.persist()
   }
 }

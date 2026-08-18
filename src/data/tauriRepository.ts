@@ -1,6 +1,6 @@
 import Database from '@tauri-apps/plugin-sql'
-import type { Security, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
-import { cleanRequired, type EquityRepository, uuid } from './repository'
+import type { Security, SecurityJournalEntry, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import { cleanJournalDate, cleanRequired, type EquityRepository, type JournalEntryInput, uuid } from './repository'
 
 type DbRow = Record<string, string | number | null>
 
@@ -125,4 +125,23 @@ export class TauriRepository implements EquityRepository {
     const result={securityId,contentHtml,updatedAt:new Date().toISOString()}
     await this.db.execute('INSERT INTO security_notes (security_id,content_html,updated_at) VALUES ($1,$2,$3) ON CONFLICT(security_id) DO UPDATE SET content_html=excluded.content_html,updated_at=excluded.updated_at',[securityId,contentHtml,result.updatedAt]); return result
   }
+  async listJournalEntries(securityId:string):Promise<SecurityJournalEntry[]> {
+    const rows=await this.db.select<DbRow[]>('SELECT id,security_id,entry_date,content_html,created_at,updated_at FROM security_journal_entries WHERE security_id=$1 ORDER BY entry_date DESC,updated_at DESC',[securityId])
+    return rows.map((row)=>({id:String(row.id),securityId:String(row.security_id),entryDate:String(row.entry_date),contentHtml:String(row.content_html),createdAt:String(row.created_at),updatedAt:String(row.updated_at)}))
+  }
+  async saveJournalEntry(input:JournalEntryInput):Promise<SecurityJournalEntry> {
+    const entryDate=cleanJournalDate(input.entryDate)
+    const id=input.id ?? uuid()
+    const existing=input.id ? await this.db.select<DbRow[]>('SELECT security_id,created_at FROM security_journal_entries WHERE id=$1',[input.id]) : []
+    if (existing[0] && String(existing[0].security_id)!==input.securityId) throw new Error('The selected journal entry does not belong to this security.')
+    const duplicates=await this.db.select<DbRow[]>('SELECT id FROM security_journal_entries WHERE security_id=$1 AND entry_date=$2 AND id<>$3 LIMIT 1',[input.securityId,entryDate,id])
+    if (duplicates.length) throw new Error('A journal entry already exists for this date.')
+    const now=new Date().toISOString()
+    const result={id,securityId:input.securityId,entryDate,contentHtml:input.contentHtml,createdAt:existing[0]?String(existing[0].created_at):now,updatedAt:now}
+    try {
+      await this.db.execute('INSERT INTO security_journal_entries (id,security_id,entry_date,content_html,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO UPDATE SET entry_date=excluded.entry_date,content_html=excluded.content_html,updated_at=excluded.updated_at',[result.id,result.securityId,result.entryDate,result.contentHtml,result.createdAt,result.updatedAt])
+    } catch { throw new Error('A journal entry already exists for this date.') }
+    return result
+  }
+  async deleteJournalEntry(id:string) { await this.db.execute('DELETE FROM security_journal_entries WHERE id=$1',[id]) }
 }

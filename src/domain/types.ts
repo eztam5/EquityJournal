@@ -44,6 +44,15 @@ export interface SecurityNote {
   updatedAt: string
 }
 
+export interface SecurityJournalEntry {
+  id: string
+  securityId: string
+  entryDate: string
+  contentHtml: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type View =
   | { type: 'all-securities' }
   | { type: 'watchlist'; id: string }

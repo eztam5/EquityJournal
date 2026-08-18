@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
@@ -24,5 +24,20 @@ describe('SecurityDetailView research notes',()=>{
     view.rerender(<AppProvider repository={repository}><SecurityDetailView id={apple.id}/></AppProvider>)
     expect(await screen.findByText('Apple thesis')).toBeInTheDocument()
     expect(screen.queryByText('Microsoft thesis')).not.toBeInTheDocument()
+  })
+
+  it('shows dated journal entries separately from the current thesis',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'NESN',name:'Nestlé',currency:'CHF'})
+    await repository.saveNote(security.id,'<p>Current thesis text</p>')
+    await repository.saveJournalEntry({securityId:security.id,entryDate:'2026-08-18',contentHtml:'<p>Half-year report review</p>'})
+
+    render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
+    expect(await screen.findByText('Current thesis text')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab',{name:'Journal'}))
+
+    expect(await screen.findByText('Half-year report review')).toBeInTheDocument()
+    expect(screen.queryByText('Current thesis text')).not.toBeInTheDocument()
+    expect(screen.getByDisplayValue('2026-08-18')).toBeInTheDocument()
   })
 })

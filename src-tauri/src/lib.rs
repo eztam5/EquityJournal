@@ -100,6 +100,11 @@ pub fn run() {
         description: "cascade_nested_tag_deletion",
         sql: include_str!("../migrations/002_tags_parent_cascade.sql"),
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 3,
+        description: "security_journal_entries",
+        sql: include_str!("../migrations/003_security_journal_entries.sql"),
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()

@@ -38,6 +38,24 @@ describe('LocalRepository',()=>{
     expect(await repository.listTaggedSecurities(taxonomy.id)).toEqual([{...security,tagId:tag.id}])
     await repository.saveNote(security.id,'<h1>Thesis</h1>');expect((await repository.loadNote(security.id)).contentHtml).toBe('<h1>Thesis</h1>')
   })
+  it('stores dated journal entries newest-first and enforces one entry per date',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'BRK.B',currency:'USD',name:'Berkshire Hathaway'})
+    const older=await repository.saveJournalEntry({securityId:security.id,entryDate:'2026-03-01',contentHtml:'<p>Annual report</p>'})
+    const newer=await repository.saveJournalEntry({securityId:security.id,entryDate:'2026-08-18',contentHtml:'<p>Quarterly report</p>'})
+
+    expect((await repository.listJournalEntries(security.id)).map((entry)=>entry.id)).toEqual([newer.id,older.id])
+    await expect(repository.saveJournalEntry({securityId:security.id,entryDate:newer.entryDate,contentHtml:'Duplicate'})).rejects.toThrow('already exists')
+
+    const updated=await repository.saveJournalEntry({...older,entryDate:'2026-04-01',contentHtml:'<p>Updated view</p>'})
+    expect(updated.createdAt).toBe(older.createdAt)
+    expect((await repository.listJournalEntries(security.id)).find((entry)=>entry.id===older.id)?.contentHtml).toBe('<p>Updated view</p>')
+
+    await repository.deleteJournalEntry(newer.id)
+    expect((await repository.listJournalEntries(security.id)).map((entry)=>entry.id)).toEqual([older.id])
+    await repository.deleteSecurity(security.id)
+    expect(await repository.listJournalEntries(security.id)).toEqual([])
+  })
   it('moves a security between tags without changing its other assignments',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'ASML',currency:'EUR',name:'ASML'})

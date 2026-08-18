@@ -1,4 +1,6 @@
-import type { Security, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import type { Security, SecurityJournalEntry, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+
+export type JournalEntryInput = Pick<SecurityJournalEntry, 'securityId' | 'entryDate' | 'contentHtml'> & { id?: string }
 
 export interface EquityRepository {
   initialize(): Promise<void>
@@ -26,11 +28,23 @@ export interface EquityRepository {
   setAssignedTags(securityId: string, tagIds: string[]): Promise<void>
   loadNote(securityId: string): Promise<SecurityNote>
   saveNote(securityId: string, contentHtml: string): Promise<SecurityNote>
+  listJournalEntries(securityId: string): Promise<SecurityJournalEntry[]>
+  saveJournalEntry(input: JournalEntryInput): Promise<SecurityJournalEntry>
+  deleteJournalEntry(id: string): Promise<void>
 }
 
 export function cleanRequired(value: string, label: string): string {
   const result = value.trim()
   if (!result) throw new Error(`Enter ${label}.`)
+  return result
+}
+
+export function cleanJournalDate(value: string): string {
+  const result = value.trim()
+  const date = new Date(`${result}T00:00:00Z`)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== result) {
+    throw new Error('Enter a valid journal date.')
+  }
   return result
 }
 
