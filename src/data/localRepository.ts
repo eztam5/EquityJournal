@@ -116,6 +116,24 @@ export class LocalRepository implements EquityRepository {
     if (this.data.tags.some((x) => x.id !== tag.id && x.taxonomyId === tag.taxonomyId && x.parentId === existing.parentId && x.name.toLowerCase() === name.toLowerCase())) throw new Error('A tag with this name already exists at this level.')
     Object.assign(existing, { name, description: tag.description.trim(), color: tag.color.toUpperCase() }); this.persist()
   }
+  async moveTag(tagId: string, parentId: string | null, index: number) {
+    const tag = this.data.tags.find((item) => item.id === tagId)
+    if (!tag) throw new Error('The selected tag no longer exists.')
+    const parent = parentId ? this.data.tags.find((item) => item.id === parentId) : undefined
+    if (parentId && (!parent || parent.taxonomyId !== tag.taxonomyId)) throw new Error('The destination tag no longer exists.')
+    for (let ancestor = parent; ancestor; ancestor = ancestor.parentId ? this.data.tags.find((item) => item.id === ancestor!.parentId) : undefined) {
+      if (ancestor.id === tagId) throw new Error('A tag cannot be moved inside itself or one of its descendants.')
+    }
+    if (this.data.tags.some((item) => item.id !== tagId && item.taxonomyId === tag.taxonomyId && item.parentId === parentId && item.name.toLowerCase() === tag.name.toLowerCase())) throw new Error('A tag with this name already exists at this level.')
+    const oldParentId = tag.parentId
+    const ordered = (parentValue: string | null) => this.data.tags.filter((item) => item.id !== tagId && item.taxonomyId === tag.taxonomyId && item.parentId === parentValue).toSorted((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name))
+    if (oldParentId !== parentId) ordered(oldParentId).forEach((item, position) => { item.sortOrder = position })
+    const destination = ordered(parentId)
+    destination.splice(Math.max(0, Math.min(index, destination.length)), 0, tag)
+    tag.parentId = parentId
+    destination.forEach((item, position) => { item.sortOrder = position })
+    this.persist()
+  }
   async deleteTag(taxonomyId: string, id: string) {
     if (this.data.tags.some((x) => x.parentId === id)) throw new Error('Delete the child tags first.')
     this.data.tags = this.data.tags.filter((x) => x.id !== id || x.taxonomyId !== taxonomyId)

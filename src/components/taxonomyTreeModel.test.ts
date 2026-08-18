@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Tag, TaggedSecurity } from '../domain/types'
-import { buildTaxonomyTreeModel } from './taxonomyTreeModel'
+import { buildTaxonomyTreeModel, resolveTagDrop } from './taxonomyTreeModel'
 
 describe('buildTaxonomyTreeModel', () => {
   it('builds mixed tag and assignment nodes without mutating its inputs', () => {
@@ -25,5 +25,19 @@ describe('buildTaxonomyTreeModel', () => {
     expect(model[1].kind==='tag'&&model[1].children.map((node)=>node.id)).toEqual(['security:other:one'])
     expect(tags).toEqual(originalTags)
     expect(assignments).toEqual(originalAssignments)
+  })
+
+  it('resolves child, sibling, and root tag drops while rejecting cycles',()=>{
+    const tags:Tag[]=[
+      {id:'a',taxonomyId:'taxonomy',parentId:null,name:'A',description:'',color:'#111',sortOrder:0},
+      {id:'b',taxonomyId:'taxonomy',parentId:null,name:'B',description:'',color:'#111',sortOrder:1},
+      {id:'child',taxonomyId:'taxonomy',parentId:'a',name:'Child',description:'',color:'#111',sortOrder:0},
+    ]
+    expect(resolveTagDrop(tags,'b','a','inside')).toEqual({parentId:'a',index:1})
+    expect(resolveTagDrop(tags,'b','a','before')).toEqual({parentId:null,index:0})
+    expect(resolveTagDrop(tags,'child','b','after')).toEqual({parentId:null,index:2})
+    expect(resolveTagDrop(tags,'child',null,'root')).toEqual({parentId:null,index:2})
+    expect(resolveTagDrop(tags,'a','child','inside')).toBeNull()
+    expect(resolveTagDrop(tags,'a','child','before')).toBeNull()
   })
 })

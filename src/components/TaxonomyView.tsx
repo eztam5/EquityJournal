@@ -4,7 +4,7 @@ import { useApp } from '../app/AppContext'
 import type { Tag, TaggedSecurity } from '../domain/types'
 import { ConfirmDialog, TagForm } from './Forms'
 import { showTaxonomySecurityMenu, showTaxonomyTagMenu } from './taxonomyContextMenus'
-import { buildTaxonomyTreeModel, type TaxonomyTreeModelNode } from './taxonomyTreeModel'
+import { buildTaxonomyTreeModel, resolveTagDrop, type TaxonomyTreeModelNode } from './taxonomyTreeModel'
 import { useTaxonomyDragAndDrop, type TaxonomyDropOperation } from './useTaxonomyDragAndDrop'
 
 export function TaxonomyView({ id }: { id: string }) {
@@ -15,7 +15,7 @@ export function TaxonomyView({ id }: { id: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['root']))
   const [form, setForm] = useState<{ parent?: Tag; tag?: Tag } | null>(null)
   const [deleting, setDeleting] = useState<Tag>()
-  const [assignmentError, setAssignmentError] = useState('')
+  const [interactionError, setInteractionError] = useState('')
 
   const load = useCallback(async () => {
     const [nextTags, nextSecurities] = await Promise.all([
@@ -28,19 +28,34 @@ export function TaxonomyView({ id }: { id: string }) {
 
   useEffect(() => { void load() }, [load])
 
-  const placeSecurity = useCallback(async (operation: TaxonomyDropOperation) => {
-    setAssignmentError('')
+  const handleDrop = useCallback(async (operation: TaxonomyDropOperation) => {
+    setInteractionError('')
     try {
-      if (operation.copy) await app.repository.copySecurityTag(operation.securityId, operation.toTagId)
-      else await app.repository.moveSecurityTag(operation.securityId, operation.fromTagId, operation.toTagId)
-      setExpanded((current) => new Set(current).add(operation.toTagId))
+      if (operation.kind === 'security') {
+        if (operation.copy) await app.repository.copySecurityTag(operation.securityId, operation.toTagId)
+        else await app.repository.moveSecurityTag(operation.securityId, operation.fromTagId, operation.toTagId)
+        setExpanded((current) => new Set(current).add(operation.toTagId))
+      } else {
+        const destination = resolveTagDrop(tags, operation.tagId, operation.targetTagId, operation.position)
+        if (!destination) return
+        await app.repository.moveTag(operation.tagId, destination.parentId, destination.index)
+        setExpanded((current) => {
+          const next = new Set(current)
+          next.add('root')
+          if (destination.parentId) next.add(destination.parentId)
+          return next
+        })
+      }
       await load()
     } catch (reason) {
-      setAssignmentError(reason instanceof Error ? reason.message : String(reason))
+      setInteractionError(reason instanceof Error ? reason.message : String(reason))
     }
-  }, [app.repository, load])
+  }, [app.repository, load, tags])
 
-  const drag = useTaxonomyDragAndDrop(placeSecurity)
+  const canDrop = useCallback((operation: TaxonomyDropOperation) => operation.kind === 'security'
+    ? operation.fromTagId !== operation.toTagId
+    : Boolean(resolveTagDrop(tags, operation.tagId, operation.targetTagId, operation.position)), [tags])
+  const drag = useTaxonomyDragAndDrop({ onDrop: handleDrop, canDrop })
   const model = useMemo(() => buildTaxonomyTreeModel(tags, taggedSecurities), [tags, taggedSecurities])
 
   if (!taxonomy) return <main className="content page"><div className="empty-state">Taxonomy not found.</div></main>
@@ -53,12 +68,12 @@ export function TaxonomyView({ id }: { id: string }) {
   })
 
   const removeAssignment = async (securityId: string, tagId: string) => {
-    setAssignmentError('')
+    setInteractionError('')
     try {
       await app.repository.removeSecurityTag(securityId, tagId)
       await load()
     } catch (reason) {
-      setAssignmentError(reason instanceof Error ? reason.message : String(reason))
+      setInteractionError(reason instanceof Error ? reason.message : String(reason))
     }
   }
 
@@ -89,7 +104,8 @@ export function TaxonomyView({ id }: { id: string }) {
       nodeData: node,
       label: <span
         data-taxonomy-tag-id={node.id}
-        className={`taxonomy-node-label ${drag.dropTargetId === node.id ? `drop-target ${drag.copying ? 'copy-target' : ''}` : ''}`}
+        data-draggable-tag-id={node.id}
+        className={`taxonomy-node-label ${drag.dropTarget?.tagId === node.id ? `drop-target ${drag.draggingKind === 'tag' ? `tag-drop-${drag.dropTarget.position}` : drag.copying ? 'copy-target' : ''}` : ''}`}
       ><i style={{ background: node.tag.color }}/>{node.tag.name}</span>,
       isExpanded: expanded.has(node.id),
       hasCaret: node.children.length > 0,
@@ -100,7 +116,7 @@ export function TaxonomyView({ id }: { id: string }) {
   const contents: TreeNodeInfo<TaxonomyTreeModelNode | undefined>[] = [{
     id: 'root',
     nodeData: undefined,
-    label: <span className="taxonomy-node-label"><i style={{ background: taxonomy.color }}/>{taxonomy.name}</span>,
+    label: <span data-taxonomy-root-drop-target className={`taxonomy-node-label ${drag.draggingKind === 'tag' && drag.dropTarget?.position === 'root' ? 'drop-target tag-drop-root' : ''}`}><i style={{ background: taxonomy.color }}/>{taxonomy.name}</span>,
     icon: 'diagram-tree',
     isExpanded: expanded.has('root'),
     hasCaret: true,
@@ -124,7 +140,7 @@ export function TaxonomyView({ id }: { id: string }) {
         }}
       />
     </div>
-    {assignmentError && <Callout className="taxonomy-move-error" intent="danger">Could not update security assignment: {assignmentError}</Callout>}
+    {interactionError && <Callout className="taxonomy-move-error" intent="danger">Could not update taxonomy: {interactionError}</Callout>}
     {form && <TagForm taxonomy={taxonomy} parent={form.parent} tag={form.tag} onSaved={load} onClose={() => setForm(null)}/>}
     {deleting && <ConfirmDialog title="Delete tag" message={`Do you really want to delete ${deleting.name}?`} onClose={() => setDeleting(undefined)} onConfirm={async () => { await app.repository.deleteTag(id, deleting.id); await load() }}/>}
   </main>

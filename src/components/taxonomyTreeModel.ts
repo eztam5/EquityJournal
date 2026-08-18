@@ -4,6 +4,32 @@ export type TaxonomyTreeModelNode =
   | { kind: 'tag'; id: string; tag: Tag; children: TaxonomyTreeModelNode[] }
   | { kind: 'security'; id: string; security: Security; tagId: string }
 
+export type TagDropPosition = 'before' | 'inside' | 'after' | 'root'
+
+export function resolveTagDrop(tags: Tag[], tagId: string, targetTagId: string | null, position: TagDropPosition) {
+  const tag = tags.find((item) => item.id === tagId)
+  const target = targetTagId ? tags.find((item) => item.id === targetTagId) : undefined
+  if (!tag || (targetTagId && !target) || targetTagId === tagId) return null
+  if (target && target.taxonomyId !== tag.taxonomyId) return null
+
+  const descendants = new Set<string>()
+  const visit = (parentId: string) => tags.filter((item) => item.parentId === parentId).forEach((item) => { descendants.add(item.id); visit(item.id) })
+  visit(tagId)
+  if (targetTagId && descendants.has(targetTagId)) return null
+
+  const parentId = position === 'inside' ? targetTagId : position === 'root' ? null : target?.parentId ?? null
+  if (parentId && descendants.has(parentId)) return null
+  const siblings = tags
+    .filter((item) => item.id !== tagId && item.taxonomyId === tag.taxonomyId && item.parentId === parentId)
+    .toSorted((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name))
+  if (position === 'before' || position === 'after') {
+    const targetIndex = siblings.findIndex((item) => item.id === targetTagId)
+    if (targetIndex < 0) return null
+    return { parentId, index: targetIndex + (position === 'after' ? 1 : 0) }
+  }
+  return { parentId, index: siblings.length }
+}
+
 export function buildTaxonomyTreeModel(tags: Tag[], taggedSecurities: TaggedSecurity[]): TaxonomyTreeModelNode[] {
   const securitiesByTag = new Map<string, TaggedSecurity[]>()
   for (const security of taggedSecurities) {

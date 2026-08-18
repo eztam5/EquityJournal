@@ -83,6 +83,30 @@ export class TauriRepository implements EquityRepository {
     try { await this.db.execute('UPDATE tags SET name=$1,description=$2,color=$3 WHERE id=$4 AND taxonomy_id=$5', [cleanRequired(tag.name,'a tag name'),tag.description.trim(),tag.color.toUpperCase(),tag.id,tag.taxonomyId]) }
     catch { throw new Error('A tag with this name already exists at this level.') }
   }
+  async moveTag(tagId: string, parentId: string | null, index: number) {
+    const rows = await this.db.select<Array<{taxonomy_id:string;parent_id:string|null;name:string}>>('SELECT taxonomy_id,parent_id,name FROM tags WHERE id=$1',[tagId])
+    const tag = rows[0]
+    if (!tag) throw new Error('The selected tag no longer exists.')
+    if (parentId) {
+      const parents = await this.db.select<Array<{taxonomy_id:string}>>('SELECT taxonomy_id FROM tags WHERE id=$1',[parentId])
+      if (!parents[0] || parents[0].taxonomy_id !== tag.taxonomy_id) throw new Error('The destination tag no longer exists.')
+      const cycle = await this.db.select<unknown[]>('WITH RECURSIVE descendants(id) AS (SELECT id FROM tags WHERE id=$1 UNION ALL SELECT tags.id FROM tags JOIN descendants ON tags.parent_id=descendants.id) SELECT 1 FROM descendants WHERE id=$2 LIMIT 1',[tagId,parentId])
+      if (cycle.length) throw new Error('A tag cannot be moved inside itself or one of its descendants.')
+    }
+    const duplicate = await this.db.select<unknown[]>(`SELECT 1 FROM tags WHERE id<>$1 AND taxonomy_id=$2 AND lower(name)=lower($3) AND ${parentId ? 'parent_id=$4' : 'parent_id IS NULL'} LIMIT 1`,parentId?[tagId,tag.taxonomy_id,tag.name,parentId]:[tagId,tag.taxonomy_id,tag.name])
+    if (duplicate.length) throw new Error('A tag with this name already exists at this level.')
+    const siblings = async(parentValue:string|null) => this.db.select<Array<{id:string}>>(`SELECT id FROM tags WHERE id<>$1 AND taxonomy_id=$2 AND ${parentValue ? 'parent_id=$3' : 'parent_id IS NULL'} ORDER BY sort_order,lower(name),id`,parentValue?[tagId,tag.taxonomy_id,parentValue]:[tagId,tag.taxonomy_id])
+    if (tag.parent_id !== parentId) {
+      const source = await siblings(tag.parent_id)
+      for (const [position,item] of source.entries()) await this.db.execute('UPDATE tags SET sort_order=$1 WHERE id=$2',[position,item.id])
+    }
+    const destination = await siblings(parentId)
+    const targetIndex = Math.max(0,Math.min(index,destination.length))
+    destination.splice(targetIndex,0,{id:tagId})
+    try { await this.db.execute('UPDATE tags SET parent_id=$1 WHERE id=$2',[parentId,tagId]) }
+    catch { throw new Error('A tag with this name already exists at this level.') }
+    for (const [position,item] of destination.entries()) await this.db.execute('UPDATE tags SET sort_order=$1 WHERE id=$2',[position,item.id])
+  }
   async deleteTag(taxonomyId: string,id: string) {
     const children = await this.db.select<unknown[]>('SELECT 1 FROM tags WHERE parent_id=$1 AND archived_at IS NULL LIMIT 1',[id])
     if (children.length) throw new Error('Delete the child tags first.')

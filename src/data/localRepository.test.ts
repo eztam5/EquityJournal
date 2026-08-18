@@ -81,4 +81,25 @@ describe('LocalRepository',()=>{
     expect(await repository.listTags(taxonomy.id)).toEqual([])
     expect(await repository.assignedTagIds(security.id)).toEqual([])
   })
+  it('reparents and reorders tags while preventing cycles',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const a=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'A',description:'',color:taxonomy.color})
+    const b=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'B',description:'',color:taxonomy.color})
+    const c=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'C',description:'',color:taxonomy.color})
+    const child=await repository.addTag({taxonomyId:taxonomy.id,parentId:a.id,name:'Child',description:'',color:taxonomy.color})
+
+    await repository.moveTag(c.id,null,0)
+    let tags=await repository.listTags(taxonomy.id)
+    expect(tags.filter((tag)=>tag.parentId===null).toSorted((left,right)=>left.sortOrder-right.sortOrder).map((tag)=>tag.id)).toEqual([c.id,a.id,b.id])
+
+    await repository.moveTag(b.id,a.id,0)
+    tags=await repository.listTags(taxonomy.id)
+    expect(tags.filter((tag)=>tag.parentId===a.id).toSorted((left,right)=>left.sortOrder-right.sortOrder).map((tag)=>tag.id)).toEqual([b.id,child.id])
+
+    await repository.moveTag(b.id,null,1)
+    tags=await repository.listTags(taxonomy.id)
+    expect(tags.filter((tag)=>tag.parentId===null).toSorted((left,right)=>left.sortOrder-right.sortOrder).map((tag)=>tag.id)).toEqual([c.id,b.id,a.id])
+    await expect(repository.moveTag(a.id,child.id,0)).rejects.toThrow('descendants')
+  })
 })

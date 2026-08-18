@@ -20,6 +20,7 @@ export interface EquityRepository {
   moveSecurityTag(securityId: string, fromTagId: string, toTagId: string): Promise<void>
   addTag(input: Omit<Tag, 'id' | 'sortOrder'>): Promise<Tag>
   updateTag(tag: Pick<Tag, 'id' | 'taxonomyId' | 'name' | 'description' | 'color'>): Promise<void>
+  moveTag(tagId: string, parentId: string | null, index: number): Promise<void>
   deleteTag(taxonomyId: string, id: string): Promise<void>
   assignedTagIds(securityId: string): Promise<string[]>
   setAssignedTags(securityId: string, tagIds: string[]): Promise<void>
