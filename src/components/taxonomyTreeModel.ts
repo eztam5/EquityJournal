@@ -6,6 +6,22 @@ export type TaxonomyTreeModelNode =
 
 export type TagDropPosition = 'before' | 'inside' | 'after' | 'root'
 
+export function filterTaxonomyTreeModel(nodes: TaxonomyTreeModelNode[], query: string): TaxonomyTreeModelNode[] {
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  if (!normalizedQuery) return nodes
+
+  const includesQuery = (...values: string[]) => values.some((value) => value.toLocaleLowerCase().includes(normalizedQuery))
+  const filterNode = (node: TaxonomyTreeModelNode): TaxonomyTreeModelNode | null => {
+    if (node.kind === 'security') {
+      return includesQuery(node.security.name, node.security.symbol) ? node : null
+    }
+    const children = node.children.map(filterNode).filter((child): child is TaxonomyTreeModelNode => child !== null)
+    return includesQuery(node.tag.name) || children.length > 0 ? { ...node, children } : null
+  }
+
+  return nodes.map(filterNode).filter((node): node is TaxonomyTreeModelNode => node !== null)
+}
+
 export function resolveTagDrop(tags: Tag[], tagId: string, targetTagId: string | null, position: TagDropPosition) {
   const tag = tags.find((item) => item.id === tagId)
   const target = targetTagId ? tags.find((item) => item.id === targetTagId) : undefined

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { Callout, Tree, type TreeNodeInfo } from '@blueprintjs/core'
+import { Button, Callout, InputGroup, Tree, type TreeNodeInfo } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { Tag, TaggedSecurity } from '../domain/types'
 import { ConfirmDialog, TagForm } from './Forms'
 import { showTaxonomySecurityMenu, showTaxonomyTagMenu } from './taxonomyContextMenus'
-import { buildTaxonomyTreeModel, resolveTagDrop, type TaxonomyTreeModelNode } from './taxonomyTreeModel'
+import { buildTaxonomyTreeModel, filterTaxonomyTreeModel, resolveTagDrop, type TaxonomyTreeModelNode } from './taxonomyTreeModel'
 import { useTaxonomyDragAndDrop, type TaxonomyDropOperation } from './useTaxonomyDragAndDrop'
 
 export function TaxonomyView({ id }: { id: string }) {
@@ -13,6 +13,7 @@ export function TaxonomyView({ id }: { id: string }) {
   const [tags, setTags] = useState<Tag[]>([])
   const [taggedSecurities, setTaggedSecurities] = useState<TaggedSecurity[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['root']))
+  const [search, setSearch] = useState('')
   const [form, setForm] = useState<{ parent?: Tag; tag?: Tag } | null>(null)
   const [deleting, setDeleting] = useState<Tag>()
   const [interactionError, setInteractionError] = useState('')
@@ -27,6 +28,7 @@ export function TaxonomyView({ id }: { id: string }) {
   }, [app.repository, id])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => { setSearch('') }, [id])
 
   const handleDrop = useCallback(async (operation: TaxonomyDropOperation) => {
     setInteractionError('')
@@ -56,7 +58,8 @@ export function TaxonomyView({ id }: { id: string }) {
     ? operation.fromTagId !== operation.toTagId
     : Boolean(resolveTagDrop(tags, operation.tagId, operation.targetTagId, operation.position)), [tags])
   const drag = useTaxonomyDragAndDrop({ onDrop: handleDrop, canDrop })
-  const model = useMemo(() => buildTaxonomyTreeModel(tags, taggedSecurities), [tags, taggedSecurities])
+  const model = useMemo(() => filterTaxonomyTreeModel(buildTaxonomyTreeModel(tags, taggedSecurities), search), [search, tags, taggedSecurities])
+  const searching = search.trim().length > 0
 
   if (!taxonomy) return <main className="content page"><div className="empty-state">Taxonomy not found.</div></main>
 
@@ -107,7 +110,7 @@ export function TaxonomyView({ id }: { id: string }) {
         data-draggable-tag-id={node.id}
         className={`taxonomy-node-label ${drag.dropTarget?.tagId === node.id ? `drop-target ${drag.draggingKind === 'tag' ? `tag-drop-${drag.dropTarget.position}` : drag.copying ? 'copy-target' : ''}` : ''}`}
       ><i style={{ background: node.tag.color }}/>{node.tag.name}</span>,
-      isExpanded: expanded.has(node.id),
+      isExpanded: searching || expanded.has(node.id),
       hasCaret: node.children.length > 0,
       childNodes: node.children.map(convert),
     }
@@ -118,14 +121,23 @@ export function TaxonomyView({ id }: { id: string }) {
     nodeData: undefined,
     label: <span data-taxonomy-root-drop-target className={`taxonomy-node-label ${drag.draggingKind === 'tag' && drag.dropTarget?.position === 'root' ? 'drop-target tag-drop-root' : ''}`}><i style={{ background: taxonomy.color }}/>{taxonomy.name}</span>,
     icon: 'diagram-tree',
-    isExpanded: expanded.has('root'),
-    hasCaret: true,
+    isExpanded: searching || expanded.has('root'),
+    hasCaret: model.length > 0,
     isSelected: true,
     childNodes: model.map(convert),
   }]
 
   return <main className="content page">
-    <header className="page-header"><div><h1>{taxonomy.name}</h1><p>{taxonomy.description || 'Build a hierarchical classification for your research.'}</p></div></header>
+    <header className="page-header taxonomy-page-header"><div><h1>{taxonomy.name}</h1><p>{taxonomy.description || 'Build a hierarchical classification for your research.'}</p></div><InputGroup
+      className="taxonomy-search"
+      type="search"
+      leftIcon="search"
+      placeholder="Search tags or securities"
+      aria-label="Search tags or securities"
+      value={search}
+      onChange={(event) => setSearch(event.target.value)}
+      rightElement={search ? <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setSearch('')}/> : undefined}
+    /></header>
     <div className="content-panel taxonomy-card" {...drag.pointerHandlers}>
       <Tree
         compact
@@ -139,6 +151,7 @@ export function TaxonomyView({ id }: { id: string }) {
           else showTaxonomySecurityMenu(event, node.nodeData.security.id, node.nodeData.tagId, (securityId, tagId) => { void removeAssignment(securityId, tagId) })
         }}
       />
+      {searching && model.length === 0 && <div className="empty-state">No matching tags or securities.</div>}
     </div>
     {interactionError && <Callout className="taxonomy-move-error" intent="danger">Could not update taxonomy: {interactionError}</Callout>}
     {form && <TagForm taxonomy={taxonomy} parent={form.parent} tag={form.tag} onSaved={load} onClose={() => setForm(null)}/>}
