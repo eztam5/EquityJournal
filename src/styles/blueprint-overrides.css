@@ -6,6 +6,8 @@
 .page h1,
 .page h2,
 .page h3 { color: var(--text); }
+.page-header,
+.security-heading { padding-inline: 16px; }
 .bp6-html-table,
 .bp6-tree,
 .bp6-tree-node-label,
@@ -21,6 +23,16 @@
 .dialog-titlebar .bp6-button { cursor: pointer; }
 .form-error.bp6-callout { margin: 0; color: inherit; }
 .form-context.bp6-callout { margin: 0; }
+.settings-dialog .bp6-dialog-body { margin: 0; padding: 0; }
+.settings-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr); min-height: 360px; }
+.settings-navigation { padding: 12px 8px; border-right: 1px solid var(--border); background: var(--sidebar); }
+.settings-navigation .bp6-button { justify-content: flex-start; margin-bottom: 3px; }
+.settings-main { min-width: 0; display: flex; flex-direction: column; }
+.settings-content { flex: 1; padding: 22px 24px; }
+.settings-content h2 { margin: 0 0 6px; font-size: 20px; }
+.settings-content > section > p { margin: 0 0 18px; }
+.settings-card.bp6-card { padding: 16px; }
+.settings-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
 .color-picker .bp6-popover-wrapper { display: inline-flex; }
 .color-picker .bp6-button { width: 31px; height: 31px; min-width: 31px; min-height: 31px; padding: 0; border-radius: 50%; }
 .color-picker .bp6-button .bp6-icon { color: #fff; filter: drop-shadow(0 1px 1px #0008); }
