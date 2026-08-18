@@ -51,6 +51,22 @@ describe('LocalRepository',()=>{
 
     expect(new Set(await repository.assignedTagIds(security.id))).toEqual(new Set([target.id,retained.id]))
   })
+  it('copies a security to another tag while retaining its source assignment',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'ASML',currency:'EUR',name:'ASML'})
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const source=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Technology',description:'',color:taxonomy.color})
+    const target=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Semiconductors',description:'',color:taxonomy.color})
+    await repository.setAssignedTags(security.id,[source.id])
+
+    await repository.copySecurityTag(security.id,target.id)
+
+    expect(new Set(await repository.assignedTagIds(security.id))).toEqual(new Set([source.id,target.id]))
+
+    await repository.removeSecurityTag(security.id,source.id)
+
+    expect(await repository.assignedTagIds(security.id)).toEqual([target.id])
+  })
   it('deletes a taxonomy with its nested tags and assignments',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'NVDA',currency:'USD',name:'NVIDIA'})
