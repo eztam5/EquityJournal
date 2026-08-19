@@ -40,4 +40,19 @@ describe('SecuritiesView visible columns',()=>{
     expect(within(menu).getByRole('menuitemcheckbox',{name:'Symbol'})).toHaveAttribute('aria-disabled','true')
   })
 
+  it('shows direct edit and delete actions for every security',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+
+    fireEvent.click(await screen.findByRole('button',{name:'Edit Apple Inc.'}))
+    const editDialog=screen.getByRole('dialog',{name:'Edit security'})
+    expect(within(editDialog).getByLabelText('Symbol')).toHaveValue('AAPL')
+    fireEvent.click(within(editDialog).getByRole('button',{name:'Cancel'}))
+
+    fireEvent.click(screen.getByRole('button',{name:'Delete Apple Inc.'}))
+    expect(screen.getByRole('dialog',{name:'Delete security'})).toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'Actions for Apple Inc.'})).not.toBeInTheDocument()
+  })
+
 })

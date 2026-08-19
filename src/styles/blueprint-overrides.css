@@ -49,6 +49,8 @@
 .nav-item.bp6-button .bp6-button-text { overflow: hidden; text-overflow: ellipsis; }
 .nav-item.bp6-button.active { background: var(--selected); font-weight: 600; }
 .nav-item.bp6-button:hover { background: var(--hover); }
+.research-topics-item.bp6-button { gap: 0; }
+.research-topics-item.bp6-button > :first-child { margin-right: 6px; }
 .taxonomy-sidebar-row { display: flex; min-width: 0; padding-left: calc(var(--taxonomy-depth, 0) * 14px); }
 .taxonomy-sidebar-row .taxonomy-sidebar-label { flex: 1; min-width: 0; padding-left: 2px; }
 .taxonomy-sidebar-toggle.bp6-button { width: 22px; min-width: 22px; min-height: 30px; padding: 0; }
@@ -103,6 +105,7 @@
 .security-table.bp6-html-table { width: 100%; font-size: 12px; }
 .security-table.bp6-html-table th { padding: 2px 12px; font-size: 11px; line-height: 1.1; vertical-align: middle; }
 .security-table.bp6-html-table td { padding: 2px 12px; font-size: 12px; line-height: 1.1; vertical-align: middle; }
+table.security-table.bp6-html-table th:last-child, table.security-table.bp6-html-table td:last-child { width: 68px; text-align: right; white-space: nowrap; }
 table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-compact.security-table td { padding-bottom: 2px; padding-top: 2px; }
 .security-table .sort-header.bp6-button { min-height: 24px; padding: 0; color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; }
 .column-chooser.bp6-menu { min-width: 285px; padding: 5px; }
