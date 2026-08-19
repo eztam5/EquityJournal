@@ -101,7 +101,7 @@ export function TaxonomyView({ id }: { id: string }) {
         title="Drag to move; hold the copy modifier to copy"
       >{formatSecurityLabel(node.security,app.securityDisplayMode)}</span>,
       secondaryLabel: node.security.currency,
-      icon: 'briefcase',
+      icon: 'chart',
     }
     return {
       id: node.id,

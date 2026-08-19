@@ -49,8 +49,14 @@
 .nav-item.bp6-button .bp6-button-text { overflow: hidden; text-overflow: ellipsis; }
 .nav-item.bp6-button.active { background: var(--selected); font-weight: 600; }
 .nav-item.bp6-button:hover { background: var(--hover); }
+.securities-list-item.bp6-button { gap: 0; }
+.securities-list-item.bp6-button > :first-child { margin-right: 6px; }
+.securities-list-item.bp6-button .bp6-icon, .securities-list-item.bp6-button .bp6-icon svg { color: var(--muted) !important; fill: var(--muted) !important; }
+.all-securities-item.bp6-button .bp6-icon, .all-securities-item.bp6-button .bp6-icon svg { color: var(--accent) !important; fill: var(--accent) !important; }
 .research-topics-item.bp6-button { gap: 0; }
 .research-topics-item.bp6-button > :first-child { margin-right: 6px; }
+.recent.bp6-button { gap: 0; }
+.recent.bp6-button > :first-child { margin-right: 6px; }
 .taxonomy-sidebar-row { display: flex; min-width: 0; padding-left: calc(var(--taxonomy-depth, 0) * 14px); }
 .taxonomy-sidebar-row .taxonomy-sidebar-label { flex: 1; min-width: 0; padding-left: 2px; }
 .taxonomy-sidebar-toggle.bp6-button { width: 22px; min-width: 22px; min-height: 30px; padding: 0; }
@@ -131,12 +137,12 @@ table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-com
 .topic-rule-list .bp6-tag span { color: var(--muted); }
 .topic-security-table.bp6-html-table { width: 100%; }
 .topic-security-table .bp6-button { justify-content: flex-start; padding-inline: 0; }
-.topic-relations-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 20px; max-height: 490px; overflow: hidden; }
-.topic-relations-editor > section { min-width: 0; display: flex; flex-direction: column; }
+.topic-relations-editor { height: clamp(280px, 55vh, 490px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 20px; overflow: hidden; }
+.topic-relations-editor > section { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .topic-relations-editor h3 { margin: 0 0 5px; font-size: 15px; }
 .topic-relations-editor section > p { min-height: 34px; margin: 0 0 10px; }
-.topic-relation-choices { min-height: 0; display: grid; align-content: start; gap: 7px; padding: 10px; overflow: auto; border: 1px solid var(--border); background: var(--content); }
-.topic-tag-rules { min-height: 0; max-height: none; padding-right: 4px; }
+.topic-relation-choices { min-height: 0; flex: 1; display: grid; align-content: start; gap: 7px; padding: 10px; overflow-y: auto; border: 1px solid var(--border); background: var(--content); }
+.topic-tag-rules { min-height: 0; max-height: none; flex: 1; padding-right: 4px; overflow-y: auto; }
 
 .taxonomy-card .bp6-tree { background: transparent; font-size: 12px; }
 .taxonomy-page-header { align-items: flex-start; gap: 20px; }
