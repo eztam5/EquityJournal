@@ -28,29 +28,33 @@ function preview(html: string) {
   return element.textContent?.trim() || 'Empty entry'
 }
 
-export function ResearchJournal({ securityId }: { securityId: string }) {
+type JournalEntry = Pick<SecurityJournalEntry,'id'|'entryDate'|'contentHtml'|'createdAt'|'updatedAt'>
+
+export function ResearchJournal({ securityId, topicId, onSaved }: { securityId?: string; topicId?: string; onSaved?:()=>void|Promise<void> }) {
   const app = useApp()
-  const [entries, setEntries] = useState<SecurityJournalEntry[]>([])
+  const [entries, setEntries] = useState<JournalEntry[]>([])
   const [draft, setDraft] = useState<DraftEntry>()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [status, setStatus] = useState('')
-  const [deleting, setDeleting] = useState<SecurityJournalEntry>()
+  const [deleting, setDeleting] = useState<JournalEntry>()
+
+  const listEntries=useCallback(()=>topicId?app.repository.listResearchTopicJournalEntries(topicId):app.repository.listJournalEntries(securityId!),[app.repository,securityId,topicId])
 
   const load = useCallback(async (preferredId?: string) => {
-    const next = await app.repository.listJournalEntries(securityId)
+    const next = await listEntries()
     setEntries(next)
     const selected = next.find((entry) => entry.id === preferredId) ?? next[0]
     setDraft(selected ? { id: selected.id, entryDate: selected.entryDate, contentHtml: selected.contentHtml } : undefined)
     setDirty(false)
     return next
-  }, [app.repository, securityId])
+  }, [listEntries])
 
   useEffect(() => {
     let active = true
     setLoading(true); setStatus(''); setEntries([]); setDraft(undefined); setDirty(false)
-    app.repository.listJournalEntries(securityId).then((next) => {
+    listEntries().then((next) => {
       if (!active) return
       setEntries(next)
       const selected = next[0]
@@ -59,14 +63,15 @@ export function ResearchJournal({ securityId }: { securityId: string }) {
       if (active) setStatus(reason instanceof Error ? reason.message : String(reason))
     }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [app.repository, securityId])
+  }, [listEntries])
 
   const save = async () => {
     if (!draft) return
     setSaving(true); setStatus('')
     try {
-      const saved = await app.repository.saveJournalEntry({ ...draft, securityId })
+      const saved = topicId?await app.repository.saveResearchTopicJournalEntry({...draft,topicId}):await app.repository.saveJournalEntry({...draft,securityId:securityId!})
       await load(saved.id)
+      await onSaved?.()
       setStatus('Saved')
     } catch (reason) {
       setStatus(reason instanceof Error ? reason.message : String(reason))
@@ -81,7 +86,7 @@ export function ResearchJournal({ securityId }: { securityId: string }) {
     setDirty(false); setStatus(existing ? 'An entry for today already exists.' : '')
   }
 
-  const select = (entry: SecurityJournalEntry) => {
+  const select = (entry: JournalEntry) => {
     setDraft({ id: entry.id, entryDate: entry.entryDate, contentHtml: entry.contentHtml })
     setDirty(false); setStatus('')
   }
@@ -97,7 +102,7 @@ export function ResearchJournal({ securityId }: { securityId: string }) {
       </Button>)}
     </aside>
     <section className="journal-editor">
-      {!draft ? <div className="empty-state"><p>Record how your view of this company develops over time.</p><Button icon="add" intent="primary" text="Add first entry" onClick={add}/></div> : <>
+      {!draft ? <div className="empty-state"><p>Record how your view of this {topicId?'topic':'company'} develops over time.</p><Button icon="add" intent="primary" text="Add first entry" onClick={add}/></div> : <>
         <header>
           <label htmlFor="journal-entry-date">Entry date</label>
           <InputGroup id="journal-entry-date" type="date" value={draft.entryDate} onChange={(event) => { setDraft({ ...draft, entryDate: event.target.value }); setDirty(true); setStatus('Unsaved changes') }}/>
@@ -109,6 +114,12 @@ export function ResearchJournal({ securityId }: { securityId: string }) {
         <Suspense fallback={<div className="empty-state">Loading editor…</div>}><RichTextEditor key={draft.id ?? `new-${draft.entryDate}`} content={draft.contentHtml} onChange={(contentHtml) => { setDraft((current) => current ? { ...current, contentHtml } : current); setDirty(true); setStatus('Unsaved changes') }}/></Suspense>
       </>}
     </section>
-    {deleting && <ConfirmDialog title="Delete journal entry" message={`Delete the journal entry from ${displayDate(deleting.entryDate)}?`} confirmLabel="Delete" onClose={() => setDeleting(undefined)} onConfirm={async () => { await app.repository.deleteJournalEntry(deleting.id); await load() }}/>} 
+    {deleting&&<ConfirmDialog
+      title="Delete journal entry"
+      message={`Delete the journal entry from ${displayDate(deleting.entryDate)}?`}
+      confirmLabel="Delete"
+      onClose={()=>setDeleting(undefined)}
+      onConfirm={async()=>{if(topicId)await app.repository.deleteResearchTopicJournalEntry(deleting.id);else await app.repository.deleteJournalEntry(deleting.id);await load();await onSaved?.()}}
+    />}
   </div>
 }

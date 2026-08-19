@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createRepository, type EquityRepository } from '../data'
 import type { SecurityInput } from '../data/repository'
-import type { Security, SecurityLinkTemplate, Tag, Taxonomy, ThemeMode, View, Watchlist } from '../domain/types'
+import type { ResearchTopic, Security, SecurityLinkTemplate, Tag, Taxonomy, ThemeMode, View, Watchlist } from '../domain/types'
 import { loadSecurityDisplayMode, SECURITY_DISPLAY_MODE_KEY, type SecurityDisplayMode } from '../utils/securityLabels'
 
 interface AppContextValue {
@@ -12,6 +12,7 @@ interface AppContextValue {
   watchlists: Watchlist[]
   taxonomies: Taxonomy[]
   securityLinkTemplates: SecurityLinkTemplate[]
+  researchTopics: ResearchTopic[]
   recent: Security[]
   view: View
   theme: ThemeMode
@@ -20,6 +21,7 @@ interface AppContextValue {
   setTheme(theme: ThemeMode): void
   setSecurityDisplayMode(mode: SecurityDisplayMode): void
   openSecurity(id: string): void
+  openResearchTopic(id: string): void
   refresh(): Promise<void>
   addSecurity(input: SecurityInput): Promise<Security>
   updateSecurity(input: Security): Promise<void>
@@ -28,6 +30,9 @@ interface AppContextValue {
   deleteWatchlist(id: string): Promise<void>
   addTaxonomy(input: Pick<Taxonomy, 'name' | 'description' | 'color'>): Promise<void>
   deleteTaxonomy(id: string): Promise<void>
+  addResearchTopic(title: string): Promise<ResearchTopic>
+  updateResearchTopic(topic: Pick<ResearchTopic, 'id' | 'title'>): Promise<void>
+  deleteResearchTopic(id: string): Promise<void>
   listTags(taxonomyId: string): Promise<Tag[]>
 }
 
@@ -43,6 +48,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const [watchlists, setWatchlists] = useState<Watchlist[]>([])
   const [taxonomies, setTaxonomies] = useState<Taxonomy[]>([])
   const [securityLinkTemplates, setSecurityLinkTemplates] = useState<SecurityLinkTemplate[]>([])
+  const [researchTopics, setResearchTopics] = useState<ResearchTopic[]>([])
   const [view, setView] = useState<View>({ type: 'all-securities' })
   const [theme, setThemeState] = useState<ThemeMode>(() => (localStorage.getItem(THEME_KEY) as ThemeMode | null) ?? 'dark')
   const [securityDisplayMode, setSecurityDisplayModeState] = useState<SecurityDisplayMode>(loadSecurityDisplayMode)
@@ -52,10 +58,10 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   })
 
   const refresh = useCallback(async () => {
-    const [nextSecurities, nextWatchlists, nextTaxonomies, nextSecurityLinkTemplates] = await Promise.all([
-      repository.listSecurities(), repository.listWatchlists(), repository.listTaxonomies(), repository.listSecurityLinkTemplates(),
+    const [nextSecurities, nextWatchlists, nextTaxonomies, nextSecurityLinkTemplates, nextResearchTopics] = await Promise.all([
+      repository.listSecurities(), repository.listWatchlists(), repository.listTaxonomies(), repository.listSecurityLinkTemplates(), repository.listResearchTopics(),
     ])
-    setSecurities(nextSecurities); setWatchlists(nextWatchlists); setTaxonomies(nextTaxonomies); setSecurityLinkTemplates(nextSecurityLinkTemplates)
+    setSecurities(nextSecurities); setWatchlists(nextWatchlists); setTaxonomies(nextTaxonomies); setSecurityLinkTemplates(nextSecurityLinkTemplates);setResearchTopics(nextResearchTopics)
     setRecentIds((ids) => ids.filter((id) => nextSecurities.some((security) => security.id === id)).slice(0, 5))
   }, [repository])
 
@@ -81,6 +87,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
     setRecentIds((ids) => [id, ...ids.filter((value) => value !== id)].slice(0, 5))
     setView({ type: 'security', id })
   }
+  const openResearchTopic = (id: string) => { if(researchTopics.some((topic)=>topic.id===id))setView({type:'topic',id}) }
   const addSecurity = async (input: SecurityInput) => { const result = await repository.addSecurity(input); await refresh(); return result }
   const updateSecurity = async (input: Security) => { await repository.updateSecurity(input); await refresh() }
   const deleteSecurity = async (id: string) => {
@@ -100,9 +107,12 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
     if (view.type === 'taxonomy' && view.id === id) setView({ type: 'all-securities' })
     await refresh()
   }
+  const addResearchTopic=async(title:string)=>{const result=await repository.addResearchTopic(title);await refresh();setView({type:'topic',id:result.id});return result}
+  const updateResearchTopic=async(topic:Pick<ResearchTopic,'id'|'title'>)=>{await repository.updateResearchTopic(topic);await refresh()}
+  const deleteResearchTopic=async(id:string)=>{await repository.deleteResearchTopic(id);if(view.type==='topic'&&view.id===id)setView({type:'topics'});await refresh()}
 
   const recent = recentIds.map((id) => securities.find((security) => security.id === id)).filter((value): value is Security => Boolean(value))
-  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, recent, view, theme, securityDisplayMode, setView, setTheme, setSecurityDisplayMode, openSecurity, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, recent, view, theme, securityDisplayMode, refresh])
+  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, theme, securityDisplayMode, setView, setTheme, setSecurityDisplayMode, openSecurity, openResearchTopic, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, addResearchTopic, updateResearchTopic, deleteResearchTopic, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, theme, securityDisplayMode, refresh])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
 

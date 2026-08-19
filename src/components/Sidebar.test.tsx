@@ -14,7 +14,7 @@ describe('Sidebar taxonomy navigation',()=>{
     const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
     await repository.setAssignedTags(security.id,[software.id])
 
-    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()}/></AppProvider>)
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/></AppProvider>)
 
     expect(await screen.findByText('Industry')).toBeInTheDocument()
     expect(screen.queryByText('Software')).not.toBeInTheDocument()
@@ -43,7 +43,7 @@ describe('Sidebar taxonomy navigation',()=>{
     const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
     await repository.setAssignedTags(security.id,[software.id])
 
-    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()}/></AppProvider>)
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/></AppProvider>)
     fireEvent.click(await screen.findByRole('button',{name:'Expand Industry'}))
     fireEvent.click(await screen.findByRole('button',{name:'Expand Software'}))
 
@@ -56,7 +56,7 @@ describe('Sidebar taxonomy navigation',()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
     localStorage.setItem('equity-journal.recent-securities',JSON.stringify([security.id]))
-    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()}/></AppProvider>)
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/></AppProvider>)
 
     expect(await screen.findByText('Recently Viewed')).toBeInTheDocument()
     expect(screen.getByRole('button',{name:'Apple Inc. — AAPL'})).toBeInTheDocument()

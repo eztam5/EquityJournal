@@ -4,10 +4,12 @@ import { Sidebar } from '../components/Sidebar'
 import { SecuritiesView } from '../components/SecuritiesView'
 import { TaxonomyView } from '../components/TaxonomyView'
 import { SecurityDetailView } from '../components/SecurityDetailView'
-import { SecurityForm, TaxonomyForm, WatchlistForm } from '../components/Forms'
+import { ResearchTopicForm, SecurityForm, TaxonomyForm, WatchlistForm } from '../components/Forms'
 import { SettingsDialog } from '../components/SettingsDialog'
+import { ResearchTopicsView } from '../components/ResearchTopicsView'
+import { ResearchTopicDetailView } from '../components/ResearchTopicDetailView'
 
-type Dialog = 'security'|'watchlist'|'taxonomy'|null
+type Dialog = 'security'|'watchlist'|'taxonomy'|'topic'|null
 export function App(){
   const app=useApp();const[dialog,setDialog]=useState<Dialog>(null);const[showSettings,setShowSettings]=useState(false);const[sidebarWidth,setSidebarWidth]=useState(()=>Number(localStorage.getItem('equity-journal.sidebar-width-v2'))||196)
   useEffect(()=>{localStorage.setItem('equity-journal.sidebar-width-v2',String(sidebarWidth))},[sidebarWidth])
@@ -21,8 +23,12 @@ export function App(){
   const resize=(event:PointerEvent)=>{const startX=event.clientX,startWidth=sidebarWidth;event.currentTarget.setPointerCapture(event.pointerId);const move=(e:globalThis.PointerEvent)=>setSidebarWidth(Math.min(480,Math.max(100,startWidth+e.clientX-startX)));const end=()=>{removeEventListener('pointermove',move);removeEventListener('pointerup',end)};addEventListener('pointermove',move);addEventListener('pointerup',end)}
   if(app.error)return <div className="fatal-error"><h1>EquityJournal could not start</h1><p>{app.error}</p></div>
   if(!app.ready)return <div className="loading-screen"><div className="spinner"/>Loading EquityJournal…</div>
-  return <div className="app-shell"><div className="workspace"><div className="sidebar-wrap" style={{width:sidebarWidth}}><Sidebar onNewSecurity={()=>setDialog('security')} onNewWatchlist={()=>setDialog('watchlist')} onNewTaxonomy={()=>setDialog('taxonomy')}/></div><div className="resize-handle" onPointerDown={resize}/><div className="view-container">{app.view.type==='all-securities'?<SecuritiesView/>:app.view.type==='watchlist'?<SecuritiesView watchlistId={app.view.id}/>:app.view.type==='taxonomy'?<TaxonomyView id={app.view.id}/>:<SecurityDetailView id={app.view.id}/>}</div></div>
-    {dialog==='security'&&<SecurityForm onClose={()=>setDialog(null)}/>} {dialog==='watchlist'&&<WatchlistForm onClose={()=>setDialog(null)}/>} {dialog==='taxonomy'&&<TaxonomyForm onClose={()=>setDialog(null)}/>} 
+  const view=app.view.type==='all-securities'?<SecuritiesView/>:app.view.type==='watchlist'?<SecuritiesView watchlistId={app.view.id}/>:app.view.type==='taxonomy'?<TaxonomyView id={app.view.id}/>:app.view.type==='topics'?<ResearchTopicsView/>:app.view.type==='topic'?<ResearchTopicDetailView id={app.view.id}/>:<SecurityDetailView id={app.view.id}/>
+  return <div className="app-shell"><div className="workspace"><div className="sidebar-wrap" style={{width:sidebarWidth}}><Sidebar onNewSecurity={()=>setDialog('security')} onNewWatchlist={()=>setDialog('watchlist')} onNewTaxonomy={()=>setDialog('taxonomy')} onNewTopic={()=>setDialog('topic')}/></div><div className="resize-handle" onPointerDown={resize}/><div className="view-container">{view}</div></div>
+    {dialog==='security'&&<SecurityForm onClose={()=>setDialog(null)}/>}
+    {dialog==='watchlist'&&<WatchlistForm onClose={()=>setDialog(null)}/>}
+    {dialog==='taxonomy'&&<TaxonomyForm onClose={()=>setDialog(null)}/>}
+    {dialog==='topic'&&<ResearchTopicForm onClose={()=>setDialog(null)}/>}
     <SettingsDialog isOpen={showSettings} onClose={()=>setShowSettings(false)}/>
   </div>
 }

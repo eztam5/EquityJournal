@@ -1,6 +1,6 @@
 import Database from '@tauri-apps/plugin-sql'
-import type { Security, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
-import { cleanJournalDate, cleanRequired, cleanSecurityLinkTemplate, type EquityRepository, type JournalEntryInput, type SecurityInput, uuid } from './repository'
+import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import { cleanJournalDate, cleanRequired, cleanSecurityLinkTemplate, type EquityRepository, type JournalEntryInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
 
 type DbRow = Record<string, string | number | null>
 const mapSecurity = (row: DbRow): Security => ({ id:String(row.id),name:String(row.name),symbol:String(row.symbol),alternativeId:String(row.alternative_id ?? ''),currency:String(row.currency) })
@@ -156,5 +156,70 @@ export class TauriRepository implements EquityRepository {
     const retained=new Set(cleaned.map((template)=>template.id))
     for (const template of existing) if (!retained.has(template.id)) await this.db.execute('DELETE FROM security_link_templates WHERE id=$1',[template.id])
     return cleaned
+  }
+  async listResearchTopics():Promise<ResearchTopic[]> {
+    const rows=await this.db.select<DbRow[]>('SELECT id,title,created_at,updated_at FROM research_topics ORDER BY updated_at DESC,lower(title),id')
+    return rows.map((row)=>({id:String(row.id),title:String(row.title),createdAt:String(row.created_at),updatedAt:String(row.updated_at)}))
+  }
+  async addResearchTopic(value:string) {
+    const now=new Date().toISOString(),result={id:uuid(),title:cleanRequired(value,'a topic title'),createdAt:now,updatedAt:now}
+    try{await this.db.execute('INSERT INTO research_topics (id,title,created_at,updated_at) VALUES ($1,$2,$3,$4)',[result.id,result.title,result.createdAt,result.updatedAt])}
+    catch{throw new Error('A research topic with this title already exists.')}
+    return result
+  }
+  async updateResearchTopic(topic:Pick<ResearchTopic,'id'|'title'>) {
+    try{await this.db.execute('UPDATE research_topics SET title=$1,updated_at=$2 WHERE id=$3',[cleanRequired(topic.title,'a topic title'),new Date().toISOString(),topic.id])}
+    catch{throw new Error('A research topic with this title already exists.')}
+  }
+  async deleteResearchTopic(id:string) { await this.db.execute('DELETE FROM research_topics WHERE id=$1',[id]) }
+  async loadResearchTopicNote(topicId:string):Promise<ResearchTopicNote> {
+    const rows=await this.db.select<DbRow[]>('SELECT topic_id,content_html,updated_at FROM research_topic_notes WHERE topic_id=$1',[topicId]),row=rows[0]
+    return row?{topicId:String(row.topic_id),contentHtml:String(row.content_html),updatedAt:String(row.updated_at)}:{topicId,contentHtml:'',updatedAt:''}
+  }
+  async saveResearchTopicNote(topicId:string,contentHtml:string) {
+    const result={topicId,contentHtml,updatedAt:new Date().toISOString()}
+    await this.db.execute('INSERT INTO research_topic_notes (topic_id,content_html,updated_at) VALUES ($1,$2,$3) ON CONFLICT(topic_id) DO UPDATE SET content_html=excluded.content_html,updated_at=excluded.updated_at',[topicId,contentHtml,result.updatedAt])
+    await this.db.execute('UPDATE research_topics SET updated_at=$1 WHERE id=$2',[result.updatedAt,topicId]);return result
+  }
+  async listResearchTopicJournalEntries(topicId:string):Promise<ResearchTopicJournalEntry[]> {
+    const rows=await this.db.select<DbRow[]>('SELECT id,topic_id,entry_date,content_html,created_at,updated_at FROM research_topic_journal_entries WHERE topic_id=$1 ORDER BY entry_date DESC,updated_at DESC',[topicId])
+    return rows.map((row)=>({id:String(row.id),topicId:String(row.topic_id),entryDate:String(row.entry_date),contentHtml:String(row.content_html),createdAt:String(row.created_at),updatedAt:String(row.updated_at)}))
+  }
+  async saveResearchTopicJournalEntry(input:TopicJournalEntryInput):Promise<ResearchTopicJournalEntry> {
+    const entryDate=cleanJournalDate(input.entryDate),id=input.id??uuid()
+    const existing=input.id?await this.db.select<DbRow[]>('SELECT topic_id,created_at FROM research_topic_journal_entries WHERE id=$1',[input.id]):[]
+    if(existing[0]&&String(existing[0].topic_id)!==input.topicId)throw new Error('The selected journal entry does not belong to this research topic.')
+    const duplicates=await this.db.select<DbRow[]>('SELECT id FROM research_topic_journal_entries WHERE topic_id=$1 AND entry_date=$2 AND id<>$3 LIMIT 1',[input.topicId,entryDate,id])
+    if(duplicates.length)throw new Error('A journal entry already exists for this date.')
+    const now=new Date().toISOString(),result={id,topicId:input.topicId,entryDate,contentHtml:input.contentHtml,createdAt:existing[0]?String(existing[0].created_at):now,updatedAt:now}
+    try{await this.db.execute('INSERT INTO research_topic_journal_entries (id,topic_id,entry_date,content_html,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO UPDATE SET entry_date=excluded.entry_date,content_html=excluded.content_html,updated_at=excluded.updated_at',[result.id,result.topicId,result.entryDate,result.contentHtml,result.createdAt,result.updatedAt])}
+    catch{throw new Error('A journal entry already exists for this date.')}
+    await this.db.execute('UPDATE research_topics SET updated_at=$1 WHERE id=$2',[now,input.topicId]);return result
+  }
+  async deleteResearchTopicJournalEntry(id:string) {
+    const rows=await this.db.select<Array<{topic_id:string}>>('SELECT topic_id FROM research_topic_journal_entries WHERE id=$1',[id])
+    await this.db.execute('DELETE FROM research_topic_journal_entries WHERE id=$1',[id])
+    if(rows[0])await this.db.execute('UPDATE research_topics SET updated_at=$1 WHERE id=$2',[new Date().toISOString(),rows[0].topic_id])
+  }
+  async getResearchTopicRelations(topicId:string) {
+    const direct=await this.db.select<Array<{security_id:string}>>('SELECT security_id FROM research_topic_securities WHERE topic_id=$1 ORDER BY security_id',[topicId])
+    const rules=await this.db.select<Array<{tag_id:string}>>('SELECT tag_id FROM research_topic_tags WHERE topic_id=$1 ORDER BY tag_id',[topicId])
+    const rows=await this.db.select<DbRow[]>(`WITH RECURSIVE descendant_tags(id) AS (
+      SELECT tag_id FROM research_topic_tags WHERE topic_id=$1
+      UNION SELECT tags.id FROM tags JOIN descendant_tags ON tags.parent_id=descendant_tags.id
+    ), relation_sources(security_id,direct,dynamic) AS (
+      SELECT security_id,1,0 FROM research_topic_securities WHERE topic_id=$1
+      UNION ALL SELECT security_tags.security_id,0,1 FROM security_tags JOIN descendant_tags ON descendant_tags.id=security_tags.tag_id
+    ) SELECT s.id,s.name,s.symbol,s.alternative_id,s.currency,MAX(relation_sources.direct) direct,MAX(relation_sources.dynamic) dynamic
+      FROM relation_sources JOIN securities s ON s.id=relation_sources.security_id
+      GROUP BY s.id,s.name,s.symbol,s.alternative_id,s.currency ORDER BY lower(s.symbol),s.id`,[topicId])
+    return{directSecurityIds:direct.map((item)=>item.security_id),tagIds:rules.map((item)=>item.tag_id),relatedSecurities:rows.map((row)=>({...mapSecurity(row),direct:Boolean(row.direct),dynamic:Boolean(row.dynamic)}))}
+  }
+  async setResearchTopicRelations(topicId:string,directSecurityIds:string[],tagIds:string[]) {
+    await this.db.execute('DELETE FROM research_topic_securities WHERE topic_id=$1',[topicId])
+    await this.db.execute('DELETE FROM research_topic_tags WHERE topic_id=$1',[topicId])
+    for(const securityId of new Set(directSecurityIds))await this.db.execute('INSERT INTO research_topic_securities (topic_id,security_id) VALUES ($1,$2)',[topicId,securityId])
+    for(const tagId of new Set(tagIds))await this.db.execute('INSERT INTO research_topic_tags (topic_id,tag_id) VALUES ($1,$2)',[topicId,tagId])
+    await this.db.execute('UPDATE research_topics SET updated_at=$1 WHERE id=$2',[new Date().toISOString(),topicId])
   }
 }

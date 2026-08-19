@@ -61,9 +61,44 @@ export interface SecurityJournalEntry {
   updatedAt: string
 }
 
+export interface ResearchTopic {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ResearchTopicNote {
+  topicId: string
+  contentHtml: string
+  updatedAt: string
+}
+
+export interface ResearchTopicJournalEntry {
+  id: string
+  topicId: string
+  entryDate: string
+  contentHtml: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TopicRelatedSecurity extends Security {
+  direct: boolean
+  dynamic: boolean
+}
+
+export interface ResearchTopicRelations {
+  directSecurityIds: string[]
+  tagIds: string[]
+  relatedSecurities: TopicRelatedSecurity[]
+}
+
 export type View =
   | { type: 'all-securities' }
   | { type: 'watchlist'; id: string }
+  | { type: 'topics' }
+  | { type: 'topic'; id: string }
   | { type: 'taxonomy'; id: string }
   | { type: 'security'; id: string }
 

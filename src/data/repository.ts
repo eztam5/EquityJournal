@@ -1,6 +1,7 @@
-import type { Security, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, ResearchTopicRelations, Security, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 
 export type JournalEntryInput = Pick<SecurityJournalEntry, 'securityId' | 'entryDate' | 'contentHtml'> & { id?: string }
+export type TopicJournalEntryInput = Pick<ResearchTopicJournalEntry, 'topicId' | 'entryDate' | 'contentHtml'> & { id?: string }
 export type SecurityInput = Omit<Security, 'id' | 'alternativeId'> & { alternativeId?: string }
 
 export interface EquityRepository {
@@ -34,6 +35,17 @@ export interface EquityRepository {
   deleteJournalEntry(id: string): Promise<void>
   listSecurityLinkTemplates(): Promise<SecurityLinkTemplate[]>
   saveSecurityLinkTemplates(templates: SecurityLinkTemplate[]): Promise<SecurityLinkTemplate[]>
+  listResearchTopics(): Promise<ResearchTopic[]>
+  addResearchTopic(title: string): Promise<ResearchTopic>
+  updateResearchTopic(topic: Pick<ResearchTopic, 'id' | 'title'>): Promise<void>
+  deleteResearchTopic(id: string): Promise<void>
+  loadResearchTopicNote(topicId: string): Promise<ResearchTopicNote>
+  saveResearchTopicNote(topicId: string, contentHtml: string): Promise<ResearchTopicNote>
+  listResearchTopicJournalEntries(topicId: string): Promise<ResearchTopicJournalEntry[]>
+  saveResearchTopicJournalEntry(input: TopicJournalEntryInput): Promise<ResearchTopicJournalEntry>
+  deleteResearchTopicJournalEntry(id: string): Promise<void>
+  getResearchTopicRelations(topicId: string): Promise<ResearchTopicRelations>
+  setResearchTopicRelations(topicId: string, directSecurityIds: string[], tagIds: string[]): Promise<void>
 }
 
 export function cleanRequired(value: string, label: string): string {

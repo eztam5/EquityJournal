@@ -110,6 +110,11 @@ pub fn run() {
         description: "security_alternative_id_and_link_templates",
         sql: include_str!("../migrations/004_security_links.sql"),
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 5,
+        description: "research_topics",
+        sql: include_str!("../migrations/005_research_topics.sql"),
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()

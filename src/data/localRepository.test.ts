@@ -136,4 +136,39 @@ describe('LocalRepository',()=>{
     expect(tags.filter((tag)=>tag.parentId===null).toSorted((left,right)=>left.sortOrder-right.sortOrder).map((tag)=>tag.id)).toEqual([c.id,b.id,a.id])
     await expect(repository.moveTag(a.id,child.id,0)).rejects.toThrow('descendants')
   })
+  it('combines direct topic securities with dynamic tag descendants',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const software=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Software',description:'',color:taxonomy.color})
+    const vms=await repository.addTag({taxonomyId:taxonomy.id,parentId:software.id,name:'VMS',description:'',color:taxonomy.color})
+    const apple=await repository.addSecurity({symbol:'AAPL',currency:'USD',name:'Apple'})
+    const constellation=await repository.addSecurity({symbol:'CSU',currency:'CAD',name:'Constellation Software'})
+    await repository.setAssignedTags(constellation.id,[vms.id])
+    const topic=await repository.addResearchTopic('Serial acquirers in VMS')
+    await repository.setResearchTopicRelations(topic.id,[apple.id,constellation.id],[software.id])
+
+    let relations=await repository.getResearchTopicRelations(topic.id)
+    expect(relations.relatedSecurities).toEqual([
+      expect.objectContaining({id:apple.id,direct:true,dynamic:false}),
+      expect.objectContaining({id:constellation.id,direct:true,dynamic:true}),
+    ])
+
+    const topicus=await repository.addSecurity({symbol:'TOI',currency:'CAD',name:'Topicus'})
+    await repository.setAssignedTags(topicus.id,[vms.id])
+    relations=await repository.getResearchTopicRelations(topic.id)
+    expect(relations.relatedSecurities.map((security)=>security.id)).toEqual([apple.id,constellation.id,topicus.id])
+  })
+  it('stores topic theses and journals and deletes them with the topic',async()=>{
+    const repository=new LocalRepository();await repository.initialize();const topic=await repository.addResearchTopic('Pricing power')
+    await repository.saveResearchTopicNote(topic.id,'<p>Current topic thesis</p>')
+    const entry=await repository.saveResearchTopicJournalEntry({topicId:topic.id,entryDate:'2026-08-19',contentHtml:'<p>New evidence</p>'})
+
+    expect((await repository.loadResearchTopicNote(topic.id)).contentHtml).toBe('<p>Current topic thesis</p>')
+    expect(await repository.listResearchTopicJournalEntries(topic.id)).toEqual([entry])
+
+    await repository.deleteResearchTopic(topic.id)
+    expect(await repository.listResearchTopics()).toEqual([])
+    expect((await repository.loadResearchTopicNote(topic.id)).contentHtml).toBe('')
+    expect(await repository.listResearchTopicJournalEntries(topic.id)).toEqual([])
+  })
 })

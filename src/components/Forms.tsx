@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Button, Callout, FormGroup, InputGroup, TextArea, Tooltip } from '@blueprintjs/core'
-import type { Security, Tag, Taxonomy } from '../domain/types'
+import type { ResearchTopic, Security, Tag, Taxonomy } from '../domain/types'
 import { useApp } from '../app/AppContext'
 import { DialogActions, DraggableDialog } from './DraggableDialog'
 
@@ -22,6 +22,12 @@ export function WatchlistForm({ onClose }: { onClose(): void }) {
 export function TaxonomyForm({ onClose }: { onClose(): void }) {
   const app=useApp();const[name,setName]=useState('');const[description,setDescription]=useState('');const[color,setColor]=useState(COLORS[0]);const[error,setError]=useState('');const submit=async(e:FormEvent)=>{e.preventDefault();try{await app.addTaxonomy({name,description,color});onClose()}catch(r){setError(r instanceof Error?r.message:String(r))}}
   return <DraggableDialog title="New taxonomy" onClose={onClose}><form onSubmit={submit} className="form-grid"><FormGroup label="Name" labelFor="taxonomy-name"><InputGroup id="taxonomy-name" autoFocus maxLength={80} value={name} onChange={(e)=>setName(e.target.value)} placeholder="For example, Investment Thesis"/></FormGroup><FormGroup label="Description" labelInfo="(optional)" labelFor="taxonomy-description"><TextArea id="taxonomy-description" fill value={description} onChange={(e)=>setDescription(e.target.value)} placeholder="Describe the purpose of this taxonomy"/></FormGroup><FormGroup label="Color"><ColorPicker value={color} onChange={setColor}/></FormGroup><ErrorText error={error}/><DialogActions><Button text="Cancel" onClick={onClose}/><Button type="submit" intent="primary" text="Save" disabled={!name.trim()}/></DialogActions></form></DraggableDialog>
+}
+
+export function ResearchTopicForm({topic,onClose}:{topic?:ResearchTopic;onClose():void}) {
+  const app=useApp();const[title,setTitle]=useState(topic?.title??'');const[error,setError]=useState('')
+  const submit=async(event:FormEvent)=>{event.preventDefault();setError('');try{if(topic)await app.updateResearchTopic({id:topic.id,title});else await app.addResearchTopic(title);onClose()}catch(reason){setError(reason instanceof Error?reason.message:String(reason))}}
+  return <DraggableDialog title={topic?'Edit research topic':'New research topic'} onClose={onClose} width={520}><form onSubmit={submit} className="form-grid"><FormGroup label="Topic title" labelFor="research-topic-title"><InputGroup id="research-topic-title" autoFocus maxLength={180} value={title} onChange={(event)=>setTitle(event.target.value)} placeholder="For example, Serial acquirers in vertical-market software"/></FormGroup><ErrorText error={error}/><DialogActions><Button text="Cancel" onClick={onClose}/><Button type="submit" intent="primary" text="Save" disabled={!title.trim()}/></DialogActions></form></DraggableDialog>
 }
 
 export function TagForm({ taxonomy, parent, tag, onSaved, onClose }: { taxonomy: Taxonomy; parent?: Tag; tag?: Tag; onSaved(): void; onClose(): void }) {

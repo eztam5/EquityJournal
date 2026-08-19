@@ -116,6 +116,25 @@ table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-com
 .column-check { width: 16px; display: grid; place-items: center; color: var(--accent); }
 .column-chooser-row > .bp6-button { min-width: 26px; min-height: 26px; padding: 0; }
 
+.topic-title-link { padding: 0; border: 0; background: transparent; color: var(--text); font-weight: 600; text-align: left; }
+.topic-title-link:hover { background: transparent !important; color: var(--accent); }
+.topic-table td:last-child { text-align: right; white-space: nowrap; }
+.topic-coverage-card { margin-bottom: 18px; padding: 18px 20px; }
+.topic-coverage-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.topic-coverage-card > header h2 { margin: 0 0 3px; font-size: 18px; }
+.topic-coverage-card > header p { margin: 0; }
+.topic-rule-list { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.topic-rule-list .bp6-tag { border: 1px solid; }
+.topic-rule-list .bp6-tag span { color: var(--muted); }
+.topic-security-table.bp6-html-table { width: 100%; }
+.topic-security-table .bp6-button { justify-content: flex-start; padding-inline: 0; }
+.topic-relations-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 20px; max-height: 490px; overflow: hidden; }
+.topic-relations-editor > section { min-width: 0; display: flex; flex-direction: column; }
+.topic-relations-editor h3 { margin: 0 0 5px; font-size: 15px; }
+.topic-relations-editor section > p { min-height: 34px; margin: 0 0 10px; }
+.topic-relation-choices { min-height: 0; display: grid; align-content: start; gap: 7px; padding: 10px; overflow: auto; border: 1px solid var(--border); background: var(--content); }
+.topic-tag-rules { min-height: 0; max-height: none; padding-right: 4px; }
+
 .taxonomy-card .bp6-tree { background: transparent; font-size: 12px; }
 .taxonomy-page-header { align-items: flex-start; gap: 20px; }
 .taxonomy-search.bp6-input-group { width: min(300px, 42vw); flex: none; }
