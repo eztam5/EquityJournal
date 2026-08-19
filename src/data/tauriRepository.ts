@@ -34,6 +34,10 @@ export class TauriRepository implements EquityRepository {
     catch { throw new Error('A watchlist with this name already exists.') }
     return result
   }
+  async updateWatchlist(watchlist: Watchlist) {
+    try { await this.db.execute('UPDATE watchlists SET name=$1 WHERE id=$2',[cleanRequired(watchlist.name,'a watchlist name'),watchlist.id]) }
+    catch { throw new Error('A watchlist with this name already exists.') }
+  }
   async deleteWatchlist(id: string) { await this.db.execute('DELETE FROM watchlists WHERE id=$1', [id]) }
   async setWatchlistSecurity(watchlistId: string, securityId: string, assigned: boolean) {
     if (assigned) await this.db.execute('INSERT OR IGNORE INTO watchlist_securities (watchlist_id,security_id) VALUES ($1,$2)', [watchlistId, securityId])

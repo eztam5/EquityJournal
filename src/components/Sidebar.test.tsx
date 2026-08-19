@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
@@ -61,6 +61,21 @@ describe('Sidebar taxonomy navigation',()=>{
 
     expect(await screen.findByText('Recently Viewed')).toBeInTheDocument()
     expect(screen.getByRole('button',{name:'Apple Inc. — AAPL'})).toBeInTheDocument()
+  })
+
+  it('renames a watchlist from its context menu',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addWatchlist('Quality')
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/></AppProvider>)
+
+    fireEvent.contextMenu(await screen.findByRole('button',{name:'Quality'}),{clientX:20,clientY:30})
+    fireEvent.click(await screen.findByRole('menuitem',{name:'Rename'}))
+    const dialog=screen.getByRole('dialog',{name:'Rename watchlist'})
+    fireEvent.change(within(dialog).getByLabelText('List name'),{target:{value:'High Quality'}})
+    fireEvent.click(within(dialog).getByRole('button',{name:'Save'}))
+
+    expect(await screen.findByRole('button',{name:'High Quality'})).toBeInTheDocument()
+    expect(await repository.listWatchlists()).toEqual([expect.objectContaining({name:'High Quality'})])
   })
 
   it('adds a security to the watchlist with pointer-based dragging',async()=>{

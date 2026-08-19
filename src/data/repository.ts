@@ -12,6 +12,7 @@ export interface EquityRepository {
   deleteSecurity(id: string): Promise<void>
   listWatchlists(): Promise<Watchlist[]>
   addWatchlist(name: string): Promise<Watchlist>
+  updateWatchlist(watchlist: Watchlist): Promise<void>
   deleteWatchlist(id: string): Promise<void>
   setWatchlistSecurity(watchlistId: string, securityId: string, assigned: boolean): Promise<void>
   listTaxonomies(): Promise<Taxonomy[]>

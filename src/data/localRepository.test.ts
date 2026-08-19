@@ -38,6 +38,17 @@ describe('LocalRepository',()=>{
     expect(await repository.listSecurities(watchlist.id)).toEqual([])
     expect(await repository.listSecurities()).toEqual([security])
   })
+  it('renames a watchlist while preserving its memberships',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'NESN',currency:'CHF',name:'Nestlé'})
+    const watchlist=await repository.addWatchlist('Swiss shares')
+    await repository.setWatchlistSecurity(watchlist.id,security.id,true)
+
+    await repository.updateWatchlist({...watchlist,name:'Quality shares'})
+
+    expect(await repository.listWatchlists()).toEqual([{...watchlist,name:'Quality shares'}])
+    expect(await repository.listSecurities(watchlist.id)).toEqual([security])
+  })
   it('creates nested tags and rejects deleting a parent with children',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const taxonomy=await repository.addTaxonomy({name:'Risks',description:'',color:'#C25555'})

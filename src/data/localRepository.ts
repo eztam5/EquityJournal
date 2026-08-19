@@ -69,6 +69,13 @@ export class LocalRepository implements EquityRepository {
     if (this.data.watchlists.some((x) => x.name.toLowerCase() === name.toLowerCase())) throw new Error('A watchlist with this name already exists.')
     const result = { id: uuid(), name }; this.data.watchlists.push(result); this.persist(); return result
   }
+  async updateWatchlist(watchlist: Watchlist) {
+    const name=cleanRequired(watchlist.name,'a watchlist name')
+    if(this.data.watchlists.some((item)=>item.id!==watchlist.id&&item.name.toLowerCase()===name.toLowerCase()))throw new Error('A watchlist with this name already exists.')
+    const existing=this.data.watchlists.find((item)=>item.id===watchlist.id)
+    if(!existing)throw new Error('The watchlist no longer exists.')
+    existing.name=name;this.persist()
+  }
   async deleteWatchlist(id: string) {
     this.data.watchlists = this.data.watchlists.filter((watchlist) => watchlist.id !== id)
     this.data.watchlistSecurities = this.data.watchlistSecurities.filter((membership) => membership.watchlistId !== id)

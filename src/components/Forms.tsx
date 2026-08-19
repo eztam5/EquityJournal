@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Button, Callout, FormGroup, InputGroup, TextArea, Tooltip } from '@blueprintjs/core'
-import type { ResearchTopic, Security, Tag, Taxonomy } from '../domain/types'
+import type { ResearchTopic, Security, Tag, Taxonomy, Watchlist } from '../domain/types'
 import { useApp } from '../app/AppContext'
 import { DialogActions, DraggableDialog } from './DraggableDialog'
 
@@ -14,9 +14,9 @@ export function SecurityForm({ security, onClose }: { security?: Security; onClo
   return <DraggableDialog title={security?'Edit security':'New security'} onClose={onClose}><form onSubmit={submit} className="form-grid"><FormGroup label="Symbol" labelFor="security-symbol"><InputGroup id="security-symbol" autoFocus maxLength={20} value={symbol} onChange={(e)=>setSymbol(e.target.value)} placeholder="For example, AAPL"/></FormGroup><FormGroup label="Alternative ID" labelInfo="(optional)" labelFor="security-alternative-id"><InputGroup id="security-alternative-id" maxLength={80} value={alternativeId} onChange={(e)=>setAlternativeId(e.target.value)} placeholder="For example, US0378331005"/></FormGroup><FormGroup label="Currency" labelFor="security-currency"><InputGroup id="security-currency" maxLength={8} value={currency} onChange={(e)=>setCurrency(e.target.value)} placeholder="For example, USD"/></FormGroup><FormGroup label="Company name" labelFor="security-name"><InputGroup id="security-name" maxLength={160} value={name} onChange={(e)=>setName(e.target.value)} placeholder="For example, Apple Inc."/></FormGroup><ErrorText error={error}/><DialogActions><Button text="Cancel" onClick={onClose}/><Button type="submit" intent="primary" text="Save" disabled={!symbol.trim()||!currency.trim()||!name.trim()}/></DialogActions></form></DraggableDialog>
 }
 
-export function WatchlistForm({ onClose }: { onClose(): void }) {
-  const app=useApp();const[name,setName]=useState('');const[error,setError]=useState('');const submit=async(e:FormEvent)=>{e.preventDefault();try{await app.addWatchlist(name);onClose()}catch(r){setError(r instanceof Error?r.message:String(r))}}
-  return <DraggableDialog title="New watchlist" onClose={onClose} width={420}><form onSubmit={submit} className="form-grid"><FormGroup label="List name" labelFor="watchlist-name"><InputGroup id="watchlist-name" autoFocus maxLength={80} value={name} onChange={(e)=>setName(e.target.value)} placeholder="For example, Watchlist"/></FormGroup><ErrorText error={error}/><DialogActions><Button text="Cancel" onClick={onClose}/><Button type="submit" intent="primary" text="Save" disabled={!name.trim()}/></DialogActions></form></DraggableDialog>
+export function WatchlistForm({ watchlist, onClose }: { watchlist?:Watchlist;onClose(): void }) {
+  const app=useApp();const[name,setName]=useState(watchlist?.name??'');const[error,setError]=useState('');const submit=async(e:FormEvent)=>{e.preventDefault();try{if(watchlist)await app.updateWatchlist({...watchlist,name});else await app.addWatchlist(name);onClose()}catch(r){setError(r instanceof Error?r.message:String(r))}}
+  return <DraggableDialog title={watchlist?'Rename watchlist':'New watchlist'} onClose={onClose} width={420}><form onSubmit={submit} className="form-grid"><FormGroup label="List name" labelFor="watchlist-name"><InputGroup id="watchlist-name" autoFocus maxLength={80} value={name} onChange={(e)=>setName(e.target.value)} placeholder="For example, Watchlist"/></FormGroup><ErrorText error={error}/><DialogActions><Button text="Cancel" onClick={onClose}/><Button type="submit" intent="primary" text="Save" disabled={!name.trim()}/></DialogActions></form></DraggableDialog>
 }
 
 export function TaxonomyForm({ onClose }: { onClose(): void }) {
