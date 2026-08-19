@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type DragEvent, type MouseEvent } from 'react'
-import { Button, HTMLTable, Icon, Menu, MenuItem, PopoverNext, showContextMenu } from '@blueprintjs/core'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { Button, HTMLTable, Icon, Menu, MenuItem, PopoverNext, showContextMenu, Tooltip } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import { resolveSecurityLink } from '../data/repository'
 import type { Security, SecurityLinkTemplate } from '../domain/types'
 import { openExternalUrl } from '../utils/externalLinks'
+import { announceWatchlistDragHover, watchlistDropTargetAt } from '../utils/watchlistSecurityDrag'
 import { ConfirmDialog, SecurityForm } from './Forms'
 
 export type SecuritySortKey = 'symbol'|'alternativeId'|'name'|'currency'
@@ -84,6 +85,9 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const[preferences,setPreferences]=useState<SecurityColumnPreferences>(loadSecurityColumnPreferences)
   const[sortKey,setSortKey]=useState<SecuritySortKey>(()=>loadVisibleSecurityColumns().find(isSecuritySortKey)??'symbol')
   const[direction,setDirection]=useState<SortDirection>('asc')
+  const pendingDrag=useRef<{security:Security;pointerId:number;x:number;y:number}|null>(null)
+  const draggingSecurity=useRef<Security|null>(null)
+  const hoveredWatchlistId=useRef<string|null>(null)
 
   useEffect(()=>{app.repository.listSecurities(watchlistId).then(setRows)},[app.repository,app.securities,watchlistId])
   useEffect(()=>{localStorage.setItem(COLUMN_PREFERENCES_KEY,JSON.stringify(preferences))},[preferences])
@@ -118,8 +122,15 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const reorderColumn=(source:SecurityColumnKey,target:SecurityColumnKey)=>setPreferences((current)=>{const order=orderedColumns.map((column)=>column.key),sourceIndex=order.indexOf(source),targetIndex=order.indexOf(target);if(sourceIndex<0||targetIndex<0||sourceIndex===targetIndex)return current;order.splice(sourceIndex,1);order.splice(targetIndex,0,source);return{...current,order:[...order,...current.order.filter((key)=>!order.includes(key))]}})
   const moveColumn=(column:SecurityColumnKey,offset:number)=>{const index=orderedColumns.findIndex((item)=>item.key===column),target=orderedColumns[index+offset];if(target)reorderColumn(column,target.key)}
   const title=watchlistId?app.watchlists.find((watchlist)=>watchlist.id===watchlistId)?.name??'Watchlist':'All Securities'
-  const openMenu=(event:MouseEvent,security:Security)=>{event.preventDefault();showContextMenu({targetOffset:{left:event.clientX,top:event.clientY},isDarkTheme:document.documentElement.classList.contains('bp6-dark'),content:<Menu><MenuItem icon="edit" text="Edit" onClick={()=>setEditing(security)}/><MenuItem icon="trash" intent="danger" text="Delete" onClick={()=>setDeleting(security)}/></Menu>})}
-  const dragSecurity=(event:DragEvent,security:Security)=>{event.dataTransfer.effectAllowed='copy';event.dataTransfer.setData('application/x-equity-security',security.id)}
+  const removeOrDeleteLabel=watchlistId?'Remove from watchlist':'Delete'
+  const removeFromWatchlist=async(security:Security)=>{if(!watchlistId)return;await app.repository.setWatchlistSecurity(watchlistId,security.id,false);setRows((current)=>current.filter((item)=>item.id!==security.id))}
+  const removeOrRequestDelete=(security:Security)=>{if(watchlistId)void removeFromWatchlist(security);else setDeleting(security)}
+  const openMenu=(event:MouseEvent,security:Security)=>{event.preventDefault();showContextMenu({targetOffset:{left:event.clientX,top:event.clientY},isDarkTheme:document.documentElement.classList.contains('bp6-dark'),content:<Menu><MenuItem icon="edit" text="Edit" onClick={()=>setEditing(security)}/><MenuItem icon="trash" intent="danger" text={removeOrDeleteLabel} onClick={()=>removeOrRequestDelete(security)}/></Menu>})}
+  const resetSecurityDrag=()=>{pendingDrag.current=null;draggingSecurity.current=null;hoveredWatchlistId.current=null;document.documentElement.classList.remove('watchlist-security-dragging');announceWatchlistDragHover(null)}
+  const startSecurityDrag=(event:PointerEvent<HTMLTableRowElement>,security:Security)=>{if(event.button!==0||(event.target as Element).closest('button,a,input'))return;pendingDrag.current={security,pointerId:event.pointerId,x:event.clientX,y:event.clientY};event.currentTarget.setPointerCapture?.(event.pointerId)}
+  const moveSecurityDrag=(event:PointerEvent<HTMLTableRowElement>)=>{const pending=pendingDrag.current;if(!draggingSecurity.current&&pending&&pending.pointerId===event.pointerId){if(Math.hypot(event.clientX-pending.x,event.clientY-pending.y)<5)return;draggingSecurity.current=pending.security;document.documentElement.classList.add('watchlist-security-dragging')}if(!draggingSecurity.current)return;event.preventDefault();const target=watchlistDropTargetAt(event.clientX,event.clientY);if(target!==hoveredWatchlistId.current){hoveredWatchlistId.current=target;announceWatchlistDragHover(target)}}
+  const finishSecurityDrag=async(event:PointerEvent<HTMLTableRowElement>)=>{const security=draggingSecurity.current;const targetWatchlistId=watchlistDropTargetAt(event.clientX,event.clientY)??hoveredWatchlistId.current;event.currentTarget.releasePointerCapture?.(event.pointerId);if(!security){pendingDrag.current=null;return}event.preventDefault();event.stopPropagation();resetSecurityDrag();if(targetWatchlistId){await app.repository.setWatchlistSecurity(targetWatchlistId,security.id,true);await app.refresh()}}
+  const renderRemoveOrDeleteButton=(security:Security)=>{const button=<Button variant="minimal" size="small" icon="trash" intent="danger" aria-label={`${watchlistId?'Remove':'Delete'} ${security.name}`} onClick={()=>removeOrRequestDelete(security)}/>;return watchlistId?<Tooltip key="remove" content="Remove from this watchlist. The security itself will not be deleted." placement="left">{button}</Tooltip>:button}
 
   const columnMenu=<Menu aria-label="Visible columns" className="column-chooser">{orderedColumns.map((column,index)=><ColumnChooserRow key={column.key} column={column} index={index} count={orderedColumns.length} visible={preferences.visible.includes(column.key)} lastVisible={preferences.visible.includes(column.key)&&visibleColumns.length===1} onToggle={()=>toggleColumn(column.key)} onMove={(offset)=>moveColumn(column.key,offset)}/>)}</Menu>
 
@@ -134,7 +145,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   }
 
   return <main className="content page"><header className="page-header"><div><h1>{title}</h1><p>{rows.length} {rows.length===1?'security':'securities'}</p></div><PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button icon="properties" text="Columns"/></PopoverNext></header>
-    <div className="content-panel data-card"><HTMLTable className="security-table" compact interactive striped><thead><tr>{visibleColumns.map(renderHeader)}<th aria-label="Actions"/></tr></thead><tbody>{sortedRows.map((security)=><tr key={security.id} draggable onDragStart={(event)=>dragSecurity(event,security)} onDoubleClick={()=>app.openSecurity(security.id)} onContextMenu={(event)=>openMenu(event,security)}>{visibleColumns.map((column)=>renderCell(column,security))}<td><Button variant="minimal" size="small" icon="edit" aria-label={`Edit ${security.name}`} onClick={()=>setEditing(security)}/><Button variant="minimal" size="small" icon="trash" intent="danger" aria-label={`Delete ${security.name}`} onClick={()=>setDeleting(security)}/></td></tr>)}</tbody></HTMLTable>{rows.length===0&&<div className="empty-state">No securities yet.</div>}</div>
-    {editing&&<SecurityForm security={editing} onClose={()=>setEditing(undefined)}/>} {deleting&&<ConfirmDialog title="Delete security" message={`Do you really want to delete ${deleting.name}?`} onClose={()=>setDeleting(undefined)} onConfirm={()=>app.deleteSecurity(deleting.id)}/>} 
+    <div className="content-panel data-card"><HTMLTable className="security-table" compact interactive striped><thead><tr>{visibleColumns.map(renderHeader)}<th aria-label="Actions"/></tr></thead><tbody>{sortedRows.map((security)=><tr key={security.id} className="security-draggable-row" onPointerDown={(event)=>startSecurityDrag(event,security)} onPointerMove={moveSecurityDrag} onPointerUp={(event)=>void finishSecurityDrag(event)} onPointerCancel={resetSecurityDrag} onDoubleClick={()=>app.openSecurity(security.id)} onContextMenu={(event)=>openMenu(event,security)}>{visibleColumns.map((column)=>renderCell(column,security))}<td><Button variant="minimal" size="small" icon="edit" aria-label={`Edit ${security.name}`} onClick={()=>setEditing(security)}/>{renderRemoveOrDeleteButton(security)}</td></tr>)}</tbody></HTMLTable>{rows.length===0&&<div className="empty-state">No securities yet.</div>}</div>
+    {editing&&<SecurityForm security={editing} onClose={()=>setEditing(undefined)}/>} {deleting&&<ConfirmDialog title="Delete security" message={`Permanently delete ${deleting.name} from the database?`} confirmLabel="Delete" onClose={()=>setDeleting(undefined)} onConfirm={()=>app.deleteSecurity(deleting.id)}/>}
   </main>
 }

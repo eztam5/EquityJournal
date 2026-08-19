@@ -55,4 +55,22 @@ describe('SecuritiesView visible columns',()=>{
     expect(screen.queryByRole('button',{name:'Actions for Apple Inc.'})).not.toBeInTheDocument()
   })
 
+  it('removes a security from a watchlist without deleting it',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    const watchlist=await repository.addWatchlist('Quality')
+    await repository.setWatchlistSecurity(watchlist.id,security.id,true)
+    render(<AppProvider repository={repository}><SecuritiesView watchlistId={watchlist.id}/></AppProvider>)
+
+    const removeButton=await screen.findByRole('button',{name:'Remove Apple Inc.'})
+    fireEvent.mouseEnter(removeButton)
+    expect(await screen.findByText(/security itself will not be deleted/i)).toBeInTheDocument()
+    fireEvent.click(removeButton)
+
+    await waitFor(()=>expect(screen.queryByText('Apple Inc.')).not.toBeInTheDocument())
+    expect(screen.queryByRole('dialog',{name:'Remove from watchlist'})).not.toBeInTheDocument()
+    expect(await repository.listSecurities(watchlist.id)).toEqual([])
+    expect(await repository.listSecurities()).toEqual([security])
+  })
+
 })

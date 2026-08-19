@@ -2,10 +2,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
+import { SecuritiesView } from './SecuritiesView'
 import { Sidebar } from './Sidebar'
 
 describe('Sidebar taxonomy navigation',()=>{
-  afterEach(()=>{cleanup();localStorage.clear()})
+  afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks();vi.unstubAllGlobals();Reflect.deleteProperty(document,'elementFromPoint')})
 
   it('starts folded and opens a security through the taxonomy tree',async()=>{
     const repository=new LocalRepository();await repository.initialize()
@@ -60,5 +61,26 @@ describe('Sidebar taxonomy navigation',()=>{
 
     expect(await screen.findByText('Recently Viewed')).toBeInTheDocument()
     expect(screen.getByRole('button',{name:'Apple Inc. — AAPL'})).toBeInTheDocument()
+  })
+
+  it('adds a security to the watchlist with pointer-based dragging',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    const watchlist=await repository.addWatchlist('Quality')
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/><SecuritiesView/></AppProvider>)
+
+    const row=(await screen.findByText('Apple Inc.')).closest('tr')
+    expect(row).not.toBeNull()
+    const target=screen.getByRole('button',{name:'Quality'})
+    class TestPointerEvent extends MouseEvent { pointerId:number;constructor(type:string,init:PointerEventInit){super(type,init);this.pointerId=init.pointerId??0} }
+    vi.stubGlobal('PointerEvent',TestPointerEvent)
+    Object.defineProperty(document,'elementFromPoint',{configurable:true,value:vi.fn(()=>target)})
+    fireEvent.pointerDown(row!,{button:0,pointerId:1,clientX:10,clientY:10})
+    fireEvent.pointerMove(row!,{pointerId:1,clientX:30,clientY:30})
+    expect(target).toHaveClass('drop-target')
+    fireEvent.pointerUp(row!,{pointerId:1,clientX:30,clientY:30})
+
+    await waitFor(async()=>expect(await repository.listSecurities(watchlist.id)).toEqual([security]))
+    expect(target).not.toHaveClass('drop-target')
   })
 })
