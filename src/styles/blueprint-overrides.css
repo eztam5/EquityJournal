@@ -84,7 +84,7 @@
 .taxonomy-security-item .bp6-icon { color: var(--muted); }
 .taxonomy-sidebar-error { padding: 4px 8px 4px 24px; color: var(--danger); font-size: 11px; }
 
-.notes-card { padding: 18px 0; }
+.notes-card { padding: 18px 0; overflow: visible; }
 .info-card { grid-template-columns: 110px 150px 90px minmax(160px, 1.4fr) minmax(150px, 1fr); gap: 18px; }
 .info-card > div { min-width: 0; }
 .security-links > div { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
@@ -116,6 +116,7 @@
 
 .editor-shell { border: 0; border-radius: 0; }
 .editor-shell:focus-within { outline: none; border: 0; box-shadow: none; }
+.editor-toolbar { position: sticky; top: 0; z-index: 15; box-shadow: 0 1px 0 var(--border); }
 .rich-editor:focus { outline: none; }
 .ProseMirror:focus { outline: none; }
 

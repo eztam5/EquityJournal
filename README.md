@@ -71,6 +71,10 @@ The new schema intentionally retains the Qt application's table and column names
 
 
 # Roadmap
-- back button
-- reference other companies or topics within a note like #CSU. This must have an auto completion
 - Add a search bar everywhere where needed like on watchlists
+- Font sizes are not aligned everywhere which looks not perfect
+- Add a stock price chart and mark the journal entries on the chart line
+- Upload documents to a company or topic.
+- Add images in the text editor
+- Add AI chat on the security detail and topic view to summarize, extend and verify the investment thesis
+    - Do we need RAG or can the content fit into the context window? Or manual user based attachments?
