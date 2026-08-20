@@ -67,6 +67,8 @@
 .securities-list-item.bp6-button .bp6-icon, .securities-list-item.bp6-button .bp6-icon svg { color: var(--muted) !important; fill: var(--muted) !important; }
 .all-securities-item.bp6-button .bp6-icon, .all-securities-item.bp6-button .bp6-icon svg { color: var(--accent) !important; fill: var(--accent) !important; }
 .security-table tbody tr.security-draggable-row { cursor: grab; user-select: none; }
+table.security-table.bp6-html-table tbody tr.security-selected > td,
+table.security-table.bp6-html-table tbody tr.security-selected:hover > td { background: var(--pressed) !important; }
 .watchlist-security-dragging, .watchlist-security-dragging * { cursor: copy !important; }
 .research-topics-item.bp6-button { gap: 0; }
 .research-topics-item.bp6-button > :first-child { margin-right: 6px; }

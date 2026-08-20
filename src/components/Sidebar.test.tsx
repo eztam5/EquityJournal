@@ -113,4 +113,47 @@ describe('Sidebar taxonomy navigation',()=>{
     await waitFor(async()=>expect(await repository.listSecurities(watchlist.id)).toEqual([security]))
     expect(target).not.toHaveClass('drop-target')
   })
+
+  it('selects with the platform modifier and drags all selected securities',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const apple=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    const microsoft=await repository.addSecurity({symbol:'MSFT',name:'Microsoft',currency:'USD'})
+    const watchlist=await repository.addWatchlist('Quality')
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/><SecuritiesView/></AppProvider>)
+
+    const appleRow=(await screen.findByText('Apple Inc.')).closest('tr')!
+    const microsoftRow=screen.getByText('Microsoft').closest('tr')!
+    fireEvent.click(appleRow,{ctrlKey:true})
+    fireEvent.click(microsoftRow,{ctrlKey:true})
+    expect(appleRow).toHaveClass('security-selected')
+    expect(microsoftRow).toHaveClass('security-selected')
+
+    const target=screen.getByRole('button',{name:'Quality'})
+    class TestPointerEvent extends MouseEvent { pointerId:number;constructor(type:string,init:PointerEventInit){super(type,init);this.pointerId=init.pointerId??0} }
+    vi.stubGlobal('PointerEvent',TestPointerEvent)
+    Object.defineProperty(document,'elementFromPoint',{configurable:true,value:vi.fn(()=>target)})
+    fireEvent.pointerDown(appleRow,{button:0,pointerId:1,clientX:10,clientY:10})
+    fireEvent.pointerMove(appleRow,{pointerId:1,clientX:30,clientY:30})
+    fireEvent.pointerUp(appleRow,{pointerId:1,clientX:30,clientY:30})
+
+    await waitFor(async()=>expect((await repository.listSecurities(watchlist.id)).map((security)=>security.id)).toEqual([apple.id,microsoft.id]))
+  })
+
+  it('selects a contiguous range with Shift',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    await repository.addSecurity({symbol:'MSFT',name:'Microsoft',currency:'USD'})
+    await repository.addSecurity({symbol:'NVDA',name:'Nvidia',currency:'USD'})
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+
+    const appleRow=(await screen.findByText('Apple Inc.')).closest('tr')!
+    const microsoftRow=screen.getByText('Microsoft').closest('tr')!
+    const nvidiaRow=screen.getByText('Nvidia').closest('tr')!
+    fireEvent.click(appleRow)
+    fireEvent.click(nvidiaRow,{shiftKey:true})
+
+    expect(appleRow).toHaveClass('security-selected')
+    expect(microsoftRow).toHaveClass('security-selected')
+    expect(nvidiaRow).toHaveClass('security-selected')
+  })
 })

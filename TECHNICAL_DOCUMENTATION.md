@@ -336,7 +336,7 @@ Internal links are stored inside the note HTML as atomic spans with stable ident
 
 The app uses pointer-driven drag-and-drop rather than the browser HTML drag API.
 
-- Securities can be dragged from security tables onto watchlists in the sidebar.
+- Securities can be dragged from security tables onto watchlists in the sidebar. Command-click on macOS or Ctrl-click on other platforms toggles individual rows, while Shift-click selects a contiguous range in the displayed order. All selected securities can be dragged together.
 - Securities can be moved between taxonomy tags.
 - Holding Option on macOS or Ctrl on other supported desktop platforms copies a tag assignment instead of moving it.
 - Tags can be reordered, reparented, or moved to the taxonomy root.
