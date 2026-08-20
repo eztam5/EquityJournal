@@ -1,6 +1,10 @@
 /* Blueprint owns component structure; these rules connect it to EquityJournal's tokens and compact layout. */
 .bp6-button { font-size: 12px; }
 .bp6-menu { min-width: 170px; }
+.bp6-context-menu-popover .bp6-menu-item,
+.bp6-context-menu .bp6-menu-item,
+.context-menu button { font-size: 12px; }
+.sidebar-add-menu .bp6-menu-item { font-size: 12px; }
 .bp6-card { background: var(--window); color: var(--text); border-radius: 0; border: 1px solid var(--border); box-shadow: none !important; }
 .content-panel.bp6-card { border-left: 0; border-right: 0; }
 .page h1,
