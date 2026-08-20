@@ -6,6 +6,7 @@ import type { Security, SecurityLinkTemplate } from '../domain/types'
 import { openExternalUrl } from '../utils/externalLinks'
 import { announceWatchlistDragHover, watchlistDropTargetAt } from '../utils/watchlistSecurityDrag'
 import { ConfirmDialog, SecurityForm } from './Forms'
+import { PageHeader } from './PageHeader'
 
 export type SecuritySortKey = 'symbol'|'alternativeId'|'name'|'currency'
 export type SecurityColumnKey = SecuritySortKey|`link:${string}`
@@ -144,7 +145,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     return <td className="security-link-cell" key={column.key}><Button variant="minimal" size="small" icon="share" text="Open" aria-label={`Open ${column.label}`} disabled={!url} title={url?`Open ${column.label}`:`Set an Alternative ID to use ${column.label}`} onClick={(event)=>{event.stopPropagation();if(url)void openExternalUrl(url)}}/></td>
   }
 
-  return <main className="content page"><header className="page-header"><div><h1>{title}</h1><p>{rows.length} {rows.length===1?'security':'securities'}</p></div><PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button icon="properties" text="Columns"/></PopoverNext></header>
+  return <main className="content page"><PageHeader title={title} description={`${rows.length} ${rows.length===1?'security':'securities'}`} actions={<PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button className="page-toolbar-button" icon="properties" text="Columns"/></PopoverNext>}/>
     <div className="content-panel data-card"><HTMLTable className="security-table" compact interactive striped><thead><tr>{visibleColumns.map(renderHeader)}<th aria-label="Actions"/></tr></thead><tbody>{sortedRows.map((security)=><tr key={security.id} className="security-draggable-row" onPointerDown={(event)=>startSecurityDrag(event,security)} onPointerMove={moveSecurityDrag} onPointerUp={(event)=>void finishSecurityDrag(event)} onPointerCancel={resetSecurityDrag} onDoubleClick={()=>app.openSecurity(security.id)} onContextMenu={(event)=>openMenu(event,security)}>{visibleColumns.map((column)=>renderCell(column,security))}<td><Button variant="minimal" size="small" icon="edit" aria-label={`Edit ${security.name}`} onClick={()=>setEditing(security)}/>{renderRemoveOrDeleteButton(security)}</td></tr>)}</tbody></HTMLTable>{rows.length===0&&<div className="empty-state">No securities yet.</div>}</div>
     {editing&&<SecurityForm security={editing} onClose={()=>setEditing(undefined)}/>} {deleting&&<ConfirmDialog title="Delete security" message={`Permanently delete ${deleting.name} from the database?`} confirmLabel="Delete" onClose={()=>setDeleting(undefined)} onConfirm={()=>app.deleteSecurity(deleting.id)}/>}
   </main>

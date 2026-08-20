@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import { createRepository, type EquityRepository } from '../data'
 import type { SecurityInput } from '../data/repository'
 import type { ResearchTopic, Security, SecurityLinkTemplate, Tag, Taxonomy, ThemeMode, View, Watchlist } from '../domain/types'
@@ -15,9 +15,11 @@ interface AppContextValue {
   researchTopics: ResearchTopic[]
   recent: Security[]
   view: View
+  canGoBack: boolean
   theme: ThemeMode
   securityDisplayMode: SecurityDisplayMode
   setView(view: View): void
+  goBack(): void
   setTheme(theme: ThemeMode): void
   setSecurityDisplayMode(mode: SecurityDisplayMode): void
   openSecurity(id: string): void
@@ -40,6 +42,14 @@ interface AppContextValue {
 const Context = createContext<AppContextValue | null>(null)
 const THEME_KEY = 'equity-journal.theme'
 const RECENT_KEY = 'equity-journal.recent-securities'
+type NavigationState={view:View;history:View[]}
+type NavigationAction={type:'navigate';view:View}|{type:'replace';view:View}|{type:'back'}
+const sameView=(left:View,right:View)=>left.type===right.type&&(!('id'in left)||!('id'in right)||left.id===right.id)
+export function navigationReducer(state:NavigationState,action:NavigationAction):NavigationState {
+  if(action.type==='back'){const previous=state.history.at(-1);return previous?{view:previous,history:state.history.slice(0,-1)}:state}
+  if(sameView(state.view,action.view))return state
+  return action.type==='replace'?{...state,view:action.view}:{view:action.view,history:[...state.history,state.view].slice(-50)}
+}
 
 export function AppProvider({ children, repository: suppliedRepository }: { children: ReactNode; repository?: EquityRepository }) {
   const [repository] = useState(() => suppliedRepository ?? createRepository())
@@ -50,7 +60,11 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const [taxonomies, setTaxonomies] = useState<Taxonomy[]>([])
   const [securityLinkTemplates, setSecurityLinkTemplates] = useState<SecurityLinkTemplate[]>([])
   const [researchTopics, setResearchTopics] = useState<ResearchTopic[]>([])
-  const [view, setView] = useState<View>({ type: 'all-securities' })
+  const [navigation, dispatchNavigation] = useReducer(navigationReducer,{view:{type:'all-securities'},history:[]})
+  const view=navigation.view
+  const setView=useCallback((next:View)=>dispatchNavigation({type:'navigate',view:next}),[])
+  const replaceView=useCallback((next:View)=>dispatchNavigation({type:'replace',view:next}),[])
+  const goBack=useCallback(()=>dispatchNavigation({type:'back'}),[])
   const [theme, setThemeState] = useState<ThemeMode>(() => (localStorage.getItem(THEME_KEY) as ThemeMode | null) ?? 'dark')
   const [securityDisplayMode, setSecurityDisplayModeState] = useState<SecurityDisplayMode>(loadSecurityDisplayMode)
   const [recentIds, setRecentIds] = useState<string[]>(() => {
@@ -93,28 +107,28 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const updateSecurity = async (input: Security) => { await repository.updateSecurity(input); await refresh() }
   const deleteSecurity = async (id: string) => {
     await repository.deleteSecurity(id); setRecentIds((ids) => ids.filter((value) => value !== id))
-    if (view.type === 'security' && view.id === id) setView({ type: 'all-securities' })
+    if (view.type === 'security' && view.id === id) replaceView({ type: 'all-securities' })
     await refresh()
   }
   const addWatchlist = async (name: string) => { await repository.addWatchlist(name); await refresh() }
   const updateWatchlist = async (watchlist: Watchlist) => { await repository.updateWatchlist(watchlist); await refresh() }
   const deleteWatchlist = async (id: string) => {
     await repository.deleteWatchlist(id)
-    if (view.type === 'watchlist' && view.id === id) setView({ type: 'all-securities' })
+    if (view.type === 'watchlist' && view.id === id) replaceView({ type: 'all-securities' })
     await refresh()
   }
   const addTaxonomy = async (input: Pick<Taxonomy, 'name' | 'description' | 'color'>) => { await repository.addTaxonomy(input); await refresh() }
   const deleteTaxonomy = async (id: string) => {
     await repository.deleteTaxonomy(id)
-    if (view.type === 'taxonomy' && view.id === id) setView({ type: 'all-securities' })
+    if (view.type === 'taxonomy' && view.id === id) replaceView({ type: 'all-securities' })
     await refresh()
   }
   const addResearchTopic=async(title:string)=>{const result=await repository.addResearchTopic(title);await refresh();setView({type:'topic',id:result.id});return result}
   const updateResearchTopic=async(topic:Pick<ResearchTopic,'id'|'title'>)=>{await repository.updateResearchTopic(topic);await refresh()}
-  const deleteResearchTopic=async(id:string)=>{await repository.deleteResearchTopic(id);if(view.type==='topic'&&view.id===id)setView({type:'topics'});await refresh()}
+  const deleteResearchTopic=async(id:string)=>{await repository.deleteResearchTopic(id);if(view.type==='topic'&&view.id===id)replaceView({type:'topics'});await refresh()}
 
   const recent = recentIds.map((id) => securities.find((security) => security.id === id)).filter((value): value is Security => Boolean(value))
-  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, theme, securityDisplayMode, setView, setTheme, setSecurityDisplayMode, openSecurity, openResearchTopic, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, updateWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, addResearchTopic, updateResearchTopic, deleteResearchTopic, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, theme, securityDisplayMode, refresh])
+  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, canGoBack:navigation.history.length>0, theme, securityDisplayMode, setView, goBack, setTheme, setSecurityDisplayMode, openSecurity, openResearchTopic, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, updateWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, addResearchTopic, updateResearchTopic, deleteResearchTopic, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, navigation.history.length, theme, securityDisplayMode, setView, goBack, refresh])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
 

@@ -68,3 +68,9 @@ git push origin v0.0.2
 ## Existing Qt database
 
 The new schema intentionally retains the Qt application's table and column names. Do not overwrite the Qt database while comparing applications. Copy it first, then place the copy at the Tauri database location before launching EquityJournal. The idempotent initial migration adds migration metadata without recreating existing tables.
+
+
+# Roadmap
+- back button
+- reference other companies or topics within a note like #CSU. This must have an auto completion
+- Add a search bar everywhere where needed like on watchlists

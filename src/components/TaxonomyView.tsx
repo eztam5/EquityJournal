@@ -7,6 +7,7 @@ import { showTaxonomySecurityMenu, showTaxonomyTagMenu } from './taxonomyContext
 import { buildTaxonomyTreeModel, filterTaxonomyTreeModel, resolveTagDrop, type TaxonomyTreeModelNode } from './taxonomyTreeModel'
 import { useTaxonomyDragAndDrop, type TaxonomyDropOperation } from './useTaxonomyDragAndDrop'
 import { formatSecurityLabel } from '../utils/securityLabels'
+import { PageHeader } from './PageHeader'
 
 export function TaxonomyView({ id }: { id: string }) {
   const app = useApp()
@@ -129,7 +130,7 @@ export function TaxonomyView({ id }: { id: string }) {
   }]
 
   return <main className="content page">
-    <header className="page-header taxonomy-page-header"><div><h1>{taxonomy.name}</h1><p>{taxonomy.description || 'Build a hierarchical classification for your research.'}</p></div><InputGroup
+    <PageHeader title={taxonomy.name} description={taxonomy.description || 'Build a hierarchical classification for your research.'} actions={<InputGroup
       className="taxonomy-search"
       type="search"
       leftIcon="search"
@@ -138,7 +139,7 @@ export function TaxonomyView({ id }: { id: string }) {
       value={search}
       onChange={(event) => setSearch(event.target.value)}
       rightElement={search ? <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setSearch('')}/> : undefined}
-    /></header>
+    />}/>
     <div className="content-panel taxonomy-card" {...drag.pointerHandlers}>
       <Tree
         compact
