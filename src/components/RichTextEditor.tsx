@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Button, ButtonGroup, HTMLSelect, InputGroup, Menu, MenuItem, PopoverNext } from '@blueprintjs/core'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Button, ButtonGroup, HTMLSelect, InputGroup, Menu, MenuDivider, MenuItem, PopoverNext } from '@blueprintjs/core'
 import { EditorContent, useEditor } from '@tiptap/react'
+import { mergeAttributes, Node } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
@@ -8,7 +9,26 @@ import Color from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
 import { TableKit } from '@tiptap/extension-table'
-import { Bold, Italic, UnderlineIcon, Strikethrough, List, ListOrdered, Outdent, Indent, Link2, Table2, Undo2, Redo2, Rows3, Columns3, Trash2 } from 'lucide-react'
+import { AtSign, Bold, Italic, UnderlineIcon, Strikethrough, List, ListOrdered, Outdent, Indent, Link2, Table2, Undo2, Redo2, Rows3, Columns3, Trash2 } from 'lucide-react'
+import { useApp } from '../app/AppContext'
+import { formatSecurityLabel } from '../utils/securityLabels'
+
+export type InternalReferenceType='security'|'topic'
+interface InternalReferenceItem {type:InternalReferenceType;id:string;label:string;searchText:string}
+
+export const InternalReference=Node.create({
+  name:'internalReference',group:'inline',inline:true,atom:true,selectable:false,
+  addAttributes(){return{
+    referenceType:{default:'security',parseHTML:(element)=>element.getAttribute('data-reference-type'),renderHTML:(attributes)=>({'data-reference-type':attributes.referenceType})},
+    referenceId:{default:'',parseHTML:(element)=>element.getAttribute('data-reference-id'),renderHTML:(attributes)=>({'data-reference-id':attributes.referenceId})},
+    label:{default:'',parseHTML:(element)=>element.getAttribute('data-reference-label')??element.textContent??'',renderHTML:(attributes)=>({'data-reference-label':attributes.label})},
+  }},
+  parseHTML(){return[{tag:'span[data-equity-journal-reference]'}]},
+  renderHTML({node,HTMLAttributes}){return['span',mergeAttributes(HTMLAttributes,{'data-equity-journal-reference':'',class:'internal-reference',contenteditable:'false'}),node.attrs.label]},
+  renderText({node}){return node.attrs.label},
+})
+
+export function filterInternalReferences(items:InternalReferenceItem[],query:string,limit=12){const needle=query.trim().toLocaleLowerCase();return items.filter((item)=>!needle||item.searchText.toLocaleLowerCase().includes(needle)).slice(0,limit)}
 
 const TEXT_COLORS=['#172033','#F2F4F7','#C25555','#C47F17','#2E8B78','#3478C9','#7A5AF8','#9B5C8F','#667085','#000000','#FFFFFF','#B42318']
 const HIGHLIGHTS=['#FFF2A8','#F6C7C7','#FAD8B4','#C7E9D9','#C9DDF5','#DDD1FA','#E4E7EC','#FDE68A','#FECACA','#BBF7D0','#BFDBFE','#E9D5FF']
@@ -16,15 +36,24 @@ const HIGHLIGHTS=['#FFF2A8','#F6C7C7','#FAD8B4','#C7E9D9','#C9DDF5','#DDD1FA','#
 function Tool({label,active=false,disabled=false,onClick,children}:{label:string;active?:boolean;disabled?:boolean;onClick():void;children:React.ReactNode}){return <Button type="button" title={label} aria-label={label} variant="minimal" size="small" active={active} className="editor-tool" disabled={disabled} onMouseDown={(e)=>e.preventDefault()} onClick={onClick}>{children}</Button>}
 function Palette({colors,clear,onSelect}:{colors:string[];clear:string;onSelect(color:string):void}){return <div className="editor-palette"><div>{colors.map((color)=><Button key={color} style={{background:color}} aria-label={color} onClick={()=>onSelect(color)}/>)}</div><Button variant="minimal" fill className="clear-color" text={clear} onClick={()=>onSelect('')}/></div>}
 
-export function RichTextEditor({content,onChange}:{content:string;onChange(html:string):void}){
-  const[colorMenu,setColorMenu]=useState<'text'|'highlight'|null>(null);const[linkOpen,setLinkOpen]=useState(false);const[href,setHref]=useState('');const[tableOpen,setTableOpen]=useState(false)
-  const editor=useEditor({extensions:[StarterKit.configure({link:false,underline:false}),Underline,Link.configure({openOnClick:false,autolink:true}),TextStyle,Color,Highlight.configure({multicolor:true}),TableKit.configure({table:{resizable:true}})],content:content||'<p></p>',editorProps:{attributes:{class:'rich-editor','aria-label':'Research notes'}},onUpdate:({editor})=>onChange(editor.getHTML())})
+export function RichTextEditor({content,onChange,beforeNavigate}:{content:string;onChange(html:string):void;beforeNavigate?():void|boolean|Promise<void|boolean>}){
+  const app=useApp();const appRef=useRef(app);appRef.current=app;const beforeNavigateRef=useRef(beforeNavigate);beforeNavigateRef.current=beforeNavigate
+  const[colorMenu,setColorMenu]=useState<'text'|'highlight'|null>(null);const[linkOpen,setLinkOpen]=useState(false);const[href,setHref]=useState('');const[tableOpen,setTableOpen]=useState(false);const[referenceOpen,setReferenceOpen]=useState(false);const[referenceQuery,setReferenceQuery]=useState('');const[highlightedReference,setHighlightedReference]=useState(0)
+  const editor=useEditor({extensions:[StarterKit.configure({link:false,underline:false}),Underline,Link.configure({openOnClick:false,autolink:true}),InternalReference,TextStyle,Color,Highlight.configure({multicolor:true}),TableKit.configure({table:{resizable:true}})],content:content||'<p></p>',editorProps:{attributes:{class:'rich-editor','aria-label':'Research notes'},handleKeyDown:(_view,event)=>{if(event.key==='@'){setReferenceQuery('');setReferenceOpen(true);return true}return false},handleDOMEvents:{click:(_view,event)=>{const reference=(event.target as Element).closest<HTMLElement>('[data-equity-journal-reference]');if(!reference)return false;event.preventDefault();const type=reference.dataset.referenceType as InternalReferenceType,id=reference.dataset.referenceId;if(!id||(type!=='security'&&type!=='topic'))return true;void(async()=>{if(await beforeNavigateRef.current?.()===false)return;if(type==='security')appRef.current.openSecurity(id);else appRef.current.openResearchTopic(id)})();return true}}},onUpdate:({editor})=>onChange(editor.getHTML())})
+  const referenceItems=useMemo<InternalReferenceItem[]>(()=>[
+    ...app.securities.map((security)=>({type:'security' as const,id:security.id,label:formatSecurityLabel(security,app.securityDisplayMode),searchText:`${security.symbol} ${security.name} ${security.alternativeId}`})),
+    ...app.researchTopics.map((topic)=>({type:'topic' as const,id:topic.id,label:topic.title,searchText:topic.title})),
+  ],[app.researchTopics,app.securities,app.securityDisplayMode])
+  const matchingReferences=useMemo(()=>filterInternalReferences(referenceItems,referenceQuery),[referenceItems,referenceQuery])
+  useEffect(()=>setHighlightedReference(0),[referenceQuery,referenceOpen])
   if(!editor)return null
   const block=editor.isActive('heading',{level:1})?'h1':editor.isActive('heading',{level:2})?'h2':'p'
   const setLink=()=>{if(!href.trim())editor.chain().focus().unsetLink().run();else editor.chain().focus().extendMarkRange('link').setLink({href}).run();setLinkOpen(false)}
   const textPalette=<Palette colors={TEXT_COLORS} clear="Automatic" onSelect={(color)=>{color?editor.chain().focus().setColor(color).run():editor.chain().focus().unsetColor().run();setColorMenu(null)}}/>
   const highlightPalette=<Palette colors={HIGHLIGHTS} clear="No highlight" onSelect={(color)=>{color?editor.chain().focus().setHighlight({color}).run():editor.chain().focus().unsetHighlight().run();setColorMenu(null)}}/>
   const linkEditor=<div className="link-popover"><InputGroup autoFocus value={href} onChange={(e)=>setHref(e.target.value)} placeholder="https://example.com" onKeyDown={(e)=>{if(e.key==='Enter')setLink()}} rightElement={<Button variant="minimal" icon="arrow-right" onClick={setLink} aria-label="Apply link"/>}/></div>
+  const insertReference=(reference:InternalReferenceItem)=>{editor.chain().focus().insertContent([{type:'internalReference',attrs:{referenceType:reference.type,referenceId:reference.id,label:reference.label}},{type:'text',text:' '}]).run();setReferenceOpen(false);setReferenceQuery('')}
+  const referencePicker=<div className="internal-reference-picker"><InputGroup autoFocus type="search" leftIcon="search" placeholder="Search securities or research topics" aria-label="Search internal references" value={referenceQuery} onChange={(event)=>setReferenceQuery(event.target.value)} onKeyDown={(event)=>{if(event.key==='ArrowDown'){event.preventDefault();setHighlightedReference((index)=>Math.min(index+1,matchingReferences.length-1))}else if(event.key==='ArrowUp'){event.preventDefault();setHighlightedReference((index)=>Math.max(index-1,0))}else if(event.key==='Enter'&&matchingReferences[highlightedReference]){event.preventDefault();insertReference(matchingReferences[highlightedReference])}else if(event.key==='Escape')setReferenceOpen(false)}}/><Menu aria-label="Internal reference results">{matchingReferences.map((reference,index)=><Fragment key={`${reference.type}:${reference.id}`}>{(index===0||matchingReferences[index-1].type!==reference.type)&&<MenuDivider title={reference.type==='security'?'Securities':'Research Topics'}/>}<MenuItem active={index===highlightedReference} icon={reference.type==='security'?'chart':'series-search'} text={reference.label} onClick={()=>insertReference(reference)}/></Fragment>)}{matchingReferences.length===0&&<MenuItem disabled text="No matching securities or topics"/>}</Menu><small>Tip: type @ in a note to open this search.</small></div>
   return <div className="editor-shell"><div className="editor-toolbar">
     <ButtonGroup className="tool-group" variant="minimal"><Tool label="Undo" disabled={!editor.can().undo()} onClick={()=>editor.chain().focus().undo().run()}><Undo2/></Tool><Tool label="Redo" disabled={!editor.can().redo()} onClick={()=>editor.chain().focus().redo().run()}><Redo2/></Tool></ButtonGroup>
     <div className="tool-group"><HTMLSelect aria-label="Paragraph style" value={block} onChange={(e)=>{if(e.target.value==='p')editor.chain().focus().setParagraph().run();else editor.chain().focus().toggleHeading({level:e.target.value==='h1'?1:2}).run()}} options={[{value:'p',label:'Paragraph'},{value:'h1',label:'Heading 1'},{value:'h2',label:'Heading 2'}]} minimal/></div>
@@ -33,7 +62,7 @@ export function RichTextEditor({content,onChange}:{content:string;onChange(html:
       <PopoverNext content={highlightPalette} isOpen={colorMenu==='highlight'} onInteraction={(open)=>setColorMenu(open?'highlight':null)} placement="bottom-start" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Tool label="Highlight color" active={editor.isActive('highlight')} onClick={()=>setColorMenu(colorMenu==='highlight'?null:'highlight')}><span className="highlight-tool">A</span></Tool></PopoverNext>
     </ButtonGroup>
     <ButtonGroup className="tool-group" variant="minimal"><Tool label="Bulleted list" active={editor.isActive('bulletList')} onClick={()=>editor.chain().focus().toggleBulletList().run()}><List/></Tool><Tool label="Numbered list" active={editor.isActive('orderedList')} onClick={()=>editor.chain().focus().toggleOrderedList().run()}><ListOrdered/></Tool><Tool label="Decrease indentation" onClick={()=>editor.chain().focus().liftListItem('listItem').run()}><Outdent/></Tool><Tool label="Increase indentation" onClick={()=>editor.chain().focus().sinkListItem('listItem').run()}><Indent/></Tool></ButtonGroup>
-    <ButtonGroup className="tool-group" variant="minimal"><PopoverNext content={linkEditor} isOpen={linkOpen} onInteraction={setLinkOpen} placement="bottom-start" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Tool label="Insert link" active={editor.isActive('link')} onClick={()=>{setHref(editor.getAttributes('link').href??'');setLinkOpen(!linkOpen)}}><Link2/></Tool></PopoverNext><PopoverNext content={<Menu><MenuItem icon="th" text="Insert 3 × 3 table" onClick={()=>{editor.chain().focus().insertTable({rows:3,cols:3,withHeaderRow:true}).run();setTableOpen(false)}}/></Menu>} isOpen={tableOpen} onInteraction={setTableOpen} placement="bottom-start" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Tool label="Insert table" onClick={()=>setTableOpen(!tableOpen)}><Table2/></Tool></PopoverNext></ButtonGroup>
+    <ButtonGroup className="tool-group" variant="minimal"><PopoverNext content={linkEditor} isOpen={linkOpen} onInteraction={setLinkOpen} placement="bottom-start" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Tool label="Insert web link" active={editor.isActive('link')} onClick={()=>{setHref(editor.getAttributes('link').href??'');setLinkOpen(!linkOpen)}}><Link2/></Tool></PopoverNext><PopoverNext content={referencePicker} isOpen={referenceOpen} onInteraction={(open)=>{setReferenceOpen(open);if(open)setReferenceQuery('')}} placement="bottom-start" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Tool label="Link to security or research topic" onClick={()=>setReferenceOpen(!referenceOpen)}><AtSign/></Tool></PopoverNext><PopoverNext content={<Menu><MenuItem icon="th" text="Insert 3 × 3 table" onClick={()=>{editor.chain().focus().insertTable({rows:3,cols:3,withHeaderRow:true}).run();setTableOpen(false)}}/></Menu>} isOpen={tableOpen} onInteraction={setTableOpen} placement="bottom-start" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Tool label="Insert table" onClick={()=>setTableOpen(!tableOpen)}><Table2/></Tool></PopoverNext></ButtonGroup>
     {editor.isActive('table')&&<ButtonGroup className="tool-group table-tools" variant="minimal"><Tool label="Add row" onClick={()=>editor.chain().focus().addRowAfter().run()}><Rows3/></Tool><Tool label="Delete row" onClick={()=>editor.chain().focus().deleteRow().run()}><Rows3/><small>−</small></Tool><Tool label="Add column" onClick={()=>editor.chain().focus().addColumnAfter().run()}><Columns3/></Tool><Tool label="Delete column" onClick={()=>editor.chain().focus().deleteColumn().run()}><Columns3/><small>−</small></Tool><Tool label="Delete table" onClick={()=>editor.chain().focus().deleteTable().run()}><Trash2/></Tool></ButtonGroup>}
   </div><EditorContent editor={editor}/></div>
 }

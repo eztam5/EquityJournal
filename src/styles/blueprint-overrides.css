@@ -194,3 +194,9 @@ table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-com
 .editor-palette > div .bp6-button { width: 26px; height: 26px; min-width: 26px; min-height: 26px; padding: 0; }
 .link-popover { position: static; width: 330px; padding: 8px; }
 .link-popover .bp6-input-group { width: 100%; }
+.internal-reference-picker { width: 330px; padding: 8px; }
+.internal-reference-picker > .bp6-input-group { margin-bottom: 7px; }
+.internal-reference-picker > .bp6-menu { max-height: 300px; overflow-y: auto; }
+.internal-reference-picker > small { display: block; padding: 6px 6px 0; color: var(--muted); }
+.rich-editor .internal-reference { display: inline-flex; align-items: center; max-width: 100%; padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border)); border-radius: 999px; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-weight: 600; cursor: pointer; vertical-align: baseline; }
+.rich-editor .internal-reference:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }

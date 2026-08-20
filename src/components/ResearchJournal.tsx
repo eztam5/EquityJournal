@@ -66,15 +66,17 @@ export function ResearchJournal({ securityId, topicId, onSaved }: { securityId?:
   }, [listEntries])
 
   const save = async () => {
-    if (!draft) return
+    if (!draft) return true
     setSaving(true); setStatus('')
     try {
       const saved = topicId?await app.repository.saveResearchTopicJournalEntry({...draft,topicId}):await app.repository.saveJournalEntry({...draft,securityId:securityId!})
       await load(saved.id)
       await onSaved?.()
       setStatus('Saved')
+      return true
     } catch (reason) {
       setStatus(reason instanceof Error ? reason.message : String(reason))
+      return false
     } finally { setSaving(false) }
   }
 
@@ -111,7 +113,7 @@ export function ResearchJournal({ securityId, topicId, onSaved }: { securityId?:
           <Button icon="floppy-disk" intent="primary" text="Save" loading={saving} disabled={!draft.entryDate || !dirty && Boolean(draft.id)} onClick={save}/>
         </header>
         {status && status !== 'Saved' && status !== 'Unsaved changes' && status !== 'An entry for today already exists.' ? <Callout className="journal-error" intent="danger">{status}</Callout> : null}
-        <Suspense fallback={<div className="empty-state">Loading editor…</div>}><RichTextEditor key={draft.id ?? `new-${draft.entryDate}`} content={draft.contentHtml} onChange={(contentHtml) => { setDraft((current) => current ? { ...current, contentHtml } : current); setDirty(true); setStatus('Unsaved changes') }}/></Suspense>
+        <Suspense fallback={<div className="empty-state">Loading editor…</div>}><RichTextEditor key={draft.id ?? `new-${draft.entryDate}`} content={draft.contentHtml} onChange={(contentHtml) => { setDraft((current) => current ? { ...current, contentHtml } : current); setDirty(true); setStatus('Unsaved changes') }} beforeNavigate={save}/></Suspense>
       </>}
     </section>
     {deleting&&<ConfirmDialog
