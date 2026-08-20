@@ -78,3 +78,5 @@ The new schema intentionally retains the Qt application's table and column names
 - Add images in the text editor
 - Add AI chat on the security detail and topic view to summarize, extend and verify the investment thesis
     - Do we need RAG or can the content fit into the context window? Or manual user based attachments?
+- Use the same > tree symbol with colored circle also in the taxonomy editor
+- Add  company logos (optionally replacing the chart symbol)
