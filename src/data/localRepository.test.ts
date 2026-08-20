@@ -49,6 +49,17 @@ describe('LocalRepository',()=>{
     expect(await repository.listWatchlists()).toEqual([{...watchlist,name:'Quality shares'}])
     expect(await repository.listSecurities(watchlist.id)).toEqual([security])
   })
+  it('persists a custom watchlist order',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const first=await repository.addWatchlist('First')
+    const second=await repository.addWatchlist('Second')
+    const third=await repository.addWatchlist('Third')
+
+    await repository.moveWatchlist(third.id,-1)
+    await repository.moveWatchlist(first.id,1)
+
+    expect((await repository.listWatchlists()).map((watchlist)=>watchlist.id)).toEqual([third.id,first.id,second.id])
+  })
   it('creates nested tags and rejects deleting a parent with children',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const taxonomy=await repository.addTaxonomy({name:'Risks',description:'',color:'#C25555'})

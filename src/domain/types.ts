@@ -22,6 +22,7 @@ export interface TaggedSecurity extends Security {
 export interface Watchlist {
   id: string
   name: string
+  sortOrder: number
 }
 
 export interface Taxonomy {

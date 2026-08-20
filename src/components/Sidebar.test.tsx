@@ -78,6 +78,21 @@ describe('Sidebar taxonomy navigation',()=>{
     expect(await repository.listWatchlists()).toEqual([expect.objectContaining({name:'High Quality'})])
   })
 
+  it('moves watchlists while keeping All Securities first',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addWatchlist('First')
+    await repository.addWatchlist('Second')
+    await repository.addWatchlist('Third')
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/></AppProvider>)
+
+    fireEvent.contextMenu(await screen.findByRole('button',{name:'Second'}),{clientX:20,clientY:30})
+    fireEvent.click(await screen.findByRole('menuitem',{name:'Move up'}))
+
+    await waitFor(()=>expect([...document.querySelectorAll('.securities-list-item')].map((item)=>item.textContent)).toEqual(['All Securities','Second','First','Third']))
+    fireEvent.contextMenu(screen.getByRole('button',{name:'Second'}),{clientX:20,clientY:30})
+    expect(await screen.findByRole('menuitem',{name:'Move up'})).toHaveAttribute('aria-disabled','true')
+  })
+
   it('adds a security to the watchlist with pointer-based dragging',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})

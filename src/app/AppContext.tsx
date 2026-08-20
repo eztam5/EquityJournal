@@ -30,6 +30,7 @@ interface AppContextValue {
   deleteSecurity(id: string): Promise<void>
   addWatchlist(name: string): Promise<void>
   updateWatchlist(watchlist: Watchlist): Promise<void>
+  moveWatchlist(id:string,offset:-1|1):Promise<void>
   deleteWatchlist(id: string): Promise<void>
   addTaxonomy(input: Pick<Taxonomy, 'name' | 'description' | 'color'>): Promise<void>
   deleteTaxonomy(id: string): Promise<void>
@@ -112,6 +113,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   }
   const addWatchlist = async (name: string) => { await repository.addWatchlist(name); await refresh() }
   const updateWatchlist = async (watchlist: Watchlist) => { await repository.updateWatchlist(watchlist); await refresh() }
+  const moveWatchlist=async(id:string,offset:-1|1)=>{await repository.moveWatchlist(id,offset);await refresh()}
   const deleteWatchlist = async (id: string) => {
     await repository.deleteWatchlist(id)
     if (view.type === 'watchlist' && view.id === id) replaceView({ type: 'all-securities' })
@@ -128,7 +130,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const deleteResearchTopic=async(id:string)=>{await repository.deleteResearchTopic(id);if(view.type==='topic'&&view.id===id)replaceView({type:'topics'});await refresh()}
 
   const recent = recentIds.map((id) => securities.find((security) => security.id === id)).filter((value): value is Security => Boolean(value))
-  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, canGoBack:navigation.history.length>0, theme, securityDisplayMode, setView, goBack, setTheme, setSecurityDisplayMode, openSecurity, openResearchTopic, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, updateWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, addResearchTopic, updateResearchTopic, deleteResearchTopic, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, navigation.history.length, theme, securityDisplayMode, setView, goBack, refresh])
+  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, canGoBack:navigation.history.length>0, theme, securityDisplayMode, setView, goBack, setTheme, setSecurityDisplayMode, openSecurity, openResearchTopic, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, updateWatchlist, moveWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, addResearchTopic, updateResearchTopic, deleteResearchTopic, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, navigation.history.length, theme, securityDisplayMode, setView, goBack, refresh])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
 

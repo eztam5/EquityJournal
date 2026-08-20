@@ -27,16 +27,26 @@ export class TauriRepository implements EquityRepository {
     catch { throw new Error('A security with this symbol already exists.') }
   }
   async deleteSecurity(id: string) { await this.db.execute('DELETE FROM securities WHERE id=$1', [id]) }
-  async listWatchlists(): Promise<Watchlist[]> { return this.db.select('SELECT id,name FROM watchlists ORDER BY lower(name),id') }
+  async listWatchlists(): Promise<Watchlist[]> {
+    const rows=await this.db.select<DbRow[]>('SELECT id,name,sort_order FROM watchlists ORDER BY sort_order,lower(name),id')
+    return rows.map((row)=>({id:String(row.id),name:String(row.name),sortOrder:Number(row.sort_order)}))
+  }
   async addWatchlist(value: string) {
-    const result = { id: uuid(), name: cleanRequired(value, 'a watchlist name') }
-    try { await this.db.execute('INSERT INTO watchlists (id,name) VALUES ($1,$2)', [result.id, result.name]) }
+    const rows=await this.db.select<Array<{next_order:number}>>('SELECT COALESCE(MAX(sort_order),-1)+1 next_order FROM watchlists')
+    const result = { id: uuid(), name: cleanRequired(value, 'a watchlist name'), sortOrder:rows[0]?.next_order??0 }
+    try { await this.db.execute('INSERT INTO watchlists (id,name,sort_order) VALUES ($1,$2,$3)', [result.id,result.name,result.sortOrder]) }
     catch { throw new Error('A watchlist with this name already exists.') }
     return result
   }
   async updateWatchlist(watchlist: Watchlist) {
     try { await this.db.execute('UPDATE watchlists SET name=$1 WHERE id=$2',[cleanRequired(watchlist.name,'a watchlist name'),watchlist.id]) }
     catch { throw new Error('A watchlist with this name already exists.') }
+  }
+  async moveWatchlist(id:string,offset:-1|1) {
+    const ordered=await this.db.select<Array<{id:string;sort_order:number}>>('SELECT id,sort_order FROM watchlists ORDER BY sort_order,lower(name),id')
+    const index=ordered.findIndex((watchlist)=>watchlist.id===id),target=ordered[index+offset]
+    if(index<0||!target)return
+    await this.db.execute('UPDATE watchlists SET sort_order=CASE id WHEN $1 THEN $2 WHEN $3 THEN $4 END WHERE id IN ($1,$3)',[id,target.sort_order,target.id,ordered[index].sort_order])
   }
   async deleteWatchlist(id: string) { await this.db.execute('DELETE FROM watchlists WHERE id=$1', [id]) }
   async setWatchlistSecurity(watchlistId: string, securityId: string, assigned: boolean) {

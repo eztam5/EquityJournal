@@ -13,6 +13,7 @@ export interface EquityRepository {
   listWatchlists(): Promise<Watchlist[]>
   addWatchlist(name: string): Promise<Watchlist>
   updateWatchlist(watchlist: Watchlist): Promise<void>
+  moveWatchlist(id: string, offset: -1 | 1): Promise<void>
   deleteWatchlist(id: string): Promise<void>
   setWatchlistSecurity(watchlistId: string, securityId: string, assigned: boolean): Promise<void>
   listTaxonomies(): Promise<Taxonomy[]>

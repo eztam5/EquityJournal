@@ -115,6 +115,11 @@ pub fn run() {
         description: "research_topics",
         sql: include_str!("../migrations/005_research_topics.sql"),
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 6,
+        description: "watchlist_order",
+        sql: include_str!("../migrations/006_watchlist_order.sql"),
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()

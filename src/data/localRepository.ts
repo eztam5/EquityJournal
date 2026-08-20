@@ -31,6 +31,7 @@ export class LocalRepository implements EquityRepository {
     if (stored) {
       this.data = { ...emptyData(), ...JSON.parse(stored) }
       this.data.securities = this.data.securities.map((security) => ({ ...security, alternativeId: security.alternativeId ?? '' }))
+      if(this.data.watchlists.some((watchlist)=>watchlist.sortOrder===undefined))this.data.watchlists=this.data.watchlists.toSorted((left,right)=>left.name.localeCompare(right.name)).map((watchlist,sortOrder)=>({...watchlist,sortOrder}))
     }
   }
 
@@ -63,11 +64,11 @@ export class LocalRepository implements EquityRepository {
     this.data.journalEntries = this.data.journalEntries.filter((x) => x.securityId !== id)
     this.data.researchTopicSecurities = this.data.researchTopicSecurities.filter((x) => x.securityId !== id); this.persist()
   }
-  async listWatchlists() { return this.data.watchlists.toSorted((a, b) => a.name.localeCompare(b.name)) }
+  async listWatchlists() { return this.data.watchlists.toSorted((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name)) }
   async addWatchlist(value: string) {
     const name = cleanRequired(value, 'a watchlist name')
     if (this.data.watchlists.some((x) => x.name.toLowerCase() === name.toLowerCase())) throw new Error('A watchlist with this name already exists.')
-    const result = { id: uuid(), name }; this.data.watchlists.push(result); this.persist(); return result
+    const result = { id: uuid(), name, sortOrder:Math.max(-1,...this.data.watchlists.map((watchlist)=>watchlist.sortOrder))+1 }; this.data.watchlists.push(result); this.persist(); return result
   }
   async updateWatchlist(watchlist: Watchlist) {
     const name=cleanRequired(watchlist.name,'a watchlist name')
@@ -75,6 +76,12 @@ export class LocalRepository implements EquityRepository {
     const existing=this.data.watchlists.find((item)=>item.id===watchlist.id)
     if(!existing)throw new Error('The watchlist no longer exists.')
     existing.name=name;this.persist()
+  }
+  async moveWatchlist(id:string,offset:-1|1) {
+    const ordered=await this.listWatchlists(),index=ordered.findIndex((watchlist)=>watchlist.id===id),target=ordered[index+offset]
+    if(index<0||!target)return
+    const current=ordered[index],currentOrder=current.sortOrder
+    current.sortOrder=target.sortOrder;target.sortOrder=currentOrder;this.persist()
   }
   async deleteWatchlist(id: string) {
     this.data.watchlists = this.data.watchlists.filter((watchlist) => watchlist.id !== id)
