@@ -155,6 +155,9 @@ table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-com
 .topic-relations-editor section > p { min-height: 34px; margin: 0 0 10px; }
 .topic-relation-choices { min-height: 0; flex: 1; display: grid; align-content: start; gap: 7px; padding: 10px; overflow-y: auto; border: 1px solid var(--border); background: var(--content); }
 .topic-tag-rules { min-height: 0; max-height: none; flex: 1; padding-right: 4px; overflow-y: auto; }
+.topic-relation-choices .bp6-control,
+.topic-tag-rules .bp6-section-header-title,
+.topic-tag-rules .bp6-control { font-size: 12px; }
 
 .taxonomy-card .bp6-tree { background: transparent; font-size: 12px; }
 .taxonomy-search.bp6-input-group { width: min(300px, 42vw); flex: none; }
