@@ -4,6 +4,7 @@ import { useApp } from '../app/AppContext'
 import { resolveSecurityLink } from '../data/repository'
 import type { Security, SecurityLinkTemplate } from '../domain/types'
 import { openExternalUrl } from '../utils/externalLinks'
+import { copyHtmlTableToClipboard, copyTextToClipboard, csvFileName, exportTableAsCsv, exportTableAsHtml, saveCsvExport, type ExportTable } from '../utils/tableExport'
 import { announceWatchlistDragHover, isAdditiveSelectionModifier, watchlistDropTargetAt } from '../utils/watchlistSecurityDrag'
 import { ConfirmDialog, SecurityForm } from './Forms'
 import { PageHeader } from './PageHeader'
@@ -86,6 +87,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const[preferences,setPreferences]=useState<SecurityColumnPreferences>(loadSecurityColumnPreferences)
   const[sortKey,setSortKey]=useState<SecuritySortKey>(()=>loadVisibleSecurityColumns().find(isSecuritySortKey)??'symbol')
   const[direction,setDirection]=useState<SortDirection>('asc')
+  const[exportStatus,setExportStatus]=useState('')
   const[selectedSecurityIds,setSelectedSecurityIds]=useState<Set<string>>(()=>new Set())
   const pendingDrag=useRef<{securities:Security[];pointerId:number;x:number;y:number}|null>(null)
   const draggingSecurities=useRef<Security[]>([])
@@ -129,6 +131,16 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const reorderColumn=(source:SecurityColumnKey,target:SecurityColumnKey)=>setPreferences((current)=>{const order=orderedColumns.map((column)=>column.key),sourceIndex=order.indexOf(source),targetIndex=order.indexOf(target);if(sourceIndex<0||targetIndex<0||sourceIndex===targetIndex)return current;order.splice(sourceIndex,1);order.splice(targetIndex,0,source);return{...current,order:[...order,...current.order.filter((key)=>!order.includes(key))]}})
   const moveColumn=(column:SecurityColumnKey,offset:number)=>{const index=orderedColumns.findIndex((item)=>item.key===column),target=orderedColumns[index+offset];if(target)reorderColumn(column,target.key)}
   const title=watchlistId?app.watchlists.find((watchlist)=>watchlist.id===watchlistId)?.name??'Watchlist':'All Securities'
+  const tableForExport:ExportTable={headers:visibleColumns.map((column)=>column.label),rows:sortedRows.map((security)=>visibleColumns.map((column)=>{
+    if(column.key==='symbol')return{text:security.symbol}
+    if(column.key==='alternativeId')return{text:security.alternativeId}
+    if(column.key==='name')return{text:security.name}
+    if(column.key==='currency')return{text:security.currency}
+    const url=column.template?resolveSecurityLink(column.template,security):null
+    return{text:url??'',href:url??undefined}
+  }))}
+  const csvExport=exportTableAsCsv(tableForExport)
+  const runExport=async(action:()=>Promise<void|boolean>,success:string)=>{setExportStatus('');try{if(await action()!==false)setExportStatus(success)}catch(reason){setExportStatus(`Export failed: ${reason instanceof Error?reason.message:String(reason)}`)}}
   const removeOrDeleteLabel=watchlistId?'Remove from watchlist':'Delete'
   const removeFromWatchlist=async(security:Security)=>{if(!watchlistId)return;await app.repository.setWatchlistSecurity(watchlistId,security.id,false);setRows((current)=>current.filter((item)=>item.id!==security.id))}
   const removeOrRequestDelete=(security:Security)=>{if(watchlistId)void removeFromWatchlist(security);else setDeleting(security)}
@@ -141,6 +153,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const renderRemoveOrDeleteButton=(security:Security)=>{const button=<Button variant="minimal" size="small" icon="trash" intent="danger" aria-label={`${watchlistId?'Remove':'Delete'} ${security.name}`} onClick={()=>removeOrRequestDelete(security)}/>;return watchlistId?<Tooltip key="remove" content="Remove from this watchlist. The security itself will not be deleted." placement="left">{button}</Tooltip>:button}
 
   const columnMenu=<Menu aria-label="Visible columns" className="column-chooser">{orderedColumns.map((column,index)=><ColumnChooserRow key={column.key} column={column} index={index} count={orderedColumns.length} visible={preferences.visible.includes(column.key)} lastVisible={preferences.visible.includes(column.key)&&visibleColumns.length===1} onToggle={()=>toggleColumn(column.key)} onMove={(offset)=>moveColumn(column.key,offset)}/>)}</Menu>
+  const exportMenu=<Menu aria-label="Export table" className="table-export-menu"><MenuItem icon="clipboard" text="Export as CSV to Clipboard" onClick={()=>void runExport(()=>copyTextToClipboard(csvExport),'CSV copied to clipboard')}/><MenuItem icon="th" text="Export as HTML table to Clipboard" onClick={()=>void runExport(()=>copyHtmlTableToClipboard(exportTableAsHtml(tableForExport),csvExport),'HTML table copied to clipboard')}/><MenuItem icon="floppy-disk" text="Export as CSV to File" onClick={()=>void runExport(()=>saveCsvExport(csvExport,csvFileName(title)),'CSV file saved')}/></Menu>
 
   const renderHeader=(column:SecurityColumnDefinition)=>column.sortKey?<SortHeader key={column.key} label={column.label} column={column.sortKey} sortKey={sortKey} direction={direction} onSort={sort}/>:<th key={column.key}>{column.label}</th>
   const renderCell=(column:SecurityColumnDefinition,security:Security)=>{
@@ -152,7 +165,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     return <td className="security-link-cell" key={column.key}><Button variant="minimal" size="small" icon="share" text="Open" aria-label={`Open ${column.label}`} disabled={!url} title={url?`Open ${column.label}`:`Set an Alternative ID to use ${column.label}`} onClick={(event)=>{event.stopPropagation();if(url)void openExternalUrl(url)}}/></td>
   }
 
-  return <main className="content page"><PageHeader title={title} description={`${rows.length} ${rows.length===1?'security':'securities'}`} actions={<PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button className="page-toolbar-button" icon="properties" text="Columns"/></PopoverNext>}/>
+  return <main className="content page"><PageHeader title={title} description={<>{rows.length} {rows.length===1?'security':'securities'}{exportStatus&&<span className="export-status" role="status"> · {exportStatus}</span>}</>} actions={<><PopoverNext content={exportMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button className="page-toolbar-button" icon="export" text="Export"/></PopoverNext><PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button className="page-toolbar-button" icon="properties" text="Columns"/></PopoverNext></>}/>
     <div className="content-panel data-card"><HTMLTable className="security-table" compact interactive striped><thead><tr>{visibleColumns.map(renderHeader)}<th aria-label="Actions"/></tr></thead><tbody>{sortedRows.map((security)=>{const selected=selectedSecurityIds.has(security.id);return <tr key={security.id} className={`security-draggable-row ${selected?'security-selected':''}`} aria-selected={selected} onClick={(event)=>selectSecurity(event,security)} onPointerDown={(event)=>startSecurityDrag(event,security)} onPointerMove={moveSecurityDrag} onPointerUp={(event)=>void finishSecurityDrag(event)} onPointerCancel={resetSecurityDrag} onDoubleClick={()=>app.openSecurity(security.id)} onContextMenu={(event)=>openMenu(event,security)}>{visibleColumns.map((column)=>renderCell(column,security))}<td><Button variant="minimal" size="small" icon="edit" aria-label={`Edit ${security.name}`} onClick={()=>setEditing(security)}/>{renderRemoveOrDeleteButton(security)}</td></tr>})}</tbody></HTMLTable>{rows.length===0&&<div className="empty-state">No securities yet.</div>}</div>
     {editing&&<SecurityForm security={editing} onClose={()=>setEditing(undefined)}/>} {deleting&&<ConfirmDialog title="Delete security" message={`Permanently delete ${deleting.name} from the database?`} confirmLabel="Delete" onClose={()=>setDeleting(undefined)} onConfirm={()=>app.deleteSecurity(deleting.id)}/>}
   </main>

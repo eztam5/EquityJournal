@@ -12,6 +12,7 @@ EquityJournal is a local-first desktop application for retail investment researc
 - writing current notes and dated journal entries for research topics;
 - relating topics directly to securities or dynamically through taxonomy tags;
 - configuring external security links and security-list columns; and
+- exporting visible security-table data as CSV or HTML through the clipboard or a native file dialog;
 - navigating between securities and topics through references embedded in rich text.
 
 The production application is a Tauri desktop process with a React frontend and a local SQLite database. A browser-only development mode replaces SQLite with a `localStorage` repository that implements the same application-facing contract.
@@ -346,7 +347,7 @@ Persistence still occurs through repository methods; the tree and table layers d
 
 ## 11. Native integration and security
 
-The Tauri capability file grants the main window access to core APIs, SQL load/select/execute operations, and the URL opener. The content security policy allows only local application content, Tauri IPC, inline styles needed by the UI, and local/data images.
+The Tauri capability file grants the main window access to core APIs, SQL load/select/execute operations, the URL opener, the native save dialog, and writing a user-selected export file. The content security policy allows only local application content, Tauri IPC, inline styles needed by the UI, and local/data images.
 
 The native Edit menu restores standard Undo, Redo, Cut, Copy, Paste, and Select All behavior. The View menu controls the theme, while the application menu opens Settings. Native browser context menus are suppressed outside editable elements; inputs and rich-text editing surfaces retain appropriate platform behavior.
 

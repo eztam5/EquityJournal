@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
 import { SecuritiesView } from './SecuritiesView'
 
 describe('SecuritiesView visible columns',()=>{
-  afterEach(()=>{cleanup();localStorage.clear()})
+  afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks()})
 
   it('hides selected columns and persists the preference',async()=>{
     const repository=new LocalRepository();await repository.initialize()
@@ -71,6 +71,22 @@ describe('SecuritiesView visible columns',()=>{
     expect(screen.queryByRole('dialog',{name:'Remove from watchlist'})).not.toBeInTheDocument()
     expect(await repository.listSecurities(watchlist.id)).toEqual([])
     expect(await repository.listSecurities()).toEqual([security])
+  })
+
+  it('exports visible columns and sorted rows as CSV to the clipboard',async()=>{
+    const writeText=vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}})
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addSecurity({symbol:'MSFT',alternativeId:'US5949181045',name:'Microsoft',currency:'USD'})
+    await repository.addSecurity({symbol:'AAPL',alternativeId:'US0378331005',name:'Apple Inc.',currency:'USD'})
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+
+    expect(await screen.findByText('Apple Inc.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Export'}))
+    fireEvent.click(await screen.findByRole('menuitem',{name:'Export as CSV to Clipboard'}))
+
+    await waitFor(()=>expect(writeText).toHaveBeenCalledWith('Symbol,Alternative ID,Company,Currency\r\nAAPL,US0378331005,Apple Inc.,USD\r\nMSFT,US5949181045,Microsoft,USD'))
+    expect(await screen.findByRole('status')).toHaveTextContent('CSV copied to clipboard')
   })
 
 })
