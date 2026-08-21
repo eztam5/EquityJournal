@@ -94,6 +94,19 @@ describe('LocalRepository',()=>{
     await repository.deleteSecurity(security.id)
     expect(await repository.listJournalEntries(security.id)).toEqual([])
   })
+  it('stores, edits, de-duplicates, and deletes security document metadata',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'ROG',currency:'CHF',name:'Roche'})
+    const document=await repository.addSecurityDocument({id:'document-1',securityId:security.id,title:'  Q2 research  ',originalFilename:'q2.pdf',storagePath:`attachments/securities/${security.id}/document-1.pdf`,source:'  UBS  ',documentDate:'2026-08-01',mimeType:'application/pdf',fileSize:2048,sha256:'abc123'})
+
+    expect(document).toEqual(expect.objectContaining({title:'Q2 research',source:'UBS',documentDate:'2026-08-01'}))
+    await expect(repository.addSecurityDocument({...document,id:'document-2',storagePath:`attachments/securities/${security.id}/document-2.pdf`})).rejects.toThrow('already attached')
+    await repository.updateSecurityDocument({id:document.id,title:'Updated research',source:'Bank research',documentDate:''})
+    expect(await repository.listSecurityDocuments(security.id)).toEqual([expect.objectContaining({title:'Updated research',source:'Bank research',documentDate:''})])
+
+    await repository.deleteSecurity(security.id)
+    expect(await repository.listSecurityDocuments(security.id)).toEqual([])
+  })
   it('moves a security between tags without changing its other assignments',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'ASML',currency:'EUR',name:'ASML'})

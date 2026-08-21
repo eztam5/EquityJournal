@@ -3,5 +3,16 @@
   "identifier": "default",
   "description": "Default permissions for EquityJournal",
   "windows": ["main"],
-  "permissions": ["core:default","sql:default","sql:allow-execute","sql:allow-select","sql:allow-load","opener:default","dialog:allow-save","fs:allow-write-text-file"]
+  "permissions": [
+    "core:default",
+    "sql:default",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-load",
+    "opener:default",
+    "dialog:allow-save",
+    "dialog:allow-open",
+    "fs:allow-read-file",
+    "fs:allow-write-text-file"
+  ]
 }

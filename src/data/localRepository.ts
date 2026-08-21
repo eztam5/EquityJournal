@@ -1,5 +1,5 @@
-import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
-import { cleanJournalDate, cleanRequired, cleanSecurityLinkTemplate, type EquityRepository, type JournalEntryInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
+import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
+import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
 
 interface LocalData {
   securities: Security[]
@@ -10,6 +10,7 @@ interface LocalData {
   securityTags: Array<{ securityId: string; tagId: string }>
   notes: SecurityNote[]
   journalEntries: SecurityJournalEntry[]
+  securityDocuments: SecurityDocument[]
   securityLinkTemplates: SecurityLinkTemplate[]
   researchTopics: ResearchTopic[]
   researchTopicNotes: ResearchTopicNote[]
@@ -20,7 +21,7 @@ interface LocalData {
 
 const STORAGE_KEY = 'equity-journal.development-database.v1'
 const emptyData = (): LocalData => ({
-  securities: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [], securityLinkTemplates: [], researchTopics: [], researchTopicNotes: [], researchTopicJournalEntries: [], researchTopicSecurities: [], researchTopicTags: [],
+  securities: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [], securityDocuments: [], securityLinkTemplates: [], researchTopics: [], researchTopicNotes: [], researchTopicJournalEntries: [], researchTopicSecurities: [], researchTopicTags: [],
 })
 
 export class LocalRepository implements EquityRepository {
@@ -62,6 +63,7 @@ export class LocalRepository implements EquityRepository {
     this.data.watchlistSecurities = this.data.watchlistSecurities.filter((x) => x.securityId !== id)
     this.data.notes = this.data.notes.filter((x) => x.securityId !== id)
     this.data.journalEntries = this.data.journalEntries.filter((x) => x.securityId !== id)
+    this.data.securityDocuments = this.data.securityDocuments.filter((x) => x.securityId !== id)
     this.data.researchTopicSecurities = this.data.researchTopicSecurities.filter((x) => x.securityId !== id); this.persist()
   }
   async listWatchlists() { return this.data.watchlists.toSorted((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name)) }
@@ -195,6 +197,18 @@ export class LocalRepository implements EquityRepository {
   async deleteJournalEntry(id: string) {
     this.data.journalEntries = this.data.journalEntries.filter((entry) => entry.id !== id); this.persist()
   }
+  async listSecurityDocuments(securityId:string) { return this.data.securityDocuments.filter((document)=>document.securityId===securityId).toSorted((left,right)=>(left.documentDate?0:1)-(right.documentDate?0:1)||right.documentDate.localeCompare(left.documentDate)||right.createdAt.localeCompare(left.createdAt)) }
+  async addSecurityDocument(input:SecurityDocumentInput) {
+    if(this.data.securityDocuments.some((document)=>document.securityId===input.securityId&&document.sha256===input.sha256))throw new Error('This PDF is already attached to this security.')
+    const now=new Date().toISOString(),result:SecurityDocument={...input,title:cleanRequired(input.title,'a document title'),source:input.source.trim(),documentDate:cleanOptionalDate(input.documentDate),createdAt:now,updatedAt:now}
+    this.data.securityDocuments.push(result);this.persist();return result
+  }
+  async updateSecurityDocument(input:Pick<SecurityDocument,'id'|'title'|'source'|'documentDate'>) {
+    const document=this.data.securityDocuments.find((item)=>item.id===input.id)
+    if(!document)throw new Error('The selected document no longer exists.')
+    Object.assign(document,{title:cleanRequired(input.title,'a document title'),source:input.source.trim(),documentDate:cleanOptionalDate(input.documentDate),updatedAt:new Date().toISOString()});this.persist()
+  }
+  async deleteSecurityDocument(id:string) { this.data.securityDocuments=this.data.securityDocuments.filter((document)=>document.id!==id);this.persist() }
   async listSecurityLinkTemplates() { return this.data.securityLinkTemplates.toSorted((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id)) }
   async saveSecurityLinkTemplates(templates: SecurityLinkTemplate[]) {
     const cleaned = templates.map(cleanSecurityLinkTemplate)

@@ -1,8 +1,9 @@
-import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, ResearchTopicRelations, Security, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, ResearchTopicRelations, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 
 export type JournalEntryInput = Pick<SecurityJournalEntry, 'securityId' | 'entryDate' | 'contentHtml'> & { id?: string }
 export type TopicJournalEntryInput = Pick<ResearchTopicJournalEntry, 'topicId' | 'entryDate' | 'contentHtml'> & { id?: string }
 export type SecurityInput = Omit<Security, 'id' | 'alternativeId'> & { alternativeId?: string }
+export type SecurityDocumentInput = Omit<SecurityDocument, 'createdAt' | 'updatedAt'>
 
 export interface EquityRepository {
   initialize(): Promise<void>
@@ -35,6 +36,10 @@ export interface EquityRepository {
   listJournalEntries(securityId: string): Promise<SecurityJournalEntry[]>
   saveJournalEntry(input: JournalEntryInput): Promise<SecurityJournalEntry>
   deleteJournalEntry(id: string): Promise<void>
+  listSecurityDocuments(securityId: string): Promise<SecurityDocument[]>
+  addSecurityDocument(input: SecurityDocumentInput): Promise<SecurityDocument>
+  updateSecurityDocument(document: Pick<SecurityDocument, 'id' | 'title' | 'source' | 'documentDate'>): Promise<void>
+  deleteSecurityDocument(id: string): Promise<void>
   listSecurityLinkTemplates(): Promise<SecurityLinkTemplate[]>
   saveSecurityLinkTemplates(templates: SecurityLinkTemplate[]): Promise<SecurityLinkTemplate[]>
   listResearchTopics(): Promise<ResearchTopic[]>
@@ -63,6 +68,10 @@ export function cleanJournalDate(value: string): string {
     throw new Error('Enter a valid journal date.')
   }
   return result
+}
+
+export function cleanOptionalDate(value: string): string {
+  return value.trim() ? cleanJournalDate(value) : ''
 }
 
 export function cleanSecurityLinkTemplate(template: SecurityLinkTemplate, sortOrder: number): SecurityLinkTemplate {

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
@@ -78,5 +78,30 @@ describe('SecurityDetailView research notes',()=>{
     expect(await screen.findByText('Materials ▸ Precious Metals ▸ Gold')).toBeInTheDocument()
     expect(screen.getByRole('heading',{name:'Asset Allocation'})).toBeInTheDocument()
     expect(screen.queryByText('Asset Allocation › Materials › Precious Metals › Gold')).not.toBeInTheDocument()
+  })
+
+  it('lists, searches, and edits managed PDF metadata in the Documents tab',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'NESN',name:'Nestlé',currency:'CHF'})
+    await repository.addSecurityDocument({id:'doc-1',securityId:security.id,title:'UBS initiation report',originalFilename:'ubs-initiation.pdf',storagePath:`attachments/securities/${security.id}/doc-1.pdf`,source:'UBS',documentDate:'2026-06-30',mimeType:'application/pdf',fileSize:2_500_000,sha256:'hash-1'})
+    await repository.addSecurityDocument({id:'doc-2',securityId:security.id,title:'Quarterly update',originalFilename:'quarterly.pdf',storagePath:`attachments/securities/${security.id}/doc-2.pdf`,source:'ZKB',documentDate:'2026-08-01',mimeType:'application/pdf',fileSize:400_000,sha256:'hash-2'})
+    render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
+
+    fireEvent.click(await screen.findByRole('tab',{name:'Documents (2)'}))
+    expect(await screen.findByText('UBS initiation report')).toBeInTheDocument()
+    expect(screen.getByText('Quarterly update')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox',{name:'Search documents'}),{target:{value:'UBS'}})
+    expect(screen.getByText('UBS initiation report')).toBeInTheDocument()
+    expect(screen.queryByText('Quarterly update')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button',{name:'Edit UBS initiation report'}))
+    const dialog=screen.getByRole('dialog',{name:'Edit document details'})
+    expect(within(dialog).queryByLabelText('Document type')).not.toBeInTheDocument()
+    fireEvent.change(within(dialog).getByLabelText('Title'),{target:{value:'Updated bank report'}})
+    fireEvent.change(within(dialog).getByLabelText(/^Source/),{target:{value:'UBS Research'}})
+    fireEvent.click(within(dialog).getByRole('button',{name:'Save'}))
+
+    await waitFor(()=>expect(screen.getByText('Updated bank report')).toBeInTheDocument())
+    expect((await repository.listSecurityDocuments(security.id)).find((document)=>document.id==='doc-1')).toEqual(expect.objectContaining({title:'Updated bank report',source:'UBS Research'}))
   })
 })

@@ -62,6 +62,21 @@ export interface SecurityJournalEntry {
   updatedAt: string
 }
 
+export interface SecurityDocument {
+  id: string
+  securityId: string
+  title: string
+  originalFilename: string
+  storagePath: string
+  source: string
+  documentDate: string
+  mimeType: string
+  fileSize: number
+  sha256: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ResearchTopic {
   id: string
   title: string

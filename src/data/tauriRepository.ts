@@ -1,9 +1,10 @@
 import Database from '@tauri-apps/plugin-sql'
-import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
-import { cleanJournalDate, cleanRequired, cleanSecurityLinkTemplate, type EquityRepository, type JournalEntryInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
+import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
 
 type DbRow = Record<string, string | number | null>
 const mapSecurity = (row: DbRow): Security => ({ id:String(row.id),name:String(row.name),symbol:String(row.symbol),alternativeId:String(row.alternative_id ?? ''),currency:String(row.currency) })
+const mapSecurityDocument=(row:DbRow):SecurityDocument=>({id:String(row.id),securityId:String(row.security_id),title:String(row.title),originalFilename:String(row.original_filename),storagePath:String(row.storage_path),source:String(row.source),documentDate:String(row.document_date),mimeType:String(row.mime_type),fileSize:Number(row.file_size),sha256:String(row.sha256),createdAt:String(row.created_at),updatedAt:String(row.updated_at)})
 
 export class TauriRepository implements EquityRepository {
   private db!: Database
@@ -159,6 +160,20 @@ export class TauriRepository implements EquityRepository {
     return result
   }
   async deleteJournalEntry(id:string) { await this.db.execute('DELETE FROM security_journal_entries WHERE id=$1',[id]) }
+  async listSecurityDocuments(securityId:string):Promise<SecurityDocument[]> {
+    const rows=await this.db.select<DbRow[]>('SELECT id,security_id,title,original_filename,storage_path,source,document_date,mime_type,file_size,sha256,created_at,updated_at FROM security_documents WHERE security_id=$1 ORDER BY CASE WHEN document_date=\'\' THEN 1 ELSE 0 END,document_date DESC,created_at DESC',[securityId])
+    return rows.map(mapSecurityDocument)
+  }
+  async addSecurityDocument(input:SecurityDocumentInput):Promise<SecurityDocument> {
+    const now=new Date().toISOString(),result:SecurityDocument={...input,title:cleanRequired(input.title,'a document title'),source:input.source.trim(),documentDate:cleanOptionalDate(input.documentDate),createdAt:now,updatedAt:now}
+    try{await this.db.execute('INSERT INTO security_documents (id,security_id,title,original_filename,storage_path,source,document_date,mime_type,file_size,sha256,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[result.id,result.securityId,result.title,result.originalFilename,result.storagePath,result.source,result.documentDate,result.mimeType,result.fileSize,result.sha256,result.createdAt,result.updatedAt])}
+    catch(reason){const message=reason instanceof Error?reason.message:String(reason);if(message.includes('security_documents.security_id, security_documents.sha256'))throw new Error('This PDF is already attached to this security.');throw reason}
+    return result
+  }
+  async updateSecurityDocument(document:Pick<SecurityDocument,'id'|'title'|'source'|'documentDate'>) {
+    await this.db.execute('UPDATE security_documents SET title=$1,source=$2,document_date=$3,updated_at=$4 WHERE id=$5',[cleanRequired(document.title,'a document title'),document.source.trim(),cleanOptionalDate(document.documentDate),new Date().toISOString(),document.id])
+  }
+  async deleteSecurityDocument(id:string) { await this.db.execute('DELETE FROM security_documents WHERE id=$1',[id]) }
   async listSecurityLinkTemplates():Promise<SecurityLinkTemplate[]> {
     const rows=await this.db.select<DbRow[]>('SELECT id,link_text,url_pattern,sort_order FROM security_link_templates ORDER BY sort_order,id')
     return rows.map((row)=>({id:String(row.id),linkText:String(row.link_text),urlPattern:String(row.url_pattern),sortOrder:Number(row.sort_order)}))

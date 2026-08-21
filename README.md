@@ -80,3 +80,11 @@ The new schema intentionally retains the Qt application's table and column names
     - Do we need RAG or can the content fit into the context window? Or manual user based attachments?
 - Use the same > tree symbol with colored circle also in the taxonomy editor
 - Add  company logos (optionally replacing the chart symbol)
+- Fetc favicon from websites like yf or tikr or whatever the user eenters and use this icon instead of text everywhere in the app
+- Search bar for any text editor
+
+- Documents
+    - Attach documents to research topics too
+    - Link from a note to a particular document
+    - Full-text PDF search
+    - Extract report text for summarization or AI-assisted research

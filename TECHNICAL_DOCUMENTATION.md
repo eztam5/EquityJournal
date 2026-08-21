@@ -1,6 +1,6 @@
 # EquityJournal Technical Documentation
 
-This document describes the current EquityJournal implementation. It reflects database migrations `001` through `006` and the application structure at the time of writing.
+This document describes the current EquityJournal implementation. It reflects database migrations `001` through `007` and the application structure at the time of writing.
 
 ## 1. System overview
 
@@ -9,6 +9,7 @@ EquityJournal is a local-first desktop application for retail investment researc
 - managing securities and ordered watchlists;
 - maintaining hierarchical taxonomies and assigning securities to tags;
 - writing a current investment thesis and dated journal entries for securities;
+- attaching and organizing PDF research documents for securities;
 - writing current notes and dated journal entries for research topics;
 - relating topics directly to securities or dynamically through taxonomy tags;
 - configuring external security links and security-list columns; and
@@ -38,6 +39,7 @@ The production application is a Tauri desktop process with a React frontend and 
 flowchart LR
     UI[React views and dialogs] --> CTX[AppContext]
     UI --> REPO[EquityRepository interface]
+    UI --> FILES[Managed PDF attachment storage]
     CTX --> REPO
     REPO -->|Tauri runtime| SQLITE[TauriRepository / SQLite]
     REPO -->|Browser runtime| LOCAL[LocalRepository / localStorage]
@@ -54,6 +56,7 @@ flowchart LR
 - `src/data/repository.ts` defines the persistence boundary and shared input validation.
 - `src/data/tauriRepository.ts` implements the repository with SQL.
 - `src/data/localRepository.ts` implements the same contract with in-memory objects persisted to browser storage.
+- `src/utils/securityDocumentStorage.ts` manages PDF bytes independently of document metadata.
 
 ### Native responsibilities
 
@@ -99,7 +102,7 @@ The Settings dialog can read and save a path through Rust commands, but that pat
 
 ## 5. Entity-relationship diagram
 
-The following diagram represents the effective SQLite schema after migration `006_watchlist_order.sql`.
+The following diagram represents the effective SQLite schema after migration `007_security_documents.sql`.
 
 ```mermaid
 erDiagram
@@ -162,6 +165,21 @@ erDiagram
         TEXT updated_at
     }
 
+    SECURITY_DOCUMENTS {
+        TEXT id PK
+        TEXT security_id FK
+        TEXT title
+        TEXT original_filename
+        TEXT storage_path UK
+        TEXT source
+        TEXT document_date
+        TEXT mime_type
+        INTEGER file_size
+        TEXT sha256
+        TEXT created_at
+        TEXT updated_at
+    }
+
     SECURITY_LINK_TEMPLATES {
         TEXT id PK
         TEXT link_text
@@ -209,6 +227,7 @@ erDiagram
     TAGS ||--o{ SECURITY_TAGS : classifies
     SECURITIES ||--o| SECURITY_NOTES : has_current_note
     SECURITIES ||--o{ SECURITY_JOURNAL_ENTRIES : has_journal
+    SECURITIES ||--o{ SECURITY_DOCUMENTS : has_documents
     RESEARCH_TOPICS ||--o| RESEARCH_TOPIC_NOTES : has_current_note
     RESEARCH_TOPICS ||--o{ RESEARCH_TOPIC_JOURNAL_ENTRIES : has_journal
     RESEARCH_TOPICS ||--o{ RESEARCH_TOPIC_SECURITIES : directly_relates
@@ -229,7 +248,7 @@ erDiagram
 - `alternative_id` is optional at the domain level and stored as an empty string when absent.
 - “All Securities” is a virtual application view, not a row in `watchlists`.
 
-Deleting a security cascades to watchlist membership, tag assignments, its current note, journal entries, and direct topic relationships. A security dynamically related to a topic through a tag disappears from that topic automatically when its tag assignment is removed.
+Deleting a security cascades to watchlist membership, tag assignments, its current note, journal entries, document metadata, and direct topic relationships. The application also removes that security's managed attachment directory. A security dynamically related to a topic through a tag disappears from that topic automatically when its tag assignment is removed.
 
 ### Watchlists
 
@@ -259,6 +278,16 @@ Securities and research topics each support two complementary note forms:
 
 Journal dates use `YYYY-MM-DD`. Each owner may have at most one entry on a particular date. Rich text is persisted as HTML, while creation and update timestamps use ISO-8601 strings.
 
+### Security documents
+
+Each security can have any number of PDF research documents. The SQLite table stores searchable metadata only: title, source, optional report date, original filename, managed relative path, size, MIME type, hash, and timestamps. It deliberately has no document-type field.
+
+Desktop PDF bytes default to the application's data directory under `attachments/securities/{security-id}/`. The Documents section in Settings can select another absolute document root. Saving a changed location copies the existing managed `securities` tree to the new root before switching the configuration, then removes the old managed tree. The setting is stored separately from the SQLite database configuration in `document-storage.json`.
+
+SQLite retains only relative paths such as `securities/{security-id}/{document-id}.pdf`, which keeps database records valid when the root changes and avoids storing large binary values in SQLite. Paths created by the first attachment implementation with an `attachments/` prefix remain supported. SHA-256 uniqueness per security prevents attaching the same PDF twice. Browser development mode mirrors file storage in IndexedDB because the browser repository itself uses `localStorage`.
+
+The Documents tab supports multi-file selection, PDF drag and drop, in-memory metadata search, editing title/source/report date, opening, revealing in Finder or Explorer, and deletion. Deleting an attachment removes both its managed file and metadata row.
+
 ### Research topics and related securities
 
 A topic can relate to securities through both mechanisms at once:
@@ -286,7 +315,7 @@ The main operation groups are:
 - security CRUD;
 - watchlist CRUD, ordering, and membership;
 - taxonomy/tag CRUD, hierarchy ordering, and security assignments;
-- current notes and dated journals;
+- current notes, dated journals, and security-document metadata;
 - external link templates; and
 - topic CRUD, notes, journals, and related-security rules.
 
@@ -348,7 +377,7 @@ Persistence still occurs through repository methods; the tree and table layers d
 
 ## 11. Native integration and security
 
-The Tauri capability file grants the main window access to core APIs, SQL load/select/execute operations, the URL opener, the native save dialog, and writing a user-selected export file. The content security policy allows only local application content, Tauri IPC, inline styles needed by the UI, and local/data images.
+The Tauri capability file grants the main window access to core APIs, SQL load/select/execute operations, the opener, native open/save dialogs, reading user-selected PDF sources, and writing a user-selected export file. Managed attachment operations use narrow Rust commands that resolve validated relative paths beneath the configured document root; configuring an arbitrary folder therefore does not require granting the webview access to the entire home directory. The content security policy allows only local application content, Tauri IPC, inline styles needed by the UI, and local/data images.
 
 The native Edit menu restores standard Undo, Redo, Cut, Copy, Paste, and Select All behavior. The View menu controls the theme, while the application menu opens Settings. Native browser context menus are suppressed outside editable elements; inputs and rich-text editing surfaces retain appropriate platform behavior.
 
@@ -367,6 +396,8 @@ The native Edit menu restores standard Undo, Redo, Cut, Copy, Paste, and Select 
 | `src/components/taxonomyTreeModel.ts` | Taxonomy tree construction and filtering |
 | `src/components/useTaxonomyDragAndDrop.ts` | Taxonomy pointer drag-and-drop state machine |
 | `src/components/ResearchJournal.tsx` | Shared security/topic journal UI |
+| `src/components/SecurityDocuments.tsx` | Security document library UI and metadata editor |
+| `src/utils/securityDocumentStorage.ts` | Native/browser PDF storage, opening, reveal, and cleanup |
 | `src-tauri/src/lib.rs` | Tauri setup, native menus, commands, and migrations |
 | `src-tauri/migrations/` | Ordered SQLite schema migrations |
 | `src/styles/global.css` | Application layout and base styles |

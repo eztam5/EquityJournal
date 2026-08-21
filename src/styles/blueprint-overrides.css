@@ -103,8 +103,9 @@ table.security-table.bp6-html-table tbody tr.security-selected:hover > td { back
 .security-links .bp6-button { min-height: 22px; padding: 0 4px; justify-content: flex-start; }
 .notes-card > header { padding: 0 20px; margin-bottom: 12px; }
 .notes-card .rich-editor { padding: 0 20px; }
-.research-tabs { margin-left: 8px; }
 .research-tabs .bp6-button[aria-selected='true'] { background: var(--selected); color: var(--text); }
+.research-save-controls { display: flex; align-items: center; gap: 8px; margin-right: 8px; }
+.research-save-controls > span { color: var(--muted); font-size: 12px; }
 .journal-workspace { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 390px; border-top: 1px solid var(--border); }
 .journal-timeline { padding: 12px; border-right: 1px solid var(--border); background: var(--sidebar); }
 .journal-timeline > .bp6-button { width: 100%; margin-bottom: 7px; }
@@ -121,6 +122,19 @@ table.security-table.bp6-html-table tbody tr.security-selected:hover > td { back
 .journal-editor > header .bp6-input-group { width: 150px; }
 .journal-editor > header > span { margin-left: auto; color: var(--muted); font-size: 12px; }
 .journal-error.bp6-callout { margin: 12px 20px; }
+.security-documents { min-height: 390px; border-top: 1px solid var(--border); }
+.documents-toolbar { min-height: 52px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 8px 20px; border-bottom: 1px solid var(--border); }
+.documents-toolbar .bp6-input-group { width: min(280px, 40vw); }
+.documents-status.bp6-callout { margin: 12px 20px 0; }
+.documents-drop-zone { min-height: 330px; margin: 12px 20px 20px; border: 1px dashed transparent; transition: border-color 100ms ease, background-color 100ms ease; }
+.documents-drop-zone.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.document-table.bp6-html-table { width: 100%; }
+.document-table td:first-child { min-width: 220px; }
+.document-table td:first-child small { display: block; max-width: 320px; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.document-title-link { padding: 0; border: 0; background: transparent; color: var(--text); font-weight: 600; text-align: left; }
+.document-title-link:hover { background: transparent !important; color: var(--accent); }
+table.document-table.bp6-html-table th:last-child,
+table.document-table.bp6-html-table td:last-child { width: 132px; text-align: right; white-space: nowrap; }
 @media (max-width: 760px) {
   .journal-workspace { grid-template-columns: 1fr; }
   .journal-timeline { border-right: 0; border-bottom: 1px solid var(--border); }

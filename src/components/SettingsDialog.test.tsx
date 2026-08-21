@@ -11,13 +11,21 @@ describe('SettingsDialog navigation',()=>{
     render(<AppProvider repository={new LocalRepository()}><SettingsDialog isOpen onClose={vi.fn()}/></AppProvider>)
 
     const navigation=screen.getByRole('navigation',{name:'Settings sections'})
-    expect(within(navigation).getAllByRole('button').map((button)=>button.textContent)).toEqual(['General','Security Links','Database Connection'])
+    expect(within(navigation).getAllByRole('button').map((button)=>button.textContent)).toEqual(['General','Documents','Security Links','Database Connection'])
     expect(screen.getByRole('heading',{name:'General'})).toBeInTheDocument()
     expect(screen.queryByLabelText('Database Path')).not.toBeInTheDocument()
 
     fireEvent.click(within(navigation).getByRole('button',{name:'Database Connection'}))
     expect(screen.getByRole('heading',{name:'Database Connection'})).toBeInTheDocument()
     expect(screen.getByLabelText('Database Path')).toBeInTheDocument()
+  })
+
+  it('shows document storage settings separately',()=>{
+    render(<AppProvider repository={new LocalRepository()}><SettingsDialog isOpen onClose={vi.fn()}/></AppProvider>)
+    fireEvent.click(screen.getByRole('button',{name:'Documents'}))
+    expect(screen.getByRole('heading',{name:'Documents'})).toBeInTheDocument()
+    expect(screen.getByLabelText('Document folder')).toBeDisabled()
+    expect(screen.getByText('Browser development mode stores attachments in IndexedDB.')).toBeInTheDocument()
   })
 
   it('configures global security links',async()=>{

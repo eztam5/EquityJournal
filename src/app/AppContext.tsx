@@ -3,6 +3,7 @@ import { createRepository, type EquityRepository } from '../data'
 import type { SecurityInput } from '../data/repository'
 import type { ResearchTopic, Security, SecurityLinkTemplate, Tag, Taxonomy, ThemeMode, View, Watchlist } from '../domain/types'
 import { loadSecurityDisplayMode, SECURITY_DISPLAY_MODE_KEY, type SecurityDisplayMode } from '../utils/securityLabels'
+import { removeSecurityDocumentDirectory } from '../utils/securityDocumentStorage'
 
 interface AppContextValue {
   repository: EquityRepository
@@ -107,7 +108,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const addSecurity = async (input: SecurityInput) => { const result = await repository.addSecurity(input); await refresh(); return result }
   const updateSecurity = async (input: Security) => { await repository.updateSecurity(input); await refresh() }
   const deleteSecurity = async (id: string) => {
-    await repository.deleteSecurity(id); setRecentIds((ids) => ids.filter((value) => value !== id))
+    await repository.deleteSecurity(id); await removeSecurityDocumentDirectory(id).catch(()=>{}); setRecentIds((ids) => ids.filter((value) => value !== id))
     if (view.type === 'security' && view.id === id) replaceView({ type: 'all-securities' })
     await refresh()
   }
