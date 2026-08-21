@@ -105,7 +105,7 @@ table.security-table.bp6-html-table tbody tr.security-selected:hover > td { back
 .notes-card .rich-editor { padding: 0 20px; }
 .research-tabs .bp6-button[aria-selected='true'] { background: var(--selected); color: var(--text); }
 .research-save-controls { display: flex; align-items: center; gap: 8px; margin-right: 8px; }
-.research-save-controls > span { color: var(--muted); font-size: 12px; }
+.research-save-controls .bp6-button { min-width: 88px; justify-content: center; }
 .journal-workspace { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 390px; border-top: 1px solid var(--border); }
 .journal-timeline { padding: 12px; border-right: 1px solid var(--border); background: var(--sidebar); }
 .journal-timeline > .bp6-button { width: 100%; margin-bottom: 7px; }
