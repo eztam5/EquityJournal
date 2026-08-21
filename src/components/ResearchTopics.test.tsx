@@ -42,4 +42,22 @@ describe('Research topics',()=>{
     expect(within(dialog).getByLabelText('CSU — Constellation Software')).toBeChecked()
     expect(within(dialog).getByLabelText('Software')).toBeChecked()
   })
+
+  it('uses the save button itself to show the current thesis save state',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const topic=await repository.addResearchTopic('Serial acquirers in VMS')
+    await repository.saveResearchTopicNote(topic.id,'<p>Initial thesis</p>')
+
+    render(<AppProvider repository={repository}><ResearchTopicDetailView id={topic.id}/></AppProvider>)
+
+    const saveButton=await screen.findByRole('button',{name:'Saved'})
+    const tabList=screen.getByRole('tablist')
+    expect(saveButton.compareDocumentPosition(tabList)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(saveButton.closest('.research-save-controls')).toBeInTheDocument()
+    expect(document.querySelector('.notes-card > header > span')).not.toBeInTheDocument()
+
+    fireEvent.click(saveButton)
+    expect(await screen.findByRole('button',{name:'Saved'})).toBeInTheDocument()
+    expect(await repository.loadResearchTopicNote(topic.id)).toEqual(expect.objectContaining({contentHtml:'<p>Initial thesis</p>'}))
+  })
 })
