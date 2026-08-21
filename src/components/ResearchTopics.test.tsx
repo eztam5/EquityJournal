@@ -25,7 +25,9 @@ describe('Research topics',()=>{
     const software=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Software',description:'',color:taxonomy.color})
     const vms=await repository.addTag({taxonomyId:taxonomy.id,parentId:software.id,name:'VMS',description:'',color:taxonomy.color})
     const constellation=await repository.addSecurity({symbol:'CSU',name:'Constellation Software',currency:'CAD'})
+    const descartes=await repository.addSecurity({symbol:'DSG',name:'Descartes Systems',currency:'CAD'})
     await repository.setAssignedTags(constellation.id,[vms.id])
+    await repository.setAssignedTags(descartes.id,[vms.id])
     const topic=await repository.addResearchTopic('Serial acquirers in VMS')
     await repository.setResearchTopicRelations(topic.id,[constellation.id],[software.id])
 
@@ -33,7 +35,11 @@ describe('Research topics',()=>{
 
     expect(await screen.findByText('Serial acquirers in VMS')).toBeInTheDocument()
     expect(await screen.findByRole('button',{name:'CSU — Constellation Software'})).toBeInTheDocument()
-    expect(screen.getByText('Individual and classification')).toBeInTheDocument()
+    expect(screen.getByRole('button',{name:'DSG — Descartes Systems'})).toBeInTheDocument()
+    expect(screen.getByText('Both').closest('.topic-inclusion-tag')).toHaveAttribute('title','Individual and classification')
+    expect(screen.getByText('Tag').closest('.topic-inclusion-tag')).toHaveAttribute('title','Classification tag')
+    expect(screen.getByLabelText('2 securities')).toBeInTheDocument()
+    expect(screen.getByRole('list',{name:'Related securities'})).toBeInTheDocument()
     expect(document.querySelector('.topic-rule-list')).toHaveTextContent('Industry: Software')
     expect(document.querySelector('.topic-rule-list')).not.toHaveTextContent('+ children')
 
