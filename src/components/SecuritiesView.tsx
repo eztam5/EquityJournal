@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
-import { Button, HTMLTable, Icon, Menu, MenuItem, PopoverNext, showContextMenu, Tooltip } from '@blueprintjs/core'
+import { Button, HTMLTable, Icon, InputGroup, Menu, MenuItem, PopoverNext, showContextMenu, Tooltip } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import { resolveSecurityLink } from '../data/repository'
 import type { Security, SecurityLinkTemplate } from '../domain/types'
@@ -87,6 +87,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const[preferences,setPreferences]=useState<SecurityColumnPreferences>(loadSecurityColumnPreferences)
   const[sortKey,setSortKey]=useState<SecuritySortKey>(()=>loadVisibleSecurityColumns().find(isSecuritySortKey)??'symbol')
   const[direction,setDirection]=useState<SortDirection>('asc')
+  const[searchQuery,setSearchQuery]=useState('')
   const[exportStatus,setExportStatus]=useState('')
   const[selectedSecurityIds,setSelectedSecurityIds]=useState<Set<string>>(()=>new Set())
   const pendingDrag=useRef<{securities:Security[];pointerId:number;x:number;y:number}|null>(null)
@@ -96,7 +97,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const selectionAnchorId=useRef<string|null>(null)
 
   useEffect(()=>{app.repository.listSecurities(watchlistId).then(setRows)},[app.repository,app.securities,watchlistId])
-  useEffect(()=>{selectionAnchorId.current=null;setSelectedSecurityIds(new Set())},[watchlistId])
+  useEffect(()=>{selectionAnchorId.current=null;setSelectedSecurityIds(new Set());setSearchQuery('')},[watchlistId])
   useEffect(()=>setSelectedSecurityIds((current)=>{const visibleIds=new Set(rows.map((row)=>row.id));if(selectionAnchorId.current&&!visibleIds.has(selectionAnchorId.current))selectionAnchorId.current=null;const next=new Set([...current].filter((id)=>visibleIds.has(id)));return next.size===current.size?current:next}),[rows])
   useEffect(()=>{const clear=(event:KeyboardEvent)=>{if(event.key==='Escape'){selectionAnchorId.current=null;setSelectedSecurityIds(new Set())}};document.addEventListener('keydown',clear);return()=>document.removeEventListener('keydown',clear)},[])
   useEffect(()=>{localStorage.setItem(COLUMN_PREFERENCES_KEY,JSON.stringify(preferences))},[preferences])
@@ -125,7 +126,8 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     if(next){setSortKey(next);setDirection('asc')}
   },[preferences.visible,sortKey,visibleColumns])
 
-  const sortedRows=useMemo(()=>sortSecurities(rows,sortKey,direction),[rows,sortKey,direction])
+  const filteredRows=useMemo(()=>{const query=searchQuery.trim().toLocaleLowerCase();return query?rows.filter((security)=>security.symbol.toLocaleLowerCase().includes(query)||security.name.toLocaleLowerCase().includes(query)):rows},[rows,searchQuery])
+  const sortedRows=useMemo(()=>sortSecurities(filteredRows,sortKey,direction),[filteredRows,sortKey,direction])
   const sort=(column:SecuritySortKey)=>{if(column===sortKey)setDirection((current)=>current==='asc'?'desc':'asc');else{setSortKey(column);setDirection('asc')}}
   const toggleColumn=(column:SecurityColumnKey)=>setPreferences((current)=>{const visible=current.visible.includes(column);if(visible&&visibleColumns.length===1)return current;return{...current,visible:visible?current.visible.filter((key)=>key!==column):[...current.visible,column]}})
   const reorderColumn=(source:SecurityColumnKey,target:SecurityColumnKey)=>setPreferences((current)=>{const order=orderedColumns.map((column)=>column.key),sourceIndex=order.indexOf(source),targetIndex=order.indexOf(target);if(sourceIndex<0||targetIndex<0||sourceIndex===targetIndex)return current;order.splice(sourceIndex,1);order.splice(targetIndex,0,source);return{...current,order:[...order,...current.order.filter((key)=>!order.includes(key))]}})
@@ -165,8 +167,10 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     return <td className="security-link-cell" key={column.key}><Button variant="minimal" size="small" icon="share" text="Open" aria-label={`Open ${column.label}`} disabled={!url} title={url?`Open ${column.label}`:`Set an Alternative ID to use ${column.label}`} onClick={(event)=>{event.stopPropagation();if(url)void openExternalUrl(url)}}/></td>
   }
 
-  return <main className="content page"><PageHeader title={title} description={<>{rows.length} {rows.length===1?'security':'securities'}{exportStatus&&<span className="export-status" role="status"> · {exportStatus}</span>}</>} actions={<><PopoverNext content={exportMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button className="page-toolbar-button" icon="export" text="Export"/></PopoverNext><PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button className="page-toolbar-button" icon="properties" text="Columns"/></PopoverNext></>}/>
-    <div className="content-panel data-card"><HTMLTable className="security-table" compact interactive striped><thead><tr>{visibleColumns.map(renderHeader)}<th aria-label="Actions"/></tr></thead><tbody>{sortedRows.map((security)=>{const selected=selectedSecurityIds.has(security.id);return <tr key={security.id} className={`security-draggable-row ${selected?'security-selected':''}`} aria-selected={selected} onClick={(event)=>selectSecurity(event,security)} onPointerDown={(event)=>startSecurityDrag(event,security)} onPointerMove={moveSecurityDrag} onPointerUp={(event)=>void finishSecurityDrag(event)} onPointerCancel={resetSecurityDrag} onDoubleClick={()=>app.openSecurity(security.id)} onContextMenu={(event)=>openMenu(event,security)}>{visibleColumns.map((column)=>renderCell(column,security))}<td><Button variant="minimal" size="small" icon="edit" aria-label={`Edit ${security.name}`} onClick={()=>setEditing(security)}/>{renderRemoveOrDeleteButton(security)}</td></tr>})}</tbody></HTMLTable>{rows.length===0&&<div className="empty-state">No securities yet.</div>}</div>
+  const searching=searchQuery.trim().length>0
+  const description=searching?`${filteredRows.length} of ${rows.length} ${rows.length===1?'security':'securities'}`:`${rows.length} ${rows.length===1?'security':'securities'}`
+  return <main className="content page"><PageHeader title={title} description={<>{description}{exportStatus&&<span className="export-status" role="status"> · {exportStatus}</span>}</>} actions={<><InputGroup className="security-search" type="search" leftIcon="search" placeholder="Search securities" aria-label="Search securities" value={searchQuery} onChange={(event)=>setSearchQuery(event.target.value)} rightElement={searchQuery?<Button variant="minimal" icon="cross" aria-label="Clear search" onClick={()=>setSearchQuery('')}/>:undefined}/><PopoverNext content={exportMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button className="page-toolbar-button" icon="export" text="Export"/></PopoverNext><PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button className="page-toolbar-button" icon="properties" text="Columns"/></PopoverNext></>}/>
+    <div className="content-panel data-card"><HTMLTable className="security-table" compact interactive striped><thead><tr>{visibleColumns.map(renderHeader)}<th aria-label="Actions"/></tr></thead><tbody>{sortedRows.map((security)=>{const selected=selectedSecurityIds.has(security.id);return <tr key={security.id} className={`security-draggable-row ${selected?'security-selected':''}`} aria-selected={selected} onClick={(event)=>selectSecurity(event,security)} onPointerDown={(event)=>startSecurityDrag(event,security)} onPointerMove={moveSecurityDrag} onPointerUp={(event)=>void finishSecurityDrag(event)} onPointerCancel={resetSecurityDrag} onDoubleClick={()=>app.openSecurity(security.id)} onContextMenu={(event)=>openMenu(event,security)}>{visibleColumns.map((column)=>renderCell(column,security))}<td><Button variant="minimal" size="small" icon="edit" aria-label={`Edit ${security.name}`} onClick={()=>setEditing(security)}/>{renderRemoveOrDeleteButton(security)}</td></tr>})}</tbody></HTMLTable>{rows.length===0?<div className="empty-state">No securities yet.</div>:searching&&filteredRows.length===0?<div className="empty-state">No securities match “{searchQuery.trim()}”.</div>:null}</div>
     {editing&&<SecurityForm security={editing} onClose={()=>setEditing(undefined)}/>} {deleting&&<ConfirmDialog title="Delete security" message={`Permanently delete ${deleting.name} from the database?`} confirmLabel="Delete" onClose={()=>setDeleting(undefined)} onConfirm={()=>app.deleteSecurity(deleting.id)}/>}
   </main>
 }

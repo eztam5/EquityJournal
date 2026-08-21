@@ -89,4 +89,50 @@ describe('SecuritiesView visible columns',()=>{
     expect(await screen.findByRole('status')).toHaveTextContent('CSV copied to clipboard')
   })
 
+  it('filters All Securities by symbol or company name without querying again',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    await repository.addSecurity({symbol:'MSFT',name:'Microsoft',currency:'USD'})
+    const listSecurities=vi.spyOn(repository,'listSecurities')
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+
+    expect(await screen.findByText('Apple Inc.')).toBeInTheDocument()
+    expect(screen.getByText('Microsoft')).toBeInTheDocument()
+    const initialQueries=listSecurities.mock.calls.length
+    const search=screen.getByRole('searchbox',{name:'Search securities'})
+    fireEvent.change(search,{target:{value:'micro'}})
+    expect(screen.queryByText('Apple Inc.')).not.toBeInTheDocument()
+    expect(screen.getByText('Microsoft')).toBeInTheDocument()
+    fireEvent.change(search,{target:{value:'aapl'}})
+    expect(screen.getByText('Apple Inc.')).toBeInTheDocument()
+    expect(screen.queryByText('Microsoft')).not.toBeInTheDocument()
+    expect(listSecurities).toHaveBeenCalledTimes(initialQueries)
+
+    fireEvent.click(screen.getByRole('button',{name:'Clear search'}))
+    expect(screen.getByText('Apple Inc.')).toBeInTheDocument()
+    expect(screen.getByText('Microsoft')).toBeInTheDocument()
+  })
+
+  it('filters only the securities belonging to the current watchlist',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const apple=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    const microsoft=await repository.addSecurity({symbol:'MSFT',name:'Microsoft',currency:'USD'})
+    await repository.addSecurity({symbol:'NVDA',name:'Nvidia',currency:'USD'})
+    const watchlist=await repository.addWatchlist('Quality')
+    await repository.setWatchlistSecurity(watchlist.id,apple.id,true)
+    await repository.setWatchlistSecurity(watchlist.id,microsoft.id,true)
+    render(<AppProvider repository={repository}><SecuritiesView watchlistId={watchlist.id}/></AppProvider>)
+
+    expect(await screen.findByText('Apple Inc.')).toBeInTheDocument()
+    expect(screen.getByText('Microsoft')).toBeInTheDocument()
+    expect(screen.queryByText('Nvidia')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox',{name:'Search securities'}),{target:{value:'MSFT'}})
+    expect(screen.queryByText('Apple Inc.')).not.toBeInTheDocument()
+    expect(screen.getByText('Microsoft')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Clear search'}))
+    expect(screen.getByText('Apple Inc.')).toBeInTheDocument()
+    expect(screen.getByText('Microsoft')).toBeInTheDocument()
+    expect(screen.queryByText('Nvidia')).not.toBeInTheDocument()
+  })
+
 })

@@ -13,6 +13,7 @@ EquityJournal is a local-first desktop application for retail investment researc
 - relating topics directly to securities or dynamically through taxonomy tags;
 - configuring external security links and security-list columns; and
 - exporting visible security-table data as CSV or HTML through the clipboard or a native file dialog;
+- filtering All Securities and watchlists in memory by symbol or company name;
 - navigating between securities and topics through references embedded in rich text.
 
 The production application is a Tauri desktop process with a React frontend and a local SQLite database. A browser-only development mode replaces SQLite with a `localStorage` repository that implements the same application-facing contract.
