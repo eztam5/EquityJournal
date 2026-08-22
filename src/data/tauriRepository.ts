@@ -1,13 +1,24 @@
 import Database from '@tauri-apps/plugin-sql'
-import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
-import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
+import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, extractEditorImageIds, type EditorImageInput, type EditorImageReferenceScope, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
 
 type DbRow = Record<string, string | number | null>
 const mapSecurity = (row: DbRow): Security => ({ id:String(row.id),name:String(row.name),symbol:String(row.symbol),alternativeId:String(row.alternative_id ?? ''),currency:String(row.currency) })
 const mapSecurityDocument=(row:DbRow):SecurityDocument=>({id:String(row.id),securityId:String(row.security_id),title:String(row.title),originalFilename:String(row.original_filename),storagePath:String(row.storage_path),source:String(row.source),documentDate:String(row.document_date),mimeType:String(row.mime_type),fileSize:Number(row.file_size),sha256:String(row.sha256),createdAt:String(row.created_at),updatedAt:String(row.updated_at)})
+const mapEditorImage=(row:DbRow):EditorImage=>({id:String(row.id),ownerType:String(row.owner_type) as EditorImage['ownerType'],ownerId:String(row.owner_id),originalFilename:String(row.original_filename),storagePath:String(row.storage_path),mimeType:String(row.mime_type),fileSize:Number(row.file_size),sha256:String(row.sha256),orphanedAt:row.orphaned_at?String(row.orphaned_at):null,createdAt:String(row.created_at),updatedAt:String(row.updated_at)})
 
 export class TauriRepository implements EquityRepository {
   private db!: Database
+  private async markUnreferencedEditorImages() { await this.db.execute("UPDATE editor_images SET orphaned_at=COALESCE(orphaned_at,$1),updated_at=CASE WHEN orphaned_at IS NULL THEN $1 ELSE updated_at END WHERE NOT EXISTS (SELECT 1 FROM editor_image_references reference WHERE reference.image_id=editor_images.id)",[new Date().toISOString()]) }
+  private async syncEditorImageReferences(scope:EditorImageReferenceScope,contentHtml:string) {
+    await this.db.execute('DELETE FROM editor_image_references WHERE content_type=$1 AND content_id=$2',[scope.contentType,scope.contentId])
+    for(const imageId of extractEditorImageIds(contentHtml)){
+      await this.db.execute('INSERT OR IGNORE INTO editor_image_references (image_id,content_type,content_id) SELECT id,$2,$3 FROM editor_images WHERE id=$1 AND owner_type=$4 AND owner_id=$5',[imageId,scope.contentType,scope.contentId,scope.ownerType,scope.ownerId])
+      await this.db.execute('UPDATE editor_images SET orphaned_at=NULL,updated_at=$1 WHERE id=$2 AND owner_type=$3 AND owner_id=$4',[new Date().toISOString(),imageId,scope.ownerType,scope.ownerId])
+    }
+    await this.markUnreferencedEditorImages()
+  }
+  private async removeEditorImageReferences(contentType:EditorImageContentType,contentId:string) { await this.db.execute('DELETE FROM editor_image_references WHERE content_type=$1 AND content_id=$2',[contentType,contentId]);await this.markUnreferencedEditorImages() }
   async initialize() {
     this.db = await Database.load('sqlite:equity-journal.sqlite3')
     await this.db.execute('PRAGMA foreign_keys = ON')
@@ -27,7 +38,7 @@ export class TauriRepository implements EquityRepository {
     try { await this.db.execute('UPDATE securities SET name=$1,symbol=$2,alternative_id=$3,currency=$4 WHERE id=$5', [name,symbol,alternativeId,currency,s.id]) }
     catch { throw new Error('A security with this symbol already exists.') }
   }
-  async deleteSecurity(id: string) { await this.db.execute('DELETE FROM securities WHERE id=$1', [id]) }
+  async deleteSecurity(id: string) { await this.db.execute("DELETE FROM editor_images WHERE owner_type='security' AND owner_id=$1",[id]);await this.db.execute('DELETE FROM securities WHERE id=$1', [id]) }
   async listWatchlists(): Promise<Watchlist[]> {
     const rows=await this.db.select<DbRow[]>('SELECT id,name,sort_order FROM watchlists ORDER BY sort_order,lower(name),id')
     return rows.map((row)=>({id:String(row.id),name:String(row.name),sortOrder:Number(row.sort_order)}))
@@ -139,7 +150,7 @@ export class TauriRepository implements EquityRepository {
   }
   async saveNote(securityId:string,contentHtml:string) {
     const result={securityId,contentHtml,updatedAt:new Date().toISOString()}
-    await this.db.execute('INSERT INTO security_notes (security_id,content_html,updated_at) VALUES ($1,$2,$3) ON CONFLICT(security_id) DO UPDATE SET content_html=excluded.content_html,updated_at=excluded.updated_at',[securityId,contentHtml,result.updatedAt]); return result
+    await this.db.execute('INSERT INTO security_notes (security_id,content_html,updated_at) VALUES ($1,$2,$3) ON CONFLICT(security_id) DO UPDATE SET content_html=excluded.content_html,updated_at=excluded.updated_at',[securityId,contentHtml,result.updatedAt]);await this.syncEditorImageReferences({contentType:'security-note',contentId:securityId,ownerType:'security',ownerId:securityId},contentHtml); return result
   }
   async listJournalEntries(securityId:string):Promise<SecurityJournalEntry[]> {
     const rows=await this.db.select<DbRow[]>('SELECT id,security_id,entry_date,content_html,created_at,updated_at FROM security_journal_entries WHERE security_id=$1 ORDER BY entry_date DESC,updated_at DESC',[securityId])
@@ -157,9 +168,9 @@ export class TauriRepository implements EquityRepository {
     try {
       await this.db.execute('INSERT INTO security_journal_entries (id,security_id,entry_date,content_html,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO UPDATE SET entry_date=excluded.entry_date,content_html=excluded.content_html,updated_at=excluded.updated_at',[result.id,result.securityId,result.entryDate,result.contentHtml,result.createdAt,result.updatedAt])
     } catch { throw new Error('A journal entry already exists for this date.') }
-    return result
+    await this.syncEditorImageReferences({contentType:'security-journal',contentId:result.id,ownerType:'security',ownerId:result.securityId},result.contentHtml);return result
   }
-  async deleteJournalEntry(id:string) { await this.db.execute('DELETE FROM security_journal_entries WHERE id=$1',[id]) }
+  async deleteJournalEntry(id:string) { await this.db.execute('DELETE FROM security_journal_entries WHERE id=$1',[id]);await this.removeEditorImageReferences('security-journal',id) }
   async listSecurityDocuments(securityId:string):Promise<SecurityDocument[]> {
     const rows=await this.db.select<DbRow[]>('SELECT id,security_id,title,original_filename,storage_path,source,document_date,mime_type,file_size,sha256,created_at,updated_at FROM security_documents WHERE security_id=$1 ORDER BY CASE WHEN document_date=\'\' THEN 1 ELSE 0 END,document_date DESC,created_at DESC',[securityId])
     return rows.map(mapSecurityDocument)
@@ -174,6 +185,10 @@ export class TauriRepository implements EquityRepository {
     await this.db.execute('UPDATE security_documents SET title=$1,source=$2,document_date=$3,updated_at=$4 WHERE id=$5',[cleanRequired(document.title,'a document title'),document.source.trim(),cleanOptionalDate(document.documentDate),new Date().toISOString(),document.id])
   }
   async deleteSecurityDocument(id:string) { await this.db.execute('DELETE FROM security_documents WHERE id=$1',[id]) }
+  async getEditorImage(id:string) { const rows=await this.db.select<DbRow[]>('SELECT id,owner_type,owner_id,original_filename,storage_path,mime_type,file_size,sha256,orphaned_at,created_at,updated_at FROM editor_images WHERE id=$1',[id]);return rows[0]?mapEditorImage(rows[0]):undefined }
+  async addEditorImage(input:EditorImageInput) { const now=new Date().toISOString(),result:EditorImage={...input,orphanedAt:now,createdAt:now,updatedAt:now};await this.db.execute('INSERT INTO editor_images (id,owner_type,owner_id,original_filename,storage_path,mime_type,file_size,sha256,orphaned_at,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',[result.id,result.ownerType,result.ownerId,result.originalFilename,result.storagePath,result.mimeType,result.fileSize,result.sha256,result.orphanedAt,result.createdAt,result.updatedAt]);return result }
+  async listOrphanedEditorImages(before:string) { const rows=await this.db.select<DbRow[]>('SELECT id,owner_type,owner_id,original_filename,storage_path,mime_type,file_size,sha256,orphaned_at,created_at,updated_at FROM editor_images WHERE orphaned_at IS NOT NULL AND orphaned_at<$1 ORDER BY orphaned_at',[before]);return rows.map(mapEditorImage) }
+  async deleteEditorImage(id:string) { await this.db.execute('DELETE FROM editor_images WHERE id=$1',[id]) }
   async listSecurityLinkTemplates():Promise<SecurityLinkTemplate[]> {
     const rows=await this.db.select<DbRow[]>('SELECT id,link_text,url_pattern,sort_order FROM security_link_templates ORDER BY sort_order,id')
     return rows.map((row)=>({id:String(row.id),linkText:String(row.link_text),urlPattern:String(row.url_pattern),sortOrder:Number(row.sort_order)}))
@@ -200,7 +215,7 @@ export class TauriRepository implements EquityRepository {
     try{await this.db.execute('UPDATE research_topics SET title=$1,updated_at=$2 WHERE id=$3',[cleanRequired(topic.title,'a topic title'),new Date().toISOString(),topic.id])}
     catch{throw new Error('A research topic with this title already exists.')}
   }
-  async deleteResearchTopic(id:string) { await this.db.execute('DELETE FROM research_topics WHERE id=$1',[id]) }
+  async deleteResearchTopic(id:string) { await this.db.execute("DELETE FROM editor_images WHERE owner_type='topic' AND owner_id=$1",[id]);await this.db.execute('DELETE FROM research_topics WHERE id=$1',[id]) }
   async loadResearchTopicNote(topicId:string):Promise<ResearchTopicNote> {
     const rows=await this.db.select<DbRow[]>('SELECT topic_id,content_html,updated_at FROM research_topic_notes WHERE topic_id=$1',[topicId]),row=rows[0]
     return row?{topicId:String(row.topic_id),contentHtml:String(row.content_html),updatedAt:String(row.updated_at)}:{topicId,contentHtml:'',updatedAt:''}
@@ -208,7 +223,7 @@ export class TauriRepository implements EquityRepository {
   async saveResearchTopicNote(topicId:string,contentHtml:string) {
     const result={topicId,contentHtml,updatedAt:new Date().toISOString()}
     await this.db.execute('INSERT INTO research_topic_notes (topic_id,content_html,updated_at) VALUES ($1,$2,$3) ON CONFLICT(topic_id) DO UPDATE SET content_html=excluded.content_html,updated_at=excluded.updated_at',[topicId,contentHtml,result.updatedAt])
-    await this.db.execute('UPDATE research_topics SET updated_at=$1 WHERE id=$2',[result.updatedAt,topicId]);return result
+    await this.syncEditorImageReferences({contentType:'topic-note',contentId:topicId,ownerType:'topic',ownerId:topicId},contentHtml);await this.db.execute('UPDATE research_topics SET updated_at=$1 WHERE id=$2',[result.updatedAt,topicId]);return result
   }
   async listResearchTopicJournalEntries(topicId:string):Promise<ResearchTopicJournalEntry[]> {
     const rows=await this.db.select<DbRow[]>('SELECT id,topic_id,entry_date,content_html,created_at,updated_at FROM research_topic_journal_entries WHERE topic_id=$1 ORDER BY entry_date DESC,updated_at DESC',[topicId])
@@ -223,11 +238,12 @@ export class TauriRepository implements EquityRepository {
     const now=new Date().toISOString(),result={id,topicId:input.topicId,entryDate,contentHtml:input.contentHtml,createdAt:existing[0]?String(existing[0].created_at):now,updatedAt:now}
     try{await this.db.execute('INSERT INTO research_topic_journal_entries (id,topic_id,entry_date,content_html,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO UPDATE SET entry_date=excluded.entry_date,content_html=excluded.content_html,updated_at=excluded.updated_at',[result.id,result.topicId,result.entryDate,result.contentHtml,result.createdAt,result.updatedAt])}
     catch{throw new Error('A journal entry already exists for this date.')}
-    await this.db.execute('UPDATE research_topics SET updated_at=$1 WHERE id=$2',[now,input.topicId]);return result
+    await this.syncEditorImageReferences({contentType:'topic-journal',contentId:result.id,ownerType:'topic',ownerId:result.topicId},result.contentHtml);await this.db.execute('UPDATE research_topics SET updated_at=$1 WHERE id=$2',[now,input.topicId]);return result
   }
   async deleteResearchTopicJournalEntry(id:string) {
     const rows=await this.db.select<Array<{topic_id:string}>>('SELECT topic_id FROM research_topic_journal_entries WHERE id=$1',[id])
     await this.db.execute('DELETE FROM research_topic_journal_entries WHERE id=$1',[id])
+    await this.removeEditorImageReferences('topic-journal',id)
     if(rows[0])await this.db.execute('UPDATE research_topics SET updated_at=$1 WHERE id=$2',[new Date().toISOString(),rows[0].topic_id])
   }
   async getResearchTopicRelations(topicId:string) {

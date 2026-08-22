@@ -179,9 +179,10 @@ fn change_document_storage_path(app: tauri::AppHandle, new_path: String) -> Resu
     if let Some(old) = &canonical_old {
         if canonical_new.starts_with(old) || old.starts_with(&canonical_new) { return Err("The new document folder cannot contain, or be contained by, the current folder.".into()); }
         copy_directory(&old.join("securities"), &canonical_new.join("securities"))?;
+        copy_directory(&old.join("topics"), &canonical_new.join("topics"))?;
     }
     save_document_storage_config(&canonical_new)?;
-    if let Some(old) = canonical_old { let _ = fs::remove_dir_all(old.join("securities")); }
+    if let Some(old) = canonical_old { let _ = fs::remove_dir_all(old.join("securities"));let _ = fs::remove_dir_all(old.join("topics")); }
     Ok(())
 }
 
@@ -230,6 +231,48 @@ fn remove_security_document_directory(app: tauri::AppHandle, security_id: String
     Ok(())
 }
 
+fn editor_image_format(bytes: &[u8]) -> Option<(&'static str, &'static str)> {
+    if bytes.starts_with(&[0x89,b'P',b'N',b'G',0x0d,0x0a,0x1a,0x0a]) { Some(("image/png","png")) }
+    else if bytes.starts_with(&[0xff,0xd8,0xff]) { Some(("image/jpeg","jpg")) }
+    else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") { Some(("image/gif","gif")) }
+    else if bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" { Some(("image/webp","webp")) }
+    else { None }
+}
+
+#[tauri::command]
+fn store_editor_image(app: tauri::AppHandle, owner_type: String, owner_id: String, image_id: String, bytes: Vec<u8>) -> Result<String, String> {
+    safe_path_part(&owner_id,"image owner identifier")?;safe_path_part(&image_id,"image identifier")?;
+    if bytes.len() > 10 * 1024 * 1024 { return Err("Images must be 10 MB or smaller.".into()); }
+    let (_,extension)=editor_image_format(&bytes).ok_or_else(|| "Choose a PNG, JPEG, WebP, or GIF image.".to_string())?;
+    let owner_directory=match owner_type.as_str(){"security"=>"securities","topic"=>"topics",_=>return Err("Invalid image owner type.".into())};
+    let relative=PathBuf::from(owner_directory).join(&owner_id).join("images").join(format!("{image_id}.{extension}"));
+    let destination=document_storage_path(&app)?.join(&relative);
+    if let Some(parent)=destination.parent(){fs::create_dir_all(parent).map_err(|error|error.to_string())?;}
+    fs::write(destination,bytes).map_err(|error|error.to_string())?;
+    Ok(relative.to_string_lossy().replace('\\',"/"))
+}
+
+#[tauri::command]
+fn load_editor_image(app: tauri::AppHandle, storage_path: String) -> Result<Vec<u8>, String> {
+    let path=resolve_document_path(&app,&storage_path)?;
+    let bytes=fs::read(path).map_err(|_|"The managed image file could not be found.".to_string())?;
+    editor_image_format(&bytes).ok_or_else(||"The managed image file is invalid.".to_string())?;
+    Ok(bytes)
+}
+
+#[tauri::command]
+fn remove_editor_image(app: tauri::AppHandle, storage_path: String) -> Result<(), String> {
+    let path=resolve_document_path(&app,&storage_path)?;
+    if path.exists(){fs::remove_file(path).map_err(|error|error.to_string())?;}Ok(())
+}
+
+#[tauri::command]
+fn remove_topic_attachment_directory(app: tauri::AppHandle, topic_id: String) -> Result<(), String> {
+    safe_path_part(&topic_id,"research topic identifier")?;
+    let path=document_storage_path(&app)?.join("topics").join(topic_id);
+    if path.exists(){fs::remove_dir_all(path).map_err(|error|error.to_string())?;}Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = vec![Migration {
@@ -267,6 +310,11 @@ pub fn run() {
         description: "security_documents",
         sql: include_str!("../migrations/007_security_documents.sql"),
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 8,
+        description: "editor_images",
+        sql: include_str!("../migrations/008_editor_images.sql"),
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()
@@ -278,7 +326,7 @@ pub fn run() {
                 .add_migrations("sqlite:equity-journal.sqlite3", migrations)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![set_theme_menu, get_database_config, save_database_config, change_database_path, get_document_storage_config, change_document_storage_path, import_security_document, open_security_document, reveal_security_document, remove_security_document, remove_security_document_directory])
+        .invoke_handler(tauri::generate_handler![set_theme_menu, get_database_config, save_database_config, change_database_path, get_document_storage_config, change_document_storage_path, import_security_document, open_security_document, reveal_security_document, remove_security_document, remove_security_document_directory, store_editor_image, load_editor_image, remove_editor_image, remove_topic_attachment_directory])
         .setup(|app| {
             let dark = CheckMenuItemBuilder::new("Dark").id("theme-dark").checked(true).build(app)?;
             let light = CheckMenuItemBuilder::new("Light").id("theme-light").build(app)?;

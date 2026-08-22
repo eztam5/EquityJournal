@@ -7,7 +7,7 @@ import { ConfirmDialog } from './Forms'
 const RichTextEditor = lazy(() => import('./RichTextEditor').then((module) => ({ default: module.RichTextEditor })))
 
 interface DraftEntry {
-  id?: string
+  id: string
   entryDate: string
   contentHtml: string
 }
@@ -84,8 +84,8 @@ export function ResearchJournal({ securityId, topicId, onSaved }: { securityId?:
     const existing = entries.find((entry) => entry.entryDate === today())
     if (existing) {
       setDraft({ id: existing.id, entryDate: existing.entryDate, contentHtml: existing.contentHtml })
-    } else setDraft({ entryDate: today(), contentHtml: '' })
-    setDirty(false); setStatus(existing ? 'An entry for today already exists.' : '')
+    } else setDraft({ id:crypto.randomUUID(),entryDate: today(), contentHtml: '' })
+    setDirty(!existing); setStatus(existing ? 'An entry for today already exists.' : '')
   }
 
   const select = (entry: JournalEntry) => {
@@ -94,6 +94,8 @@ export function ResearchJournal({ securityId, topicId, onSaved }: { securityId?:
   }
 
   if (loading) return <div className="empty-state">Loading journal…</div>
+
+  const persisted=Boolean(draft&&entries.some((entry)=>entry.id===draft.id))
 
   return <div className="journal-workspace">
     <aside className="journal-timeline" aria-label="Journal entries">
@@ -109,11 +111,11 @@ export function ResearchJournal({ securityId, topicId, onSaved }: { securityId?:
           <label htmlFor="journal-entry-date">Entry date</label>
           <InputGroup id="journal-entry-date" type="date" value={draft.entryDate} onChange={(event) => { setDraft({ ...draft, entryDate: event.target.value }); setDirty(true); setStatus('Unsaved changes') }}/>
           <span>{status || (dirty ? 'Unsaved changes' : '')}</span>
-          {draft.id && <Button icon="trash" intent="danger" minimal aria-label="Delete journal entry" onClick={() => setDeleting(entries.find((entry) => entry.id === draft.id))}/>} 
-          <Button icon="floppy-disk" intent="primary" text="Save" loading={saving} disabled={!draft.entryDate || !dirty && Boolean(draft.id)} onClick={save}/>
+          {persisted && <Button icon="trash" intent="danger" minimal aria-label="Delete journal entry" onClick={() => setDeleting(entries.find((entry) => entry.id === draft.id))}/>}
+          <Button icon="floppy-disk" intent="primary" text="Save" loading={saving} disabled={!draft.entryDate || !dirty&&persisted} onClick={save}/>
         </header>
         {status && status !== 'Saved' && status !== 'Unsaved changes' && status !== 'An entry for today already exists.' ? <Callout className="journal-error" intent="danger">{status}</Callout> : null}
-        <Suspense fallback={<div className="empty-state">Loading editor…</div>}><RichTextEditor key={draft.id ?? `new-${draft.entryDate}`} content={draft.contentHtml} onChange={(contentHtml) => { setDraft((current) => current ? { ...current, contentHtml } : current); setDirty(true); setStatus('Unsaved changes') }} beforeNavigate={save}/></Suspense>
+        <Suspense fallback={<div className="empty-state">Loading editor…</div>}><RichTextEditor key={draft.id} content={draft.contentHtml} onChange={(contentHtml) => { setDraft((current) => current ? { ...current, contentHtml } : current); setDirty(true); setStatus('Unsaved changes') }} beforeNavigate={save} imageContext={{ownerType:topicId?'topic':'security',ownerId:topicId??securityId!,contentType:topicId?'topic-journal':'security-journal',contentId:draft.id}}/></Suspense>
       </>}
     </section>
     {deleting&&<ConfirmDialog

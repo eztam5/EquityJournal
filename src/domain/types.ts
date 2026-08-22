@@ -77,6 +77,30 @@ export interface SecurityDocument {
   updatedAt: string
 }
 
+export type EditorImageOwnerType = 'security' | 'topic'
+export type EditorImageContentType = 'security-note' | 'security-journal' | 'topic-note' | 'topic-journal'
+
+export interface EditorImageContext {
+  ownerType: EditorImageOwnerType
+  ownerId: string
+  contentType: EditorImageContentType
+  contentId: string
+}
+
+export interface EditorImage {
+  id: string
+  ownerType: EditorImageOwnerType
+  ownerId: string
+  originalFilename: string
+  storagePath: string
+  mimeType: string
+  fileSize: number
+  sha256: string
+  orphanedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ResearchTopic {
   id: string
   title: string

@@ -1,9 +1,10 @@
-import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, ResearchTopicRelations, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import type { EditorImage, EditorImageContentType, EditorImageOwnerType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, ResearchTopicRelations, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 
 export type JournalEntryInput = Pick<SecurityJournalEntry, 'securityId' | 'entryDate' | 'contentHtml'> & { id?: string }
 export type TopicJournalEntryInput = Pick<ResearchTopicJournalEntry, 'topicId' | 'entryDate' | 'contentHtml'> & { id?: string }
 export type SecurityInput = Omit<Security, 'id' | 'alternativeId'> & { alternativeId?: string }
 export type SecurityDocumentInput = Omit<SecurityDocument, 'createdAt' | 'updatedAt'>
+export type EditorImageInput = Omit<EditorImage, 'orphanedAt' | 'createdAt' | 'updatedAt'>
 
 export interface EquityRepository {
   initialize(): Promise<void>
@@ -40,6 +41,10 @@ export interface EquityRepository {
   addSecurityDocument(input: SecurityDocumentInput): Promise<SecurityDocument>
   updateSecurityDocument(document: Pick<SecurityDocument, 'id' | 'title' | 'source' | 'documentDate'>): Promise<void>
   deleteSecurityDocument(id: string): Promise<void>
+  getEditorImage(id: string): Promise<EditorImage | undefined>
+  addEditorImage(input: EditorImageInput): Promise<EditorImage>
+  listOrphanedEditorImages(before: string): Promise<EditorImage[]>
+  deleteEditorImage(id: string): Promise<void>
   listSecurityLinkTemplates(): Promise<SecurityLinkTemplate[]>
   saveSecurityLinkTemplates(templates: SecurityLinkTemplate[]): Promise<SecurityLinkTemplate[]>
   listResearchTopics(): Promise<ResearchTopic[]>
@@ -94,4 +99,18 @@ export function resolveSecurityLink(template: SecurityLinkTemplate, security: Se
 
 export function uuid(): string {
   return crypto.randomUUID()
+}
+
+export function extractEditorImageIds(contentHtml: string): string[] {
+  const ids = new Set<string>()
+  const pattern = /data-equity-journal-image-id\s*=\s*(["'])([^"']+)\1/gi
+  for (const match of contentHtml.matchAll(pattern)) if (/^[a-zA-Z0-9_-]+$/.test(match[2])) ids.add(match[2])
+  return [...ids]
+}
+
+export interface EditorImageReferenceScope {
+  contentType: EditorImageContentType
+  contentId: string
+  ownerType: EditorImageOwnerType
+  ownerId: string
 }

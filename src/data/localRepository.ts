@@ -1,5 +1,5 @@
-import type { ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
-import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
+import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
+import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, extractEditorImageIds, type EditorImageInput, type EditorImageReferenceScope, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
 
 interface LocalData {
   securities: Security[]
@@ -11,6 +11,8 @@ interface LocalData {
   notes: SecurityNote[]
   journalEntries: SecurityJournalEntry[]
   securityDocuments: SecurityDocument[]
+  editorImages: EditorImage[]
+  editorImageReferences: Array<{ imageId: string; contentType: EditorImageContentType; contentId: string }>
   securityLinkTemplates: SecurityLinkTemplate[]
   researchTopics: ResearchTopic[]
   researchTopicNotes: ResearchTopicNote[]
@@ -21,7 +23,7 @@ interface LocalData {
 
 const STORAGE_KEY = 'equity-journal.development-database.v1'
 const emptyData = (): LocalData => ({
-  securities: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [], securityDocuments: [], securityLinkTemplates: [], researchTopics: [], researchTopicNotes: [], researchTopicJournalEntries: [], researchTopicSecurities: [], researchTopicTags: [],
+  securities: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [], securityDocuments: [], editorImages: [], editorImageReferences: [], securityLinkTemplates: [], researchTopics: [], researchTopicNotes: [], researchTopicJournalEntries: [], researchTopicSecurities: [], researchTopicTags: [],
 })
 
 export class LocalRepository implements EquityRepository {
@@ -38,6 +40,18 @@ export class LocalRepository implements EquityRepository {
 
   private persist() { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data)) }
   private touchTopic(topicId: string, updatedAt = new Date().toISOString()) { const topic=this.data.researchTopics.find((item)=>item.id===topicId);if(topic)topic.updatedAt=updatedAt }
+  private syncEditorImageReferences(scope:EditorImageReferenceScope,contentHtml:string) {
+    const referencedIds=new Set(extractEditorImageIds(contentHtml))
+    this.data.editorImageReferences=this.data.editorImageReferences.filter((reference)=>reference.contentType!==scope.contentType||reference.contentId!==scope.contentId)
+    for(const imageId of referencedIds){const image=this.data.editorImages.find((item)=>item.id===imageId&&item.ownerType===scope.ownerType&&item.ownerId===scope.ownerId);if(image){this.data.editorImageReferences.push({imageId,contentType:scope.contentType,contentId:scope.contentId});image.orphanedAt=null;image.updatedAt=new Date().toISOString()}}
+    const referenced=new Set(this.data.editorImageReferences.map((reference)=>reference.imageId)),now=new Date().toISOString()
+    for(const image of this.data.editorImages)if(!referenced.has(image.id)&&!image.orphanedAt)image.orphanedAt=now
+  }
+  private removeEditorImageReferences(contentType:EditorImageContentType,contentId:string) {
+    this.data.editorImageReferences=this.data.editorImageReferences.filter((reference)=>reference.contentType!==contentType||reference.contentId!==contentId)
+    const referenced=new Set(this.data.editorImageReferences.map((reference)=>reference.imageId)),now=new Date().toISOString()
+    for(const image of this.data.editorImages)if(!referenced.has(image.id)&&!image.orphanedAt)image.orphanedAt=now
+  }
   private duplicate(items: Array<{ name: string }>, name: string, ignoredId?: string, ids?: Array<{ id: string }>) {
     const duplicateIndex = items.findIndex((item) => item.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0)
     return duplicateIndex >= 0 && (!ignoredId || !ids || ids[duplicateIndex]?.id !== ignoredId)
@@ -64,6 +78,8 @@ export class LocalRepository implements EquityRepository {
     this.data.notes = this.data.notes.filter((x) => x.securityId !== id)
     this.data.journalEntries = this.data.journalEntries.filter((x) => x.securityId !== id)
     this.data.securityDocuments = this.data.securityDocuments.filter((x) => x.securityId !== id)
+    const imageIds=new Set(this.data.editorImages.filter((image)=>image.ownerType==='security'&&image.ownerId===id).map((image)=>image.id))
+    this.data.editorImages=this.data.editorImages.filter((image)=>!imageIds.has(image.id));this.data.editorImageReferences=this.data.editorImageReferences.filter((reference)=>!imageIds.has(reference.imageId))
     this.data.researchTopicSecurities = this.data.researchTopicSecurities.filter((x) => x.securityId !== id); this.persist()
   }
   async listWatchlists() { return this.data.watchlists.toSorted((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name)) }
@@ -178,7 +194,7 @@ export class LocalRepository implements EquityRepository {
   async loadNote(securityId: string) { return this.data.notes.find((x) => x.securityId === securityId) ?? { securityId, contentHtml: '', updatedAt: '' } }
   async saveNote(securityId: string, contentHtml: string) {
     const result = { securityId, contentHtml, updatedAt: new Date().toISOString() }
-    this.data.notes = this.data.notes.filter((x) => x.securityId !== securityId); this.data.notes.push(result); this.persist(); return result
+    this.data.notes = this.data.notes.filter((x) => x.securityId !== securityId); this.data.notes.push(result);this.syncEditorImageReferences({contentType:'security-note',contentId:securityId,ownerType:'security',ownerId:securityId},contentHtml); this.persist(); return result
   }
   async listJournalEntries(securityId: string) {
     return this.data.journalEntries.filter((entry) => entry.securityId === securityId).toSorted((left, right) => right.entryDate.localeCompare(left.entryDate) || right.updatedAt.localeCompare(left.updatedAt))
@@ -190,12 +206,12 @@ export class LocalRepository implements EquityRepository {
     const existing = input.id ? this.data.journalEntries.find((entry) => entry.id === input.id) : undefined
     if (existing && existing.securityId !== input.securityId) throw new Error('The selected journal entry does not belong to this security.')
     const now = new Date().toISOString()
-    const result: SecurityJournalEntry = { id: existing?.id ?? uuid(), securityId: input.securityId, entryDate, contentHtml: input.contentHtml, createdAt: existing?.createdAt ?? now, updatedAt: now }
+    const result: SecurityJournalEntry = { id: input.id ?? uuid(), securityId: input.securityId, entryDate, contentHtml: input.contentHtml, createdAt: existing?.createdAt ?? now, updatedAt: now }
     this.data.journalEntries = this.data.journalEntries.filter((entry) => entry.id !== result.id)
-    this.data.journalEntries.push(result); this.persist(); return result
+    this.data.journalEntries.push(result);this.syncEditorImageReferences({contentType:'security-journal',contentId:result.id,ownerType:'security',ownerId:input.securityId},input.contentHtml); this.persist(); return result
   }
   async deleteJournalEntry(id: string) {
-    this.data.journalEntries = this.data.journalEntries.filter((entry) => entry.id !== id); this.persist()
+    this.data.journalEntries = this.data.journalEntries.filter((entry) => entry.id !== id);this.removeEditorImageReferences('security-journal',id); this.persist()
   }
   async listSecurityDocuments(securityId:string) { return this.data.securityDocuments.filter((document)=>document.securityId===securityId).toSorted((left,right)=>(left.documentDate?0:1)-(right.documentDate?0:1)||right.documentDate.localeCompare(left.documentDate)||right.createdAt.localeCompare(left.createdAt)) }
   async addSecurityDocument(input:SecurityDocumentInput) {
@@ -209,6 +225,10 @@ export class LocalRepository implements EquityRepository {
     Object.assign(document,{title:cleanRequired(input.title,'a document title'),source:input.source.trim(),documentDate:cleanOptionalDate(input.documentDate),updatedAt:new Date().toISOString()});this.persist()
   }
   async deleteSecurityDocument(id:string) { this.data.securityDocuments=this.data.securityDocuments.filter((document)=>document.id!==id);this.persist() }
+  async getEditorImage(id:string) { return this.data.editorImages.find((image)=>image.id===id) }
+  async addEditorImage(input:EditorImageInput) { const now=new Date().toISOString(),result:EditorImage={...input,orphanedAt:now,createdAt:now,updatedAt:now};this.data.editorImages.push(result);this.persist();return result }
+  async listOrphanedEditorImages(before:string) { return this.data.editorImages.filter((image)=>Boolean(image.orphanedAt&&image.orphanedAt<before)) }
+  async deleteEditorImage(id:string) { this.data.editorImages=this.data.editorImages.filter((image)=>image.id!==id);this.data.editorImageReferences=this.data.editorImageReferences.filter((reference)=>reference.imageId!==id);this.persist() }
   async listSecurityLinkTemplates() { return this.data.securityLinkTemplates.toSorted((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id)) }
   async saveSecurityLinkTemplates(templates: SecurityLinkTemplate[]) {
     const cleaned = templates.map(cleanSecurityLinkTemplate)
@@ -232,13 +252,15 @@ export class LocalRepository implements EquityRepository {
     this.data.researchTopics=this.data.researchTopics.filter((item)=>item.id!==id)
     this.data.researchTopicNotes=this.data.researchTopicNotes.filter((item)=>item.topicId!==id)
     this.data.researchTopicJournalEntries=this.data.researchTopicJournalEntries.filter((item)=>item.topicId!==id)
+    const imageIds=new Set(this.data.editorImages.filter((image)=>image.ownerType==='topic'&&image.ownerId===id).map((image)=>image.id))
+    this.data.editorImages=this.data.editorImages.filter((image)=>!imageIds.has(image.id));this.data.editorImageReferences=this.data.editorImageReferences.filter((reference)=>!imageIds.has(reference.imageId))
     this.data.researchTopicSecurities=this.data.researchTopicSecurities.filter((item)=>item.topicId!==id)
     this.data.researchTopicTags=this.data.researchTopicTags.filter((item)=>item.topicId!==id);this.persist()
   }
   async loadResearchTopicNote(topicId:string) { return this.data.researchTopicNotes.find((item)=>item.topicId===topicId)??{topicId,contentHtml:'',updatedAt:''} }
   async saveResearchTopicNote(topicId:string,contentHtml:string) {
     const result={topicId,contentHtml,updatedAt:new Date().toISOString()}
-    this.data.researchTopicNotes=this.data.researchTopicNotes.filter((item)=>item.topicId!==topicId);this.data.researchTopicNotes.push(result);this.touchTopic(topicId,result.updatedAt);this.persist();return result
+    this.data.researchTopicNotes=this.data.researchTopicNotes.filter((item)=>item.topicId!==topicId);this.data.researchTopicNotes.push(result);this.syncEditorImageReferences({contentType:'topic-note',contentId:topicId,ownerType:'topic',ownerId:topicId},contentHtml);this.touchTopic(topicId,result.updatedAt);this.persist();return result
   }
   async listResearchTopicJournalEntries(topicId:string) { return this.data.researchTopicJournalEntries.filter((entry)=>entry.topicId===topicId).toSorted((left,right)=>right.entryDate.localeCompare(left.entryDate)||right.updatedAt.localeCompare(left.updatedAt)) }
   async saveResearchTopicJournalEntry(input:TopicJournalEntryInput) {
@@ -246,12 +268,12 @@ export class LocalRepository implements EquityRepository {
     if(this.data.researchTopicJournalEntries.some((entry)=>entry.topicId===input.topicId&&entry.entryDate===entryDate&&entry.id!==input.id))throw new Error('A journal entry already exists for this date.')
     const existing=input.id?this.data.researchTopicJournalEntries.find((entry)=>entry.id===input.id):undefined
     if(existing&&existing.topicId!==input.topicId)throw new Error('The selected journal entry does not belong to this research topic.')
-    const now=new Date().toISOString(),result:ResearchTopicJournalEntry={id:existing?.id??uuid(),topicId:input.topicId,entryDate,contentHtml:input.contentHtml,createdAt:existing?.createdAt??now,updatedAt:now}
-    this.data.researchTopicJournalEntries=this.data.researchTopicJournalEntries.filter((entry)=>entry.id!==result.id);this.data.researchTopicJournalEntries.push(result);this.touchTopic(input.topicId,now);this.persist();return result
+    const now=new Date().toISOString(),result:ResearchTopicJournalEntry={id:input.id??uuid(),topicId:input.topicId,entryDate,contentHtml:input.contentHtml,createdAt:existing?.createdAt??now,updatedAt:now}
+    this.data.researchTopicJournalEntries=this.data.researchTopicJournalEntries.filter((entry)=>entry.id!==result.id);this.data.researchTopicJournalEntries.push(result);this.syncEditorImageReferences({contentType:'topic-journal',contentId:result.id,ownerType:'topic',ownerId:input.topicId},input.contentHtml);this.touchTopic(input.topicId,now);this.persist();return result
   }
   async deleteResearchTopicJournalEntry(id:string) {
     const entry=this.data.researchTopicJournalEntries.find((item)=>item.id===id)
-    this.data.researchTopicJournalEntries=this.data.researchTopicJournalEntries.filter((item)=>item.id!==id);if(entry)this.touchTopic(entry.topicId);this.persist()
+    this.data.researchTopicJournalEntries=this.data.researchTopicJournalEntries.filter((item)=>item.id!==id);this.removeEditorImageReferences('topic-journal',id);if(entry)this.touchTopic(entry.topicId);this.persist()
   }
   async getResearchTopicRelations(topicId:string) {
     const directSecurityIds=this.data.researchTopicSecurities.filter((item)=>item.topicId===topicId).map((item)=>item.securityId)

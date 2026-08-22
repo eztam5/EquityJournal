@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { LocalRepository } from './localRepository'
-import { resolveSecurityLink } from './repository'
+import { extractEditorImageIds, resolveSecurityLink } from './repository'
 
 describe('LocalRepository',()=>{
   beforeEach(()=>localStorage.clear())
@@ -106,6 +106,28 @@ describe('LocalRepository',()=>{
 
     await repository.deleteSecurity(security.id)
     expect(await repository.listSecurityDocuments(security.id)).toEqual([])
+  })
+  it('reconciles editor image references and delays orphan cleanup',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'ROG',currency:'CHF',name:'Roche'})
+    const image=await repository.addEditorImage({id:'image-1',ownerType:'security',ownerId:security.id,originalFilename:'chart.png',storagePath:`securities/${security.id}/images/image-1.png`,mimeType:'image/png',fileSize:128,sha256:'hash'})
+    const future=new Date(Date.now()+1000).toISOString(),html=`<p>Chart</p><img data-equity-journal-image-id="${image.id}" alt="Chart">`
+
+    expect((await repository.listOrphanedEditorImages(future)).map((item)=>item.id)).toEqual([image.id])
+    await repository.saveNote(security.id,html)
+    expect(await repository.listOrphanedEditorImages(future)).toEqual([])
+
+    const journal=await repository.saveJournalEntry({id:'journal-1',securityId:security.id,entryDate:'2026-08-20',contentHtml:html})
+    await repository.saveNote(security.id,'<p>No image</p>')
+    expect(await repository.listOrphanedEditorImages(future)).toEqual([])
+
+    await repository.deleteJournalEntry(journal.id)
+    expect((await repository.listOrphanedEditorImages(future)).map((item)=>item.id)).toEqual([image.id])
+    await repository.saveNote(security.id,html)
+    expect(await repository.listOrphanedEditorImages(future)).toEqual([])
+  })
+  it('extracts unique managed image IDs from persisted HTML',()=>{
+    expect(extractEditorImageIds(`<img data-equity-journal-image-id="first"><img data-equity-journal-image-id='second'><img data-equity-journal-image-id="first">`)).toEqual(['first','second'])
   })
   it('moves a security between tags without changing its other assignments',async()=>{
     const repository=new LocalRepository();await repository.initialize()

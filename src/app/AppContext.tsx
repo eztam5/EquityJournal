@@ -4,6 +4,7 @@ import type { SecurityInput } from '../data/repository'
 import type { ResearchTopic, Security, SecurityLinkTemplate, Tag, Taxonomy, ThemeMode, View, Watchlist } from '../domain/types'
 import { loadSecurityDisplayMode, SECURITY_DISPLAY_MODE_KEY, type SecurityDisplayMode } from '../utils/securityLabels'
 import { removeSecurityDocumentDirectory } from '../utils/securityDocumentStorage'
+import { cleanupOrphanedEditorImages, removeTopicAttachmentDirectory } from '../utils/editorImageStorage'
 
 interface AppContextValue {
   repository: EquityRepository
@@ -83,7 +84,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   }, [repository])
 
   useEffect(() => {
-    repository.initialize().then(refresh).then(() => setReady(true)).catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
+    repository.initialize().then(()=>cleanupOrphanedEditorImages(repository)).then(refresh).then(() => setReady(true)).catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
   }, [refresh, repository])
 
   useEffect(() => {
@@ -128,7 +129,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   }
   const addResearchTopic=async(title:string)=>{const result=await repository.addResearchTopic(title);await refresh();setView({type:'topic',id:result.id});return result}
   const updateResearchTopic=async(topic:Pick<ResearchTopic,'id'|'title'>)=>{await repository.updateResearchTopic(topic);await refresh()}
-  const deleteResearchTopic=async(id:string)=>{await repository.deleteResearchTopic(id);if(view.type==='topic'&&view.id===id)replaceView({type:'topics'});await refresh()}
+  const deleteResearchTopic=async(id:string)=>{await repository.deleteResearchTopic(id);await removeTopicAttachmentDirectory(id).catch(()=>{});if(view.type==='topic'&&view.id===id)replaceView({type:'topics'});await refresh()}
 
   const recent = recentIds.map((id) => securities.find((security) => security.id === id)).filter((value): value is Security => Boolean(value))
   const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, canGoBack:navigation.history.length>0, theme, securityDisplayMode, setView, goBack, setTheme, setSecurityDisplayMode, openSecurity, openResearchTopic, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, updateWatchlist, moveWatchlist, deleteWatchlist, addTaxonomy, deleteTaxonomy, addResearchTopic, updateResearchTopic, deleteResearchTopic, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, navigation.history.length, theme, securityDisplayMode, setView, goBack, refresh])

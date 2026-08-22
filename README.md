@@ -71,16 +71,18 @@ The new schema intentionally retains the Qt application's table and column names
 
 
 # Roadmap
-- Add a search bar everywhere where needed like on watchlists
-- Font sizes are not aligned everywhere which looks not perfect
-- Add a stock price chart and mark the journal entries on the chart line
-- Upload documents to a company or topic.
 - Add images in the text editor
-- Add AI chat on the security detail and topic view to summarize, extend and verify the investment thesis
-    - Do we need RAG or can the content fit into the context window? Or manual user based attachments?
+- Add a search bar on the research topics view, the same way as we have done this already for watchlists
+- Add upload functionality for documents to the research topics view the same way, as we have done it already for securities
 - Use the same > tree symbol with colored circle also in the taxonomy editor
 - Add  company logos (optionally replacing the chart symbol)
-- Fetc favicon from websites like yf or tikr or whatever the user eenters and use this icon instead of text everywhere in the app
+
+- Font sizes are not aligned everywhere which looks not perfect
+- Add a stock price chart and mark the journal entries on the chart line
+- Add AI chat on the security detail and topic view to summarize, extend and verify the investment thesis
+    - Do we need RAG or can the content fit into the context window? Or manual user based attachments?
+
+- Fetch favicon from websites like yf or tikr or whatever the user eenters and use this icon instead of text everywhere in the app
 - Search bar for any text editor
 
 - Documents

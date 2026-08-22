@@ -102,7 +102,7 @@ The Settings dialog can read and save a path through Rust commands, but that pat
 
 ## 5. Entity-relationship diagram
 
-The following diagram represents the effective SQLite schema after migration `007_security_documents.sql`.
+The following diagram represents the effective SQLite schema after migration `008_editor_images.sql`.
 
 ```mermaid
 erDiagram
@@ -180,6 +180,26 @@ erDiagram
         TEXT updated_at
     }
 
+    EDITOR_IMAGES {
+        TEXT id PK
+        TEXT owner_type
+        TEXT owner_id
+        TEXT original_filename
+        TEXT storage_path UK
+        TEXT mime_type
+        INTEGER file_size
+        TEXT sha256
+        TEXT orphaned_at
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    EDITOR_IMAGE_REFERENCES {
+        TEXT image_id PK, FK
+        TEXT content_type PK
+        TEXT content_id PK
+    }
+
     SECURITY_LINK_TEMPLATES {
         TEXT id PK
         TEXT link_text
@@ -228,6 +248,7 @@ erDiagram
     SECURITIES ||--o| SECURITY_NOTES : has_current_note
     SECURITIES ||--o{ SECURITY_JOURNAL_ENTRIES : has_journal
     SECURITIES ||--o{ SECURITY_DOCUMENTS : has_documents
+    EDITOR_IMAGES ||--o{ EDITOR_IMAGE_REFERENCES : is_used_by
     RESEARCH_TOPICS ||--o| RESEARCH_TOPIC_NOTES : has_current_note
     RESEARCH_TOPICS ||--o{ RESEARCH_TOPIC_JOURNAL_ENTRIES : has_journal
     RESEARCH_TOPICS ||--o{ RESEARCH_TOPIC_SECURITIES : directly_relates
@@ -278,11 +299,15 @@ Securities and research topics each support two complementary note forms:
 
 Journal dates use `YYYY-MM-DD`. Each owner may have at most one entry on a particular date. Rich text is persisted as HTML, while creation and update timestamps use ISO-8601 strings.
 
+Managed note images can be inserted from the editor toolbar, by dropping files, or by pasting screenshots. Persisted HTML contains `data-equity-journal-image-id` references rather than image bytes or absolute paths. `editor_images` stores managed-file metadata, while `editor_image_references` records which current note or journal entry uses each image.
+
+Every successful note save rebuilds that content record's image references from its HTML. Images without references receive an `orphaned_at` timestamp; referencing them again clears it. Startup cleanup deletes managed files that have remained orphaned for seven days and then removes their metadata, providing a grace period for undo and interrupted edits. Deleting a security or topic removes its image metadata immediately and removes the owner's complete managed attachment directory.
+
 ### Security documents
 
 Each security can have any number of PDF research documents. The SQLite table stores searchable metadata only: title, source, optional report date, original filename, managed relative path, size, MIME type, hash, and timestamps. It deliberately has no document-type field.
 
-Desktop PDF bytes default to the application's data directory under `attachments/securities/{security-id}/`. The Documents section in Settings can select another absolute document root. Saving a changed location copies the existing managed `securities` tree to the new root before switching the configuration, then removes the old managed tree. The setting is stored separately from the SQLite database configuration in `document-storage.json`.
+Desktop PDF and image bytes default to the application's data directory under `attachments/`. PDFs use `securities/{security-id}/`, while note images use `securities/{security-id}/images/` or `topics/{topic-id}/images/`. The Documents section in Settings can select another absolute attachment root. Saving a changed location copies the managed `securities` and `topics` trees to the new root before switching the configuration, then removes the old managed trees. The setting is stored separately from the SQLite database configuration in `document-storage.json`.
 
 SQLite retains only relative paths such as `securities/{security-id}/{document-id}.pdf`, which keeps database records valid when the root changes and avoids storing large binary values in SQLite. Paths created by the first attachment implementation with an `attachments/` prefix remain supported. SHA-256 uniqueness per security prevents attaching the same PDF twice. Browser development mode mirrors file storage in IndexedDB because the browser repository itself uses `localStorage`.
 

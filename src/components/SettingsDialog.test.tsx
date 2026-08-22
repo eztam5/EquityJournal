@@ -24,7 +24,7 @@ describe('SettingsDialog navigation',()=>{
     render(<AppProvider repository={new LocalRepository()}><SettingsDialog isOpen onClose={vi.fn()}/></AppProvider>)
     fireEvent.click(screen.getByRole('button',{name:'Documents'}))
     expect(screen.getByRole('heading',{name:'Documents'})).toBeInTheDocument()
-    expect(screen.getByLabelText('Document folder')).toBeDisabled()
+    expect(screen.getByLabelText('Attachment folder')).toBeDisabled()
     expect(screen.getByText('Browser development mode stores attachments in IndexedDB.')).toBeInTheDocument()
   })
 

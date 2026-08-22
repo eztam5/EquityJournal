@@ -145,6 +145,15 @@ table.document-table.bp6-html-table td:last-child { width: 132px; text-align: ri
 .editor-toolbar { position: sticky; top: 0; z-index: 15; box-shadow: 0 1px 0 var(--border); }
 .rich-editor:focus { outline: none; }
 .ProseMirror:focus { outline: none; }
+.managed-editor-image { width: fit-content; max-width: 100%; margin: 14px 0; padding: 3px; border: 1px solid transparent; border-radius: 6px; }
+.managed-editor-image.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.managed-editor-image[data-state='loading'],
+.managed-editor-image[data-state='error'] { min-width: 180px; min-height: 72px; display: grid; place-items: center; border-color: var(--border); background: var(--sidebar); color: var(--muted); font-size: 12px; }
+.managed-editor-image[data-state='ready'] > span { display: none; }
+.managed-editor-image-content,
+.managed-editor-image img { display: block; max-width: 100%; max-height: 70vh; border-radius: 3px; object-fit: contain; }
+.editor-image-uploading { padding: 7px 20px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.editor-image-error { padding: 7px 20px; border-bottom: 1px solid var(--border); background: color-mix(in srgb,var(--danger) 10%,var(--window)); color: var(--danger); font-size: 12px; }
 
 .security-table.bp6-html-table { width: 100%; font-size: 12px; }
 .security-table.bp6-html-table th { padding: 2px 12px; font-size: 11px; line-height: 1.1; vertical-align: middle; }
