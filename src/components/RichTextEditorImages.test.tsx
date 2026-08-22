@@ -41,4 +41,18 @@ describe('RichTextEditor managed images',()=>{
     await waitFor(()=>expect(onChange).toHaveBeenCalled())
     expect(onChange.mock.calls.at(-1)?.[0]).toContain('data-equity-journal-image-id="image-2"')
   })
+
+  it('persists keyboard image resizing in the editor HTML',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'MSFT',name:'Microsoft',currency:'USD'}),onChange=vi.fn()
+    imageMocks.resolve.mockResolvedValue({url:'blob:managed-image',release:vi.fn()})
+    render(<AppProvider repository={repository}><RichTextEditor content='<img data-equity-journal-image-id="image-3" data-equity-journal-image-width="50" alt="Chart">' onChange={onChange} imageContext={{ownerType:'security',ownerId:security.id,contentType:'security-note',contentId:security.id}}/></AppProvider>)
+
+    const handle=await screen.findByRole('button',{name:'Resize image'})
+    expect(document.querySelector<HTMLElement>('.managed-editor-image')?.style.width).toBe('50%')
+    fireEvent.keyDown(handle,{key:'ArrowLeft'})
+
+    await waitFor(()=>expect(onChange).toHaveBeenCalled())
+    expect(onChange.mock.calls.at(-1)?.[0]).toContain('data-equity-journal-image-width="45"')
+  })
 })
