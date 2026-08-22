@@ -19,6 +19,27 @@ describe('Research topics',()=>{
     await waitFor(async()=>expect((await repository.listResearchTopics()).map((topic)=>topic.title)).toEqual(['Serial acquirers in VMS']))
   })
 
+  it('searches research topics by title and clears the search',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addResearchTopic('Pricing power in luxury goods')
+    await repository.addResearchTopic('Serial acquirers in VMS')
+    render(<AppProvider repository={repository}><ResearchTopicsView/></AppProvider>)
+
+    const search=await screen.findByRole('searchbox',{name:'Search research topics'})
+    expect(await screen.findByText('Pricing power in luxury goods')).toBeInTheDocument()
+    expect(screen.getByText('Serial acquirers in VMS')).toBeInTheDocument()
+
+    fireEvent.change(search,{target:{value:'pricing'}})
+    expect(screen.getByText('Pricing power in luxury goods')).toBeInTheDocument()
+    expect(screen.queryByText('Serial acquirers in VMS')).not.toBeInTheDocument()
+    expect(screen.getByText('1 of 2 research topics')).toBeInTheDocument()
+
+    fireEvent.change(search,{target:{value:'missing'}})
+    expect(screen.getByText('No research topics match “missing”.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Clear search'}))
+    expect(screen.getByText('Serial acquirers in VMS')).toBeInTheDocument()
+  })
+
   it('shows direct and dynamically included securities with the selected tag rule',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
