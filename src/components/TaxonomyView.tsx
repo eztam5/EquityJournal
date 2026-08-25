@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { Button, Callout, Icon, InputGroup, Tree, type TreeNodeInfo } from '@blueprintjs/core'
+import { Button, ButtonGroup, Callout, Icon, InputGroup, Tree, type TreeNodeInfo } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { Tag, TaggedSecurity } from '../domain/types'
 import { ConfirmDialog, TagForm, TaxonomyForm } from './Forms'
@@ -64,8 +64,12 @@ export function TaxonomyView({ id }: { id: string }) {
     ? operation.fromTagId !== operation.toTagId
     : Boolean(resolveTagDrop(tags, operation.tagId, operation.targetTagId, operation.position)), [tags])
   const drag = useTaxonomyDragAndDrop({ onDrop: handleDrop, canDrop })
-  const model = useMemo(() => filterTaxonomyTreeModel(buildTaxonomyTreeModel(tags, taggedSecurities), search), [search, tags, taggedSecurities])
+  const fullModel=useMemo(()=>buildTaxonomyTreeModel(tags,taggedSecurities),[tags,taggedSecurities])
+  const model = useMemo(() => filterTaxonomyTreeModel(fullModel, search), [fullModel,search])
   const searching = search.trim().length > 0
+  const expandableIds=useMemo(()=>{const ids:string[]=[];const visit=(nodes:TaxonomyTreeModelNode[])=>nodes.forEach((node)=>{if(node.kind==='tag'&&node.children.length){ids.push(node.id);visit(node.children)}});if(fullModel.length)ids.push('root');visit(fullModel);return ids},[fullModel])
+  const canExpandAll=!searching&&expandableIds.some((nodeId)=>!expanded.has(nodeId))
+  const canCollapseAll=!searching&&expandableIds.some((nodeId)=>expanded.has(nodeId))
 
   if (!taxonomy) return <main className="content page"><div className="empty-state">Taxonomy not found.</div></main>
 
@@ -137,7 +141,7 @@ export function TaxonomyView({ id }: { id: string }) {
   }]
 
   return <main className="content page">
-    <PageHeader title={taxonomy.name} description={taxonomy.description || 'Build a hierarchical classification for your research.'} actions={<InputGroup
+    <PageHeader title={taxonomy.name} description={taxonomy.description || 'Build a hierarchical classification for your research.'} actions={<><InputGroup
       className="taxonomy-search"
       type="search"
       leftIcon="search"
@@ -146,7 +150,7 @@ export function TaxonomyView({ id }: { id: string }) {
       value={search}
       onChange={(event) => setSearch(event.target.value)}
       rightElement={search ? <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setSearch('')}/> : undefined}
-    />}/>
+    /><ButtonGroup variant="minimal"><Button icon="expand-all" aria-label="Expand entire taxonomy" title="Expand entire taxonomy" disabled={!canExpandAll} onClick={()=>setExpanded(new Set(expandableIds))}/><Button icon="collapse-all" aria-label="Collapse entire taxonomy" title="Collapse entire taxonomy" disabled={!canCollapseAll} onClick={()=>setExpanded(new Set())}/></ButtonGroup></>}/>
     <div className="content-panel taxonomy-card" {...drag.pointerHandlers}>
       <Tree
         compact

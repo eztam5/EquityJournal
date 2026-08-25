@@ -77,6 +77,27 @@ describe('TaxonomyView drag and drop',()=>{
     expect(screen.queryByText('AAPL — Apple Inc.')).not.toBeInTheDocument()
   })
 
+  it('expands and collapses the entire taxonomy tree',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const software=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Software',description:'',color:taxonomy.color})
+    const application=await repository.addTag({taxonomyId:taxonomy.id,parentId:software.id,name:'Application software',description:'',color:taxonomy.color})
+    const security=await repository.addSecurity({symbol:'SAP',name:'SAP SE',currency:'EUR'})
+    await repository.setAssignedTags(security.id,[application.id])
+    render(<AppProvider repository={repository}><TaxonomyView id={taxonomy.id}/></AppProvider>)
+
+    expect(await screen.findByRole('button',{name:'Expand Software'})).toBeInTheDocument()
+    const expandAll=screen.getByRole('button',{name:'Expand entire taxonomy'}),collapseAll=screen.getByRole('button',{name:'Collapse entire taxonomy'})
+    fireEvent.click(expandAll)
+    expect(await screen.findByRole('button',{name:'Collapse Software'})).toBeInTheDocument()
+    expect(screen.getByRole('button',{name:'Collapse Application software'})).toBeInTheDocument()
+    expect(expandAll).toBeDisabled()
+
+    fireEvent.click(collapseAll)
+    expect(screen.getByRole('button',{name:'Expand Industry'})).toBeInTheDocument()
+    expect(collapseAll).toBeDisabled()
+  })
+
   it('edits the taxonomy from the root context menu',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const taxonomy=await repository.addTaxonomy({name:'Industry',description:'Company classification',color:'#4F7CAC'})
