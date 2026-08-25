@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
+import { Sidebar } from './Sidebar'
 import { TaxonomyView } from './TaxonomyView'
 
 describe('TaxonomyView drag and drop',()=>{
@@ -78,7 +79,7 @@ describe('TaxonomyView drag and drop',()=>{
   it('edits the taxonomy from the root context menu',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const taxonomy=await repository.addTaxonomy({name:'Industry',description:'Company classification',color:'#4F7CAC'})
-    render(<AppProvider repository={repository}><TaxonomyView id={taxonomy.id}/></AppProvider>)
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={()=>{}} onNewWatchlist={()=>{}} onNewTaxonomy={()=>{}} onNewTopic={()=>{}}/><TaxonomyView id={taxonomy.id}/></AppProvider>)
     await screen.findByRole('heading',{name:'Industry'})
     const root=document.querySelector<HTMLElement>('[data-taxonomy-root-drop-target]')
     expect(root).not.toBeNull()
@@ -90,6 +91,7 @@ describe('TaxonomyView drag and drop',()=>{
     fireEvent.click(within(dialog).getByRole('button',{name:'Save'}))
 
     expect(await screen.findByRole('heading',{name:'Sectors'})).toBeInTheDocument()
+    expect(screen.getByRole('button',{name:'Sectors'})).toBeInTheDocument()
     expect(await repository.listTaxonomies()).toEqual([expect.objectContaining({name:'Sectors'})])
   })
 })

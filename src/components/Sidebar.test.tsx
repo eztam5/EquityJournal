@@ -4,6 +4,7 @@ import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
 import { SecuritiesView } from './SecuritiesView'
 import { Sidebar } from './Sidebar'
+import { TaxonomyView } from './TaxonomyView'
 
 describe('Sidebar taxonomy navigation',()=>{
   afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks();vi.unstubAllGlobals();Reflect.deleteProperty(document,'elementFromPoint')})
@@ -92,6 +93,27 @@ describe('Sidebar taxonomy navigation',()=>{
 
     expect(await screen.findByRole('button',{name:'Sectors'})).toBeInTheDocument()
     expect(await repository.listTaxonomies()).toEqual([expect.objectContaining({name:'Sectors',description:'Company classification'})])
+  })
+
+  it('reloads an expanded taxonomy tree after a tag is edited in the taxonomy view',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const tag=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Software',description:'',color:taxonomy.color})
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/><TaxonomyView id={taxonomy.id}/></AppProvider>)
+
+    fireEvent.click(await screen.findByRole('button',{name:'Expand Industry'}))
+    const sidebar=document.querySelector<HTMLElement>('.sidebar')!
+    expect(await within(sidebar).findByText('Software')).toBeInTheDocument()
+    const mainTag=document.querySelector<HTMLElement>(`.taxonomy-card [data-taxonomy-tag-id="${tag.id}"]`)
+    expect(mainTag).not.toBeNull()
+    fireEvent.contextMenu(mainTag!,{clientX:20,clientY:30})
+    fireEvent.click(await screen.findByRole('menuitem',{name:'Edit Tag'}))
+    const dialog=screen.getByRole('dialog',{name:'Edit tag'})
+    fireEvent.change(within(dialog).getByLabelText('Name'),{target:{value:'Technology'}})
+    fireEvent.click(within(dialog).getByRole('button',{name:'Save'}))
+
+    expect(await within(sidebar).findByText('Technology')).toBeInTheDocument()
+    expect(within(sidebar).queryByText('Software')).not.toBeInTheDocument()
   })
 
   it('moves watchlists while keeping All Securities first',async()=>{

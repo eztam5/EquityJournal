@@ -3,6 +3,7 @@ import { Button, Callout, FormGroup, InputGroup, TextArea, Tooltip } from '@blue
 import type { ResearchTopic, Security, Tag, Taxonomy, Watchlist } from '../domain/types'
 import { useApp } from '../app/AppContext'
 import { DialogActions, DraggableDialog } from './DraggableDialog'
+import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
 
 const COLORS = ['#4F7CAC','#2E8B78','#7A5AF8','#C47F17','#C25555','#9B5C8F','#667085','#3478C9']
 function ErrorText({ error }: { error: string }) { return error ? <Callout className="form-error" intent="danger" role="alert">{error}</Callout> : null }
@@ -32,7 +33,7 @@ export function ResearchTopicForm({topic,onClose}:{topic?:ResearchTopic;onClose(
 
 export function TagForm({ taxonomy, parent, tag, onSaved, onClose }: { taxonomy: Taxonomy; parent?: Tag; tag?: Tag; onSaved(): void; onClose(): void }) {
   const app=useApp();const[name,setName]=useState(tag?.name??'');const[description,setDescription]=useState(tag?.description??'');const[color,setColor]=useState(tag?.color||parent?.color||taxonomy.color);const[error,setError]=useState('');
-  const submit=async(e:FormEvent)=>{e.preventDefault();try{if(tag)await app.repository.updateTag({id:tag.id,taxonomyId:taxonomy.id,name,description,color});else await app.repository.addTag({taxonomyId:taxonomy.id,parentId:parent?.id??null,name,description,color});await onSaved();onClose()}catch(r){setError(r instanceof Error?r.message:String(r))}}
+  const submit=async(e:FormEvent)=>{e.preventDefault();try{if(tag)await app.repository.updateTag({id:tag.id,taxonomyId:taxonomy.id,name,description,color});else await app.repository.addTag({taxonomyId:taxonomy.id,parentId:parent?.id??null,name,description,color});await onSaved();notifyTaxonomyTreeChanged(taxonomy.id);onClose()}catch(r){setError(r instanceof Error?r.message:String(r))}}
   return <DraggableDialog title={tag?'Edit tag':'New tag'} onClose={onClose}><form onSubmit={submit} className="form-grid">{!tag&&<Callout className="form-context" icon="diagram-tree">Parent: {parent?.name??taxonomy.name}</Callout>}<FormGroup label="Name" labelFor="tag-name"><InputGroup id="tag-name" autoFocus maxLength={80} value={name} onChange={(e)=>setName(e.target.value)} placeholder="For example, Strong pricing power"/></FormGroup><FormGroup label="Description" labelInfo="(optional)" labelFor="tag-description"><TextArea id="tag-description" fill value={description} onChange={(e)=>setDescription(e.target.value)} placeholder="Describe how this tag should be used"/></FormGroup><FormGroup label="Color"><ColorPicker value={color} onChange={setColor}/></FormGroup><ErrorText error={error}/><DialogActions><Button text="Cancel" onClick={onClose}/><Button type="submit" intent="primary" text="Save" disabled={!name.trim()}/></DialogActions></form></DraggableDialog>
 }
 

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type MouseEvent } from 'react'
+import { Fragment, useCallback, useEffect, useState, type MouseEvent } from 'react'
 import { Button, Icon, Menu, MenuDivider, MenuItem, PopoverNext, showContextMenu } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { Taxonomy, Watchlist } from '../domain/types'
@@ -6,6 +6,7 @@ import { ConfirmDialog, TaxonomyForm, WatchlistForm } from './Forms'
 import { buildTaxonomyTreeModel, type TaxonomyTreeModelNode } from './taxonomyTreeModel'
 import { formatSecurityLabel } from '../utils/securityLabels'
 import { WATCHLIST_DRAG_HOVER_EVENT } from '../utils/watchlistSecurityDrag'
+import { TAXONOMY_TREE_CHANGED_EVENT } from '../utils/taxonomyTreeChanges'
 
 function SectionHeader({ title, onAdd, menu }: { title: string; onAdd?: () => void; menu?:React.ReactNode }) { return <div className="sidebar-section-header"><span>{title}</span>{menu??(onAdd&&<Button variant="minimal" size="small" icon="add" onClick={onAdd} aria-label={`Add ${title}`}/>)}</div> }
 
@@ -18,15 +19,7 @@ export function Sidebar({ onNewSecurity, onNewWatchlist, onNewTaxonomy, onNewTop
   const[loadingTaxonomies,setLoadingTaxonomies]=useState<Set<string>>(()=>new Set())
   const[taxonomyTreeErrors,setTaxonomyTreeErrors]=useState<Record<string,string>>({})
   useEffect(()=>{const update=(event:Event)=>setDropTarget((event as CustomEvent<string|null>).detail??'');window.addEventListener(WATCHLIST_DRAG_HOVER_EVENT,update);return()=>window.removeEventListener(WATCHLIST_DRAG_HOVER_EVENT,update)},[])
-  const openTaxonomyMenu=(event:MouseEvent,taxonomy:Taxonomy)=>{event.preventDefault();showContextMenu({targetOffset:{left:event.clientX,top:event.clientY},isDarkTheme:document.documentElement.classList.contains('bp6-dark'),content:<Menu><MenuItem icon="edit" text="Edit" onClick={()=>setEditingTaxonomy(taxonomy)}/><MenuDivider/><MenuItem icon="trash" intent="danger" text="Delete" onClick={()=>setDeletingTaxonomy(taxonomy)}/></Menu>})}
-  const openWatchlistMenu=(event:MouseEvent,watchlist:Watchlist,index:number)=>{event.preventDefault();showContextMenu({targetOffset:{left:event.clientX,top:event.clientY},isDarkTheme:document.documentElement.classList.contains('bp6-dark'),content:<Menu><MenuItem icon="edit" text="Rename" onClick={()=>setRenamingWatchlist(watchlist)}/><MenuItem icon="arrow-up" text="Move up" disabled={index===0} onClick={()=>app.moveWatchlist(watchlist.id,-1)}/><MenuItem icon="arrow-down" text="Move down" disabled={index===app.watchlists.length-1} onClick={()=>app.moveWatchlist(watchlist.id,1)}/><MenuDivider/><MenuItem icon="trash" intent="danger" text="Delete" onClick={()=>setDeletingWatchlist(watchlist)}/></Menu>})}
-  const taxonomyNodeKey=(taxonomyId:string)=>`taxonomy:${taxonomyId}`
-  const tagNodeKey=(tagId:string)=>`tag:${tagId}`
-  const toggleTag=(tagId:string)=>setExpandedTaxonomyNodes((current)=>{const next=new Set(current),key=tagNodeKey(tagId);if(next.has(key))next.delete(key);else next.add(key);return next})
-  const toggleTaxonomy=async(taxonomyId:string)=>{
-    const key=taxonomyNodeKey(taxonomyId)
-    if(expandedTaxonomyNodes.has(key)){setExpandedTaxonomyNodes((current)=>{const next=new Set(current);next.delete(key);return next});return}
-    setExpandedTaxonomyNodes((current)=>new Set(current).add(key))
+  const loadTaxonomyTree=useCallback(async(taxonomyId:string)=>{
     setLoadingTaxonomies((current)=>new Set(current).add(taxonomyId))
     setTaxonomyTreeErrors((current)=>{const next={...current};delete next[taxonomyId];return next})
     try{
@@ -37,6 +30,27 @@ export function Sidebar({ onNewSecurity, onNewWatchlist, onNewTaxonomy, onNewTop
     }finally{
       setLoadingTaxonomies((current)=>{const next=new Set(current);next.delete(taxonomyId);return next})
     }
+  },[app.repository])
+  useEffect(()=>{
+    const update=(event:Event)=>{
+      const taxonomyId=(event as CustomEvent<string>).detail
+      if(!taxonomyId)return
+      if(expandedTaxonomyNodes.has(taxonomyNodeKey(taxonomyId)))void loadTaxonomyTree(taxonomyId)
+      else setTaxonomyTrees((current)=>{const next={...current};delete next[taxonomyId];return next})
+    }
+    window.addEventListener(TAXONOMY_TREE_CHANGED_EVENT,update)
+    return()=>window.removeEventListener(TAXONOMY_TREE_CHANGED_EVENT,update)
+  },[expandedTaxonomyNodes,loadTaxonomyTree])
+  const openTaxonomyMenu=(event:MouseEvent,taxonomy:Taxonomy)=>{event.preventDefault();showContextMenu({targetOffset:{left:event.clientX,top:event.clientY},isDarkTheme:document.documentElement.classList.contains('bp6-dark'),content:<Menu><MenuItem icon="edit" text="Edit" onClick={()=>setEditingTaxonomy(taxonomy)}/><MenuDivider/><MenuItem icon="trash" intent="danger" text="Delete" onClick={()=>setDeletingTaxonomy(taxonomy)}/></Menu>})}
+  const openWatchlistMenu=(event:MouseEvent,watchlist:Watchlist,index:number)=>{event.preventDefault();showContextMenu({targetOffset:{left:event.clientX,top:event.clientY},isDarkTheme:document.documentElement.classList.contains('bp6-dark'),content:<Menu><MenuItem icon="edit" text="Rename" onClick={()=>setRenamingWatchlist(watchlist)}/><MenuItem icon="arrow-up" text="Move up" disabled={index===0} onClick={()=>app.moveWatchlist(watchlist.id,-1)}/><MenuItem icon="arrow-down" text="Move down" disabled={index===app.watchlists.length-1} onClick={()=>app.moveWatchlist(watchlist.id,1)}/><MenuDivider/><MenuItem icon="trash" intent="danger" text="Delete" onClick={()=>setDeletingWatchlist(watchlist)}/></Menu>})}
+  const taxonomyNodeKey=(taxonomyId:string)=>`taxonomy:${taxonomyId}`
+  const tagNodeKey=(tagId:string)=>`tag:${tagId}`
+  const toggleTag=(tagId:string)=>setExpandedTaxonomyNodes((current)=>{const next=new Set(current),key=tagNodeKey(tagId);if(next.has(key))next.delete(key);else next.add(key);return next})
+  const toggleTaxonomy=async(taxonomyId:string)=>{
+    const key=taxonomyNodeKey(taxonomyId)
+    if(expandedTaxonomyNodes.has(key)){setExpandedTaxonomyNodes((current)=>{const next=new Set(current);next.delete(key);return next});return}
+    setExpandedTaxonomyNodes((current)=>new Set(current).add(key))
+    await loadTaxonomyTree(taxonomyId)
   }
   const renderTaxonomyNode=(node:TaxonomyTreeModelNode,depth:number):React.ReactNode=>{
     if(node.kind==='security'){const label=formatSecurityLabel(node.security,app.securityDisplayMode);return <Button key={node.id} fill alignText="start" variant="minimal" className={`nav-item taxonomy-sidebar-label taxonomy-security-item ${app.view.type==='security'&&app.view.id===node.security.id?'active':''}`} style={{'--taxonomy-depth':depth} as React.CSSProperties} icon="chart" text={label} title={label} onClick={()=>app.openSecurity(node.security.id)}/>}

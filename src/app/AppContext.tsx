@@ -5,6 +5,7 @@ import type { ResearchTopic, Security, SecurityLinkTemplate, Tag, Taxonomy, Them
 import { loadSecurityDisplayMode, SECURITY_DISPLAY_MODE_KEY, type SecurityDisplayMode } from '../utils/securityLabels'
 import { removeSecurityDocumentDirectory } from '../utils/securityDocumentStorage'
 import { cleanupOrphanedEditorImages, removeTopicAttachmentDirectory } from '../utils/editorImageStorage'
+import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
 
 interface AppContextValue {
   repository: EquityRepository
@@ -128,7 +129,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
     await refresh()
   }
   const addTaxonomy = async (input: Pick<Taxonomy, 'name' | 'description' | 'color'>) => { await repository.addTaxonomy(input); await refresh() }
-  const updateTaxonomy = async (taxonomy: Pick<Taxonomy, 'id' | 'name' | 'description' | 'color'>) => { await repository.updateTaxonomy(taxonomy); await refresh() }
+  const updateTaxonomy = async (taxonomy: Pick<Taxonomy, 'id' | 'name' | 'description' | 'color'>) => { await repository.updateTaxonomy(taxonomy); await refresh(); notifyTaxonomyTreeChanged(taxonomy.id) }
   const deleteTaxonomy = async (id: string) => {
     await repository.deleteTaxonomy(id)
     if (view.type === 'taxonomy' && view.id === id) replaceView({ type: 'all-securities' })

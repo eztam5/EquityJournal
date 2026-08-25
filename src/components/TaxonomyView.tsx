@@ -8,6 +8,7 @@ import { buildTaxonomyTreeModel, filterTaxonomyTreeModel, resolveTagDrop, type T
 import { useTaxonomyDragAndDrop, type TaxonomyDropOperation } from './useTaxonomyDragAndDrop'
 import { formatSecurityLabel } from '../utils/securityLabels'
 import { PageHeader } from './PageHeader'
+import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
 
 export function TaxonomyView({ id }: { id: string }) {
   const app = useApp()
@@ -52,10 +53,11 @@ export function TaxonomyView({ id }: { id: string }) {
         })
       }
       await load()
+      notifyTaxonomyTreeChanged(id)
     } catch (reason) {
       setInteractionError(reason instanceof Error ? reason.message : String(reason))
     }
-  }, [app.repository, load, tags])
+  }, [app.repository, id, load, tags])
 
   const canDrop = useCallback((operation: TaxonomyDropOperation) => operation.kind === 'security'
     ? operation.fromTagId !== operation.toTagId
@@ -78,6 +80,7 @@ export function TaxonomyView({ id }: { id: string }) {
     try {
       await app.repository.removeSecurityTag(securityId, tagId)
       await load()
+      notifyTaxonomyTreeChanged(id)
     } catch (reason) {
       setInteractionError(reason instanceof Error ? reason.message : String(reason))
     }
@@ -160,6 +163,11 @@ export function TaxonomyView({ id }: { id: string }) {
     {interactionError && <Callout className="taxonomy-move-error" intent="danger">Could not update taxonomy: {interactionError}</Callout>}
     {editingTaxonomy && <TaxonomyForm taxonomy={taxonomy} onClose={() => setEditingTaxonomy(false)}/>}
     {form && <TagForm taxonomy={taxonomy} parent={form.parent} tag={form.tag} onSaved={load} onClose={() => setForm(null)}/>}
-    {deleting && <ConfirmDialog title="Delete tag" message={`Do you really want to delete ${deleting.name}?`} onClose={() => setDeleting(undefined)} onConfirm={async () => { await app.repository.deleteTag(id, deleting.id); await load() }}/>}
+    {deleting && <ConfirmDialog
+      title="Delete tag"
+      message={`Do you really want to delete ${deleting.name}?`}
+      onClose={() => setDeleting(undefined)}
+      onConfirm={async () => { await app.repository.deleteTag(id, deleting.id); await load(); notifyTaxonomyTreeChanged(id) }}
+    />}
   </main>
 }
