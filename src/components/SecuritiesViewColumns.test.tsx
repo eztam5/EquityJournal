@@ -1,8 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AppProvider } from '../app/AppContext'
+import { AppProvider, useApp } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
 import { SecuritiesView } from './SecuritiesView'
+
+function WatchlistViewHarness({watchlistId}:{watchlistId:string}) {
+  const app=useApp()
+  return <><button onClick={()=>app.setView({type:'watchlist',id:watchlistId})}>Open watchlist</button><SecuritiesView watchlistId={watchlistId}/></>
+}
 
 describe('SecuritiesView visible columns',()=>{
   afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks()})
@@ -60,6 +65,32 @@ describe('SecuritiesView visible columns',()=>{
     menu=await screen.findByRole('menu')
     fireEvent.click(within(menu).getByRole('menuitem',{name:'Delete security'}))
     expect(screen.getByRole('dialog',{name:'Delete security'})).toBeInTheDocument()
+  })
+
+  it('opens the new security dialog from the All Securities toolbar',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+
+    fireEvent.click(screen.getByRole('button',{name:'New security'}))
+
+    expect(screen.getByRole('dialog',{name:'New security'})).toBeInTheDocument()
+  })
+
+  it('creates a security in the currently open watchlist from the toolbar',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const watchlist=await repository.addWatchlist('Quality')
+    render(<AppProvider repository={repository}><WatchlistViewHarness watchlistId={watchlist.id}/></AppProvider>)
+
+    fireEvent.click(screen.getByRole('button',{name:'Open watchlist'}))
+    fireEvent.click(screen.getByRole('button',{name:'New security'}))
+    const dialog=screen.getByRole('dialog',{name:'New security'})
+    fireEvent.change(within(dialog).getByLabelText('Company name'),{target:{value:'Apple Inc.'}})
+    fireEvent.change(within(dialog).getByLabelText('Symbol'),{target:{value:'AAPL'}})
+    fireEvent.change(within(dialog).getByLabelText('Currency'),{target:{value:'USD'}})
+    fireEvent.click(within(dialog).getByRole('button',{name:'Save'}))
+
+    await waitFor(()=>expect(screen.queryByRole('dialog',{name:'New security'})).not.toBeInTheDocument())
+    expect((await repository.listSecurities(watchlist.id)).map((security)=>security.symbol)).toEqual(['AAPL'])
   })
 
   it('removes a security from a watchlist without deleting it',async()=>{

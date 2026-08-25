@@ -40,6 +40,28 @@ describe('Research topics',()=>{
     expect(screen.getByText('Serial acquirers in VMS')).toBeInTheDocument()
   })
 
+  it('opens edit and delete actions from the topic row menu',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addResearchTopic('Serial acquirers in VMS')
+    render(<AppProvider repository={repository}><ResearchTopicsView/></AppProvider>)
+
+    const actions=await screen.findByRole('button',{name:'Actions for Serial acquirers in VMS'})
+    expect(screen.queryByRole('button',{name:'Edit Serial acquirers in VMS'})).not.toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'Delete Serial acquirers in VMS'})).not.toBeInTheDocument()
+    fireEvent.click(actions)
+    let menu=await screen.findByRole('menu')
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(2)
+    fireEvent.click(within(menu).getByRole('menuitem',{name:'Edit topic'}))
+    const editDialog=screen.getByRole('dialog',{name:'Edit research topic'})
+    expect(within(editDialog).getByLabelText('Topic title')).toHaveValue('Serial acquirers in VMS')
+    fireEvent.click(within(editDialog).getByRole('button',{name:'Cancel'}))
+
+    fireEvent.click(actions)
+    menu=await screen.findByRole('menu')
+    fireEvent.click(within(menu).getByRole('menuitem',{name:'Delete topic'}))
+    expect(screen.getByRole('dialog',{name:'Delete research topic'})).toBeInTheDocument()
+  })
+
   it('shows direct and dynamically included securities with the selected tag rule',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
