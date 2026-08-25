@@ -141,7 +141,7 @@ export function TaxonomyView({ id }: { id: string }) {
   }]
 
   return <main className="content page">
-    <PageHeader title={taxonomy.name} description={taxonomy.description || 'Build a hierarchical classification for your research.'} actions={<><InputGroup
+    <PageHeader title={taxonomy.name} description={taxonomy.description || 'Build a hierarchical classification for your research.'} actions={<PageToolbarIconBar label="Taxonomy controls"><InputGroup
       className="taxonomy-search"
       type="search"
       leftIcon="search"
@@ -150,7 +150,7 @@ export function TaxonomyView({ id }: { id: string }) {
       value={search}
       onChange={(event) => setSearch(event.target.value)}
       rightElement={search ? <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setSearch('')}/> : undefined}
-    /><PageToolbarIconBar label="Taxonomy display"><PageToolbarIconButton icon="expand-all" label="Expand entire taxonomy" disabled={!canExpandAll} onClick={()=>setExpanded(new Set(expandableIds))}/><PageToolbarIconButton icon="collapse-all" label="Collapse entire taxonomy" disabled={!canCollapseAll} onClick={()=>setExpanded(new Set())}/></PageToolbarIconBar></>}/>
+    /><PageToolbarIconButton icon="expand-all" label="Expand entire taxonomy" disabled={!canExpandAll} onClick={()=>setExpanded(new Set(expandableIds))}/><PageToolbarIconButton icon="collapse-all" label="Collapse entire taxonomy" disabled={!canCollapseAll} onClick={()=>setExpanded(new Set())}/></PageToolbarIconBar>}/>
     <div className="content-panel taxonomy-card" {...drag.pointerHandlers}>
       <Tree
         compact
