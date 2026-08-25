@@ -19,8 +19,9 @@ describe('TaxonomyView drag and drop',()=>{
     await repository.setAssignedTags(security.id,[source.id])
     render(<AppProvider repository={repository}><TaxonomyView id={taxonomy.id}/></AppProvider>)
     const sourceLabel=await screen.findByText('Software')
-    await waitFor(()=>expect(sourceLabel.closest('li')!.querySelector('.bp6-tree-node-caret')).toBeTruthy())
-    const sourceCaret=sourceLabel.closest('li')!.querySelector('.bp6-tree-node-caret')!
+    const sourceCaret=await screen.findByRole('button',{name:'Expand Software'})
+    expect(sourceCaret).toHaveClass('taxonomy-sidebar-marker','expandable')
+    expect(sourceLabel.closest('li')!.querySelector('.bp6-tree-node-caret')).toBeNull()
     fireEvent.pointerDown(sourceCaret,{button:0,clientX:10,clientY:10,pointerId:7})
     fireEvent.pointerUp(sourceCaret,{clientX:10,clientY:10,pointerId:7})
     fireEvent.click(sourceCaret)
@@ -83,6 +84,7 @@ describe('TaxonomyView drag and drop',()=>{
     await screen.findByRole('heading',{name:'Industry'})
     const root=document.querySelector<HTMLElement>('[data-taxonomy-root-drop-target]')
     expect(root).not.toBeNull()
+    expect(root!.closest('.bp6-tree-node-content')?.querySelector('[data-icon="diagram-tree"]')).not.toBeNull()
 
     fireEvent.contextMenu(root!,{clientX:20,clientY:30})
     fireEvent.click(await screen.findByRole('menuitem',{name:'Edit taxonomy'}))

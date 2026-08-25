@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { Button, Callout, InputGroup, Tree, type TreeNodeInfo } from '@blueprintjs/core'
+import { Button, Callout, Icon, InputGroup, Tree, type TreeNodeInfo } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { Tag, TaggedSecurity } from '../domain/types'
 import { ConfirmDialog, TagForm, TaxonomyForm } from './Forms'
@@ -9,6 +9,7 @@ import { useTaxonomyDragAndDrop, type TaxonomyDropOperation } from './useTaxonom
 import { formatSecurityLabel } from '../utils/securityLabels'
 import { PageHeader } from './PageHeader'
 import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
+import { TaxonomyMarker } from './TaxonomyMarker'
 
 export function TaxonomyView({ id }: { id: string }) {
   const app = useApp()
@@ -109,16 +110,18 @@ export function TaxonomyView({ id }: { id: string }) {
       secondaryLabel: node.security.currency,
       icon: 'chart',
     }
+    const isExpanded=searching||expanded.has(node.id),expandable=node.children.length>0
     return {
       id: node.id,
       nodeData: node,
+      className: 'taxonomy-marker-node',
       label: <span
         data-taxonomy-tag-id={node.id}
         data-draggable-tag-id={node.id}
         className={`taxonomy-node-label ${drag.dropTarget?.tagId === node.id ? `drop-target ${drag.draggingKind === 'tag' ? `tag-drop-${drag.dropTarget.position}` : drag.copying ? 'copy-target' : ''}` : ''}`}
-      ><i style={{ background: node.tag.color }}/>{node.tag.name}</span>,
-      isExpanded: searching || expanded.has(node.id),
-      hasCaret: node.children.length > 0,
+      ><TaxonomyMarker color={node.tag.color} expanded={isExpanded} expandable={expandable} label={node.tag.name} onToggle={()=>toggle(node.id)}/>{node.tag.name}</span>,
+      isExpanded,
+      hasCaret: false,
       childNodes: node.children.map(convert),
     }
   }
@@ -126,11 +129,10 @@ export function TaxonomyView({ id }: { id: string }) {
   const contents: TreeNodeInfo<TaxonomyTreeModelNode | undefined>[] = [{
     id: 'root',
     nodeData: undefined,
-    label: <span data-taxonomy-root-drop-target className={`taxonomy-node-label ${drag.draggingKind === 'tag' && drag.dropTarget?.position === 'root' ? 'drop-target tag-drop-root' : ''}`}><i style={{ background: taxonomy.color }}/>{taxonomy.name}</span>,
-    icon: 'diagram-tree',
+    className: 'taxonomy-marker-node',
+    label: <span data-taxonomy-root-drop-target className={`taxonomy-node-label ${drag.draggingKind === 'tag' && drag.dropTarget?.position === 'root' ? 'drop-target tag-drop-root' : ''}`}><TaxonomyMarker color={taxonomy.color} expanded={searching||expanded.has('root')} expandable={model.length>0} label={taxonomy.name} onToggle={()=>toggle('root')}/>{taxonomy.name}<Icon icon="diagram-tree"/></span>,
     isExpanded: searching || expanded.has('root'),
-    hasCaret: model.length > 0,
-    isSelected: true,
+    hasCaret: false,
     childNodes: model.map(convert),
   }]
 

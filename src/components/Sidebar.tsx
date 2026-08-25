@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useState, type MouseEvent } from 'react'
-import { Button, Icon, Menu, MenuDivider, MenuItem, PopoverNext, showContextMenu } from '@blueprintjs/core'
+import { Button, Menu, MenuDivider, MenuItem, PopoverNext, showContextMenu } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { Taxonomy, Watchlist } from '../domain/types'
 import { ConfirmDialog, TaxonomyForm, WatchlistForm } from './Forms'
@@ -7,10 +7,9 @@ import { buildTaxonomyTreeModel, type TaxonomyTreeModelNode } from './taxonomyTr
 import { formatSecurityLabel } from '../utils/securityLabels'
 import { WATCHLIST_DRAG_HOVER_EVENT } from '../utils/watchlistSecurityDrag'
 import { TAXONOMY_TREE_CHANGED_EVENT } from '../utils/taxonomyTreeChanges'
+import { TaxonomyMarker } from './TaxonomyMarker'
 
 function SectionHeader({ title, onAdd, menu }: { title: string; onAdd?: () => void; menu?:React.ReactNode }) { return <div className="sidebar-section-header"><span>{title}</span>{menu??(onAdd&&<Button variant="minimal" size="small" icon="add" onClick={onAdd} aria-label={`Add ${title}`}/>)}</div> }
-
-function TaxonomyMarker({color,expanded,expandable}:{color:string;expanded?:boolean;expandable:boolean}){return <span className={`taxonomy-sidebar-marker ${expandable?'expandable':'leaf'}`} style={{'--tag-color':color} as React.CSSProperties}>{expandable&&<Icon icon={expanded?'chevron-down':'chevron-right'} size={10}/>}</span>}
 
 export function Sidebar({ onNewSecurity, onNewWatchlist, onNewTaxonomy, onNewTopic }: { onNewSecurity():void;onNewWatchlist():void;onNewTaxonomy():void;onNewTopic():void }) {
   const app=useApp();const[dropTarget,setDropTarget]=useState('');const[editingTaxonomy,setEditingTaxonomy]=useState<Taxonomy>();const[deletingTaxonomy,setDeletingTaxonomy]=useState<Taxonomy>();const[deletingWatchlist,setDeletingWatchlist]=useState<Watchlist>();const[renamingWatchlist,setRenamingWatchlist]=useState<Watchlist>()
