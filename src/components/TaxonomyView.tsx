@@ -130,7 +130,7 @@ export function TaxonomyView({ id }: { id: string }) {
     id: 'root',
     nodeData: undefined,
     className: 'taxonomy-marker-node',
-    label: <span data-taxonomy-root-drop-target className={`taxonomy-node-label ${drag.draggingKind === 'tag' && drag.dropTarget?.position === 'root' ? 'drop-target tag-drop-root' : ''}`}><TaxonomyMarker color={taxonomy.color} expanded={searching||expanded.has('root')} expandable={model.length>0} label={taxonomy.name} onToggle={()=>toggle('root')}/>{taxonomy.name}<Icon icon="diagram-tree"/></span>,
+    label: <span data-taxonomy-root-drop-target className={`taxonomy-node-label ${drag.draggingKind === 'tag' && drag.dropTarget?.position === 'root' ? 'drop-target tag-drop-root' : ''}`}><TaxonomyMarker color={taxonomy.color} expanded={searching||expanded.has('root')} expandable={model.length>0} label={taxonomy.name} onToggle={()=>toggle('root')}/><Icon icon="diagram-tree"/>{taxonomy.name}</span>,
     isExpanded: searching || expanded.has('root'),
     hasCaret: false,
     childNodes: model.map(convert),
