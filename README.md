@@ -71,8 +71,6 @@ The new schema intentionally retains the Qt application's table and column names
 
 
 # Roadmap
-- Add images in the text editor
-- Add a search bar on the research topics view, the same way as we have done this already for watchlists
 - Add upload functionality for documents to the research topics view the same way, as we have done it already for securities
 - Use the same > tree symbol with colored circle also in the taxonomy editor
 - Add  company logos (optionally replacing the chart symbol)

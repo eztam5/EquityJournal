@@ -106,7 +106,12 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
     setView({ type: 'security', id })
   }
   const openResearchTopic = (id: string) => { if(researchTopics.some((topic)=>topic.id===id))setView({type:'topic',id}) }
-  const addSecurity = async (input: SecurityInput) => { const result = await repository.addSecurity(input); await refresh(); return result }
+  const addSecurity = async (input: SecurityInput) => {
+    const result = await repository.addSecurity(input)
+    if (view.type === 'watchlist') await repository.setWatchlistSecurity(view.id, result.id, true)
+    await refresh()
+    return result
+  }
   const updateSecurity = async (input: Security) => { await repository.updateSecurity(input); await refresh() }
   const deleteSecurity = async (id: string) => {
     await repository.deleteSecurity(id); await removeSecurityDocumentDirectory(id).catch(()=>{}); setRecentIds((ids) => ids.filter((value) => value !== id))
