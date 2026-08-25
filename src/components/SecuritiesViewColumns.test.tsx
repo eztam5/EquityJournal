@@ -40,19 +40,26 @@ describe('SecuritiesView visible columns',()=>{
     expect(within(menu).getByRole('menuitemcheckbox',{name:'Symbol'})).toHaveAttribute('aria-disabled','true')
   })
 
-  it('shows direct edit and delete actions for every security',async()=>{
+  it('opens edit and delete actions from the row menu',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
     render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
 
-    fireEvent.click(await screen.findByRole('button',{name:'Edit Apple Inc.'}))
+    const actions=await screen.findByRole('button',{name:'Actions for Apple Inc.'})
+    expect(screen.queryByRole('button',{name:'Edit Apple Inc.'})).not.toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'Delete Apple Inc.'})).not.toBeInTheDocument()
+    fireEvent.click(actions)
+    let menu=await screen.findByRole('menu')
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(2)
+    fireEvent.click(within(menu).getByRole('menuitem',{name:'Edit security'}))
     const editDialog=screen.getByRole('dialog',{name:'Edit security'})
     expect(within(editDialog).getByLabelText('Symbol')).toHaveValue('AAPL')
     fireEvent.click(within(editDialog).getByRole('button',{name:'Cancel'}))
 
-    fireEvent.click(screen.getByRole('button',{name:'Delete Apple Inc.'}))
+    fireEvent.click(actions)
+    menu=await screen.findByRole('menu')
+    fireEvent.click(within(menu).getByRole('menuitem',{name:'Delete security'}))
     expect(screen.getByRole('dialog',{name:'Delete security'})).toBeInTheDocument()
-    expect(screen.queryByRole('button',{name:'Actions for Apple Inc.'})).not.toBeInTheDocument()
   })
 
   it('removes a security from a watchlist without deleting it',async()=>{
@@ -62,15 +69,31 @@ describe('SecuritiesView visible columns',()=>{
     await repository.setWatchlistSecurity(watchlist.id,security.id,true)
     render(<AppProvider repository={repository}><SecuritiesView watchlistId={watchlist.id}/></AppProvider>)
 
-    const removeButton=await screen.findByRole('button',{name:'Remove Apple Inc.'})
-    fireEvent.mouseEnter(removeButton)
-    expect(await screen.findByText(/security itself will not be deleted/i)).toBeInTheDocument()
-    fireEvent.click(removeButton)
+    fireEvent.click(await screen.findByRole('button',{name:'Actions for Apple Inc.'}))
+    const menu=await screen.findByRole('menu')
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(3)
+    expect(within(menu).getByRole('menuitem',{name:'Edit'})).toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem',{name:'Delete security'})).toBeInTheDocument()
+    fireEvent.click(within(menu).getByRole('menuitem',{name:'Remove from watchlist'}))
 
     await waitFor(()=>expect(screen.queryByText('Apple Inc.')).not.toBeInTheDocument())
     expect(screen.queryByRole('dialog',{name:'Remove from watchlist'})).not.toBeInTheDocument()
     expect(await repository.listSecurities(watchlist.id)).toEqual([])
     expect(await repository.listSecurities()).toEqual([security])
+  })
+
+  it('offers permanent security deletion from a watchlist menu',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    const watchlist=await repository.addWatchlist('Quality')
+    await repository.setWatchlistSecurity(watchlist.id,security.id,true)
+    render(<AppProvider repository={repository}><SecuritiesView watchlistId={watchlist.id}/></AppProvider>)
+
+    fireEvent.click(await screen.findByRole('button',{name:'Actions for Apple Inc.'}))
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem',{name:'Delete security'}))
+
+    expect(screen.getByRole('dialog',{name:'Delete security'})).toBeInTheDocument()
+    expect(screen.getByText(/permanently delete Apple Inc. from the database/i)).toBeInTheDocument()
   })
 
   it('exports visible columns and sorted rows as CSV to the clipboard',async()=>{
