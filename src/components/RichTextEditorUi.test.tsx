@@ -35,4 +35,15 @@ describe('RichTextEditor internal reference picker',()=>{
 
     expect(await screen.findByRole('searchbox',{name:'Search internal references'})).toBeInTheDocument()
   })
+
+  it('toggles a block quote from the toolbar',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const onChange=vi.fn()
+    render(<AppProvider repository={repository}><RichTextEditor content="<p>Long-term perspective</p>" onChange={onChange}/></AppProvider>)
+
+    fireEvent.click(await screen.findByRole('button',{name:'Block quote'}))
+
+    await waitFor(()=>expect(onChange).toHaveBeenCalled())
+    expect(onChange.mock.calls.at(-1)?.[0]).toContain('<blockquote>')
+  })
 })
