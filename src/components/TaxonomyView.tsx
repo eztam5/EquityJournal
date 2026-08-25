@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { Button, ButtonGroup, Callout, Icon, InputGroup, Tree, type TreeNodeInfo } from '@blueprintjs/core'
+import { Button, Callout, Icon, InputGroup, Tree, type TreeNodeInfo } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { Tag, TaggedSecurity } from '../domain/types'
 import { ConfirmDialog, TagForm, TaxonomyForm } from './Forms'
@@ -7,7 +7,7 @@ import { showTaxonomySecurityMenu, showTaxonomyTagMenu } from './taxonomyContext
 import { buildTaxonomyTreeModel, filterTaxonomyTreeModel, resolveTagDrop, type TaxonomyTreeModelNode } from './taxonomyTreeModel'
 import { useTaxonomyDragAndDrop, type TaxonomyDropOperation } from './useTaxonomyDragAndDrop'
 import { formatSecurityLabel } from '../utils/securityLabels'
-import { PageHeader } from './PageHeader'
+import { PageHeader, PageToolbarIconBar, PageToolbarIconButton } from './PageHeader'
 import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
 import { TaxonomyMarker } from './TaxonomyMarker'
 
@@ -150,7 +150,7 @@ export function TaxonomyView({ id }: { id: string }) {
       value={search}
       onChange={(event) => setSearch(event.target.value)}
       rightElement={search ? <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setSearch('')}/> : undefined}
-    /><ButtonGroup variant="minimal"><Button icon="expand-all" aria-label="Expand entire taxonomy" title="Expand entire taxonomy" disabled={!canExpandAll} onClick={()=>setExpanded(new Set(expandableIds))}/><Button icon="collapse-all" aria-label="Collapse entire taxonomy" title="Collapse entire taxonomy" disabled={!canCollapseAll} onClick={()=>setExpanded(new Set())}/></ButtonGroup></>}/>
+    /><PageToolbarIconBar label="Taxonomy display"><PageToolbarIconButton icon="expand-all" label="Expand entire taxonomy" disabled={!canExpandAll} onClick={()=>setExpanded(new Set(expandableIds))}/><PageToolbarIconButton icon="collapse-all" label="Collapse entire taxonomy" disabled={!canCollapseAll} onClick={()=>setExpanded(new Set())}/></PageToolbarIconBar></>}/>
     <div className="content-panel taxonomy-card" {...drag.pointerHandlers}>
       <Tree
         compact

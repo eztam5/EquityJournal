@@ -1,9 +1,9 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { Button, InputGroup } from '@blueprintjs/core'
 import { describe, expect, it } from 'vitest'
 import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
-import { isPageSearchShortcut, PageHeader } from './PageHeader'
+import { isPageSearchShortcut, PageHeader, PageToolbarIconBar, PageToolbarIconButton } from './PageHeader'
 
 describe('PageHeader',()=>{
   it('groups multiple page actions in an accessible toolbar',async()=>{
@@ -14,6 +14,19 @@ describe('PageHeader',()=>{
     expect(screen.getByRole('button',{name:'Back'})).toBeDisabled()
     const toolbar=screen.getByRole('toolbar',{name:'Page tools'})
     expect(within(toolbar).getAllByRole('button')).toHaveLength(2)
+  })
+
+  it('renders compact page actions as labelled icon-only buttons',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    render(<AppProvider repository={repository}><PageHeader title="Example" actions={<PageToolbarIconBar><PageToolbarIconButton icon="export" label="Export"/></PageToolbarIconBar>}/></AppProvider>)
+
+    const group=screen.getByRole('group',{name:'Page actions'})
+    const button=within(group).getByRole('button',{name:'Export'})
+    expect(button).toHaveClass('page-toolbar-icon-button')
+    expect(button).toHaveTextContent('')
+    fireEvent.mouseEnter(button)
+    expect(screen.queryByText('Export',{selector:'.bp6-popover-content'})).not.toBeInTheDocument()
+    expect(await screen.findByText('Export',{selector:'.bp6-popover-content'})).toBeInTheDocument()
   })
 
   it('focuses and selects the page search with the native find shortcut',async()=>{

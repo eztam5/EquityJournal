@@ -19,10 +19,9 @@
 .page-heading { min-width: 0; }
 .page-toolbar { min-height: 32px; display: flex; flex: none; align-items: center; justify-content: flex-end; gap: 8px; }
 .page-toolbar > * { flex: none; }
-.page-toolbar > .bp6-button,
-.page-toolbar > .bp6-popover-target > .bp6-button,
-.page-toolbar > .bp6-popover2-target > .bp6-button,
-.page-toolbar-button.bp6-button { width: 112px; min-height: 32px; justify-content: center; }
+.page-toolbar-icon-bar { min-height: 32px; display: flex; align-items: center; gap: 1px; padding: 1px; border: 1px solid var(--border); border-radius: 6px; background: var(--sidebar); }
+.page-toolbar-icon-bar > * { display: flex; flex: none; }
+.page-toolbar-icon-bar .page-toolbar-icon-button.bp6-button { width: 28px; min-width: 28px; height: 28px; min-height: 28px; padding: 0; justify-content: center; }
 .page-toolbar .bp6-input { height: 32px; }
 .bp6-html-table,
 .bp6-tree,

@@ -1,9 +1,17 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { Button } from '@blueprintjs/core'
+import { Button, Tooltip, type ButtonProps } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 
 export function PageToolbar({children,label='Page tools'}:{children:ReactNode;label?:string}) {
   return <div className="page-toolbar" role="toolbar" aria-label={label}>{children}</div>
+}
+
+export function PageToolbarIconBar({children,label='Page actions'}:{children:ReactNode;label?:string}) {
+  return <div className="page-toolbar-icon-bar" role="group" aria-label={label}>{children}</div>
+}
+
+export function PageToolbarIconButton({label,className='',...props}:{label:string}&Omit<ButtonProps,'text'|'aria-label'>) {
+  return <Tooltip content={label} placement="bottom" hoverOpenDelay={500}><Button {...props} className={`page-toolbar-icon-button ${className}`.trim()} variant={props.variant??'minimal'} aria-label={label}/></Tooltip>
 }
 
 export function isPageSearchShortcut(event:Pick<KeyboardEvent,'key'|'ctrlKey'|'metaKey'|'altKey'|'shiftKey'>,platform=navigator.platform) {
