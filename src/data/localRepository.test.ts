@@ -60,6 +60,16 @@ describe('LocalRepository',()=>{
 
     expect((await repository.listWatchlists()).map((watchlist)=>watchlist.id)).toEqual([third.id,first.id,second.id])
   })
+  it('updates a taxonomy while preserving its order',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'Original description',color:'#4F7CAC'})
+    await repository.addTaxonomy({name:'Region',description:'',color:'#2E8B78'})
+
+    await repository.updateTaxonomy({id:taxonomy.id,name:'Sectors',description:'Business sectors',color:'#c25555'})
+
+    expect((await repository.listTaxonomies())[0]).toEqual({...taxonomy,name:'Sectors',description:'Business sectors',color:'#C25555'})
+    await expect(repository.updateTaxonomy({id:taxonomy.id,name:'Region',description:'',color:'#C25555'})).rejects.toThrow('already exists')
+  })
   it('creates nested tags and rejects deleting a parent with children',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const taxonomy=await repository.addTaxonomy({name:'Risks',description:'',color:'#C25555'})

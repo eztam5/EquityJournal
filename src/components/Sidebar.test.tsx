@@ -78,6 +78,22 @@ describe('Sidebar taxonomy navigation',()=>{
     expect(await repository.listWatchlists()).toEqual([expect.objectContaining({name:'High Quality'})])
   })
 
+  it('edits a taxonomy from its context menu',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addTaxonomy({name:'Industry',description:'Company classification',color:'#4F7CAC'})
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/></AppProvider>)
+
+    fireEvent.contextMenu(await screen.findByRole('button',{name:'Industry'}),{clientX:20,clientY:30})
+    fireEvent.click(await screen.findByRole('menuitem',{name:'Edit'}))
+    const dialog=screen.getByRole('dialog',{name:'Edit taxonomy'})
+    expect(within(dialog).getByLabelText(/^Description/)).toHaveValue('Company classification')
+    fireEvent.change(within(dialog).getByLabelText('Name'),{target:{value:'Sectors'}})
+    fireEvent.click(within(dialog).getByRole('button',{name:'Save'}))
+
+    expect(await screen.findByRole('button',{name:'Sectors'})).toBeInTheDocument()
+    expect(await repository.listTaxonomies()).toEqual([expect.objectContaining({name:'Sectors',description:'Company classification'})])
+  })
+
   it('moves watchlists while keeping All Securities first',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     await repository.addWatchlist('First')

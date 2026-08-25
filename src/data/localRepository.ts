@@ -117,6 +117,13 @@ export class LocalRepository implements EquityRepository {
     const result = { id: uuid(), name, description: input.description.trim(), color: input.color.toUpperCase(), sortOrder: this.data.taxonomies.length }
     this.data.taxonomies.push(result); this.persist(); return result
   }
+  async updateTaxonomy(taxonomy: Pick<Taxonomy, 'id' | 'name' | 'description' | 'color'>) {
+    const name=cleanRequired(taxonomy.name,'a taxonomy name')
+    if(this.data.taxonomies.some((item)=>item.id!==taxonomy.id&&item.name.toLowerCase()===name.toLowerCase()))throw new Error('A taxonomy with this name already exists.')
+    const existing=this.data.taxonomies.find((item)=>item.id===taxonomy.id)
+    if(!existing)throw new Error('The taxonomy no longer exists.')
+    existing.name=name;existing.description=taxonomy.description.trim();existing.color=taxonomy.color.toUpperCase();this.persist()
+  }
   async deleteTaxonomy(id: string) {
     const tagIds = new Set(this.data.tags.filter((tag) => tag.taxonomyId === id).map((tag) => tag.id))
     this.data.taxonomies = this.data.taxonomies.filter((taxonomy) => taxonomy.id !== id)

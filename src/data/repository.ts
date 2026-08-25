@@ -20,6 +20,7 @@ export interface EquityRepository {
   setWatchlistSecurity(watchlistId: string, securityId: string, assigned: boolean): Promise<void>
   listTaxonomies(): Promise<Taxonomy[]>
   addTaxonomy(input: Pick<Taxonomy, 'name' | 'description' | 'color'>): Promise<Taxonomy>
+  updateTaxonomy(taxonomy: Pick<Taxonomy, 'id' | 'name' | 'description' | 'color'>): Promise<void>
   deleteTaxonomy(id: string): Promise<void>
   listTags(taxonomyId: string): Promise<Tag[]>
   listTaggedSecurities(taxonomyId: string): Promise<TaggedSecurity[]>

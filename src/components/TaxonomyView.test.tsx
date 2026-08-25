@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
@@ -73,5 +73,23 @@ describe('TaxonomyView drag and drop',()=>{
 
     expect(await screen.findByText('Apple Inc. — AAPL')).toBeInTheDocument()
     expect(screen.queryByText('AAPL — Apple Inc.')).not.toBeInTheDocument()
+  })
+
+  it('edits the taxonomy from the root context menu',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'Company classification',color:'#4F7CAC'})
+    render(<AppProvider repository={repository}><TaxonomyView id={taxonomy.id}/></AppProvider>)
+    await screen.findByRole('heading',{name:'Industry'})
+    const root=document.querySelector<HTMLElement>('[data-taxonomy-root-drop-target]')
+    expect(root).not.toBeNull()
+
+    fireEvent.contextMenu(root!,{clientX:20,clientY:30})
+    fireEvent.click(await screen.findByRole('menuitem',{name:'Edit taxonomy'}))
+    const dialog=screen.getByRole('dialog',{name:'Edit taxonomy'})
+    fireEvent.change(within(dialog).getByLabelText('Name'),{target:{value:'Sectors'}})
+    fireEvent.click(within(dialog).getByRole('button',{name:'Save'}))
+
+    expect(await screen.findByRole('heading',{name:'Sectors'})).toBeInTheDocument()
+    expect(await repository.listTaxonomies()).toEqual([expect.objectContaining({name:'Sectors'})])
   })
 })

@@ -76,6 +76,10 @@ export class TauriRepository implements EquityRepository {
     catch { throw new Error('A taxonomy with this name already exists.') }
     return result
   }
+  async updateTaxonomy(taxonomy: Pick<Taxonomy, 'id' | 'name' | 'description' | 'color'>) {
+    try { await this.db.execute('UPDATE taxonomies SET name=$1,description=$2,color=$3 WHERE id=$4',[cleanRequired(taxonomy.name,'a taxonomy name'),taxonomy.description.trim(),taxonomy.color.toUpperCase(),taxonomy.id]) }
+    catch { throw new Error('A taxonomy with this name already exists.') }
+  }
   async deleteTaxonomy(id: string) {
     await this.db.execute('DELETE FROM taxonomies WHERE id=$1', [id])
   }

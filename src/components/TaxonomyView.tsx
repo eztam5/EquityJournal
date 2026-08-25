@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'reac
 import { Button, Callout, InputGroup, Tree, type TreeNodeInfo } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { Tag, TaggedSecurity } from '../domain/types'
-import { ConfirmDialog, TagForm } from './Forms'
+import { ConfirmDialog, TagForm, TaxonomyForm } from './Forms'
 import { showTaxonomySecurityMenu, showTaxonomyTagMenu } from './taxonomyContextMenus'
 import { buildTaxonomyTreeModel, filterTaxonomyTreeModel, resolveTagDrop, type TaxonomyTreeModelNode } from './taxonomyTreeModel'
 import { useTaxonomyDragAndDrop, type TaxonomyDropOperation } from './useTaxonomyDragAndDrop'
@@ -17,6 +17,7 @@ export function TaxonomyView({ id }: { id: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['root']))
   const [search, setSearch] = useState('')
   const [form, setForm] = useState<{ parent?: Tag; tag?: Tag } | null>(null)
+  const [editingTaxonomy, setEditingTaxonomy] = useState(false)
   const [deleting, setDeleting] = useState<Tag>()
   const [interactionError, setInteractionError] = useState('')
 
@@ -87,6 +88,7 @@ export function TaxonomyView({ id }: { id: string }) {
       setForm({ parent })
       if (parent) setExpanded((current) => new Set(current).add(parent.id))
     },
+    editTaxonomy: () => setEditingTaxonomy(true),
     edit: (item) => setForm({ tag: item }),
     delete: setDeleting,
   })
@@ -156,6 +158,7 @@ export function TaxonomyView({ id }: { id: string }) {
       {searching && model.length === 0 && <div className="empty-state">No matching tags or securities.</div>}
     </div>
     {interactionError && <Callout className="taxonomy-move-error" intent="danger">Could not update taxonomy: {interactionError}</Callout>}
+    {editingTaxonomy && <TaxonomyForm taxonomy={taxonomy} onClose={() => setEditingTaxonomy(false)}/>}
     {form && <TagForm taxonomy={taxonomy} parent={form.parent} tag={form.tag} onSaved={load} onClose={() => setForm(null)}/>}
     {deleting && <ConfirmDialog title="Delete tag" message={`Do you really want to delete ${deleting.name}?`} onClose={() => setDeleting(undefined)} onConfirm={async () => { await app.repository.deleteTag(id, deleting.id); await load() }}/>}
   </main>

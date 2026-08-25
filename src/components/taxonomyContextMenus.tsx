@@ -12,6 +12,7 @@ function menuPosition(event: MouseEvent) {
 
 export function showTaxonomyTagMenu(event: MouseEvent, tag: Tag | undefined, actions: {
   add(parent?: Tag): void
+  editTaxonomy(): void
   edit(tag: Tag): void
   delete(tag: Tag): void
 }) {
@@ -19,8 +20,7 @@ export function showTaxonomyTagMenu(event: MouseEvent, tag: Tag | undefined, act
     ...menuPosition(event),
     content: <Menu>
       <MenuItem icon="add" text="Add Tag" onClick={() => actions.add(tag)}/>
-      <MenuItem icon="edit" text="Edit Tag" disabled={!tag} onClick={() => tag && actions.edit(tag)}/>
-      <MenuItem icon="trash" intent="danger" text="Delete Tag" disabled={!tag} onClick={() => tag && actions.delete(tag)}/>
+      {tag?<><MenuItem icon="edit" text="Edit Tag" onClick={() => actions.edit(tag)}/><MenuItem icon="trash" intent="danger" text="Delete Tag" onClick={() => actions.delete(tag)}/></>:<MenuItem icon="edit" text="Edit taxonomy" onClick={actions.editTaxonomy}/>}
     </Menu>,
   })
 }
