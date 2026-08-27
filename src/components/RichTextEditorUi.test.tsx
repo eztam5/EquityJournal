@@ -46,4 +46,15 @@ describe('RichTextEditor internal reference picker',()=>{
     await waitFor(()=>expect(onChange).toHaveBeenCalled())
     expect(onChange.mock.calls.at(-1)?.[0]).toContain('<blockquote>')
   })
+
+  it('formats text as a third-level heading',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const onChange=vi.fn()
+    render(<AppProvider repository={repository}><RichTextEditor content="<p>Supporting detail</p>" onChange={onChange}/></AppProvider>)
+
+    fireEvent.change(await screen.findByRole('combobox',{name:'Paragraph style'}),{target:{value:'h3'}})
+
+    await waitFor(()=>expect(onChange).toHaveBeenCalled())
+    expect(onChange.mock.calls.at(-1)?.[0]).toContain('<h3>Supporting detail</h3>')
+  })
 })
