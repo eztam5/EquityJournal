@@ -90,7 +90,8 @@ export class LocalRepository implements EquityRepository {
   async listSecurityPrices(securityId:string) { return this.data.securityPrices.filter((price)=>price.securityId===securityId).toSorted((left,right)=>left.priceDate.localeCompare(right.priceDate)) }
   async saveSecurityPrices(securityId:string,sourceSymbol:string,currency:string,prices:Array<Pick<SecurityPrice,'priceDate'|'close'|'adjustedClose'>>) {
     const fetchedAt=new Date().toISOString(),symbol=cleanRequired(sourceSymbol,'a symbol').toUpperCase(),normalizedCurrency=currency.trim().toUpperCase()
-    this.data.securityPrices=this.data.securityPrices.filter((price)=>price.securityId!==securityId)
+    const incomingDates=new Set(prices.map((price)=>price.priceDate))
+    this.data.securityPrices=this.data.securityPrices.filter((price)=>price.securityId!==securityId||(price.sourceSymbol===symbol&&!incomingDates.has(price.priceDate)))
     this.data.securityPrices.push(...prices.map((price)=>({...price,securityId,currency:normalizedCurrency,sourceSymbol:symbol,fetchedAt})))
     this.persist();return this.listSecurityPrices(securityId)
   }

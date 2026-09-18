@@ -69,7 +69,7 @@ async fn fetch_yahoo_prices(symbol: String, range: Option<String>) -> Result<Yah
     let symbol = symbol.trim().to_uppercase();
     if symbol.is_empty() || symbol.len() > 32 { return Err("Enter a valid Yahoo Finance symbol.".to_string()); }
     let range = range.unwrap_or_else(|| "max".to_string());
-    if !matches!(range.as_str(), "1mo" | "10y") { return Err("Unsupported price-history range.".to_string()); }
+    if !matches!(range.as_str(), "1d" | "1mo" | "10y") { return Err("Unsupported price-history range.".to_string()); }
 
     let client = reqwest::Client::builder().user_agent("Mozilla/5.0 (compatible; EquityJournal/0.1)").timeout(std::time::Duration::from_secs(20)).build().map_err(|error| error.to_string())?;
     let mut response = None;

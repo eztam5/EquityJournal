@@ -21,7 +21,7 @@ function normalizeHistory(value:YahooPriceHistory):YahooPriceHistory {
   return {...value,symbol:value.symbol.toUpperCase(),prices}
 }
 
-export async function fetchYahooPriceHistory(symbol:string,range:'1mo'|'10y'='10y'):Promise<YahooPriceHistory> {
+export async function fetchYahooPriceHistory(symbol:string,range:'1d'|'1mo'|'10y'='10y'):Promise<YahooPriceHistory> {
   const normalized=symbol.trim().toUpperCase()
   if(!normalized)throw new Error('Enter a Yahoo Finance symbol first.')
   if(isTauriDesktop()){

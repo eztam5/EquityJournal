@@ -51,4 +51,16 @@ describe('SettingsDialog navigation',()=>{
     await waitFor(()=>expect(onClose).toHaveBeenCalled())
     await waitFor(()=>expect(localStorage.getItem('equity-journal.security-display-mode')).toBe('name-only'))
   })
+
+  it('persists the price update interval from General settings',async()=>{
+    const repository=new LocalRepository();await repository.initialize();const onClose=vi.fn()
+    render(<AppProvider repository={repository}><SettingsDialog isOpen onClose={onClose}/></AppProvider>)
+
+    expect(screen.getByLabelText('Price update interval (minutes)')).toHaveValue('15')
+    fireEvent.change(screen.getByLabelText('Price update interval (minutes)'),{target:{value:'30'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save'}))
+
+    await waitFor(()=>expect(onClose).toHaveBeenCalled())
+    await waitFor(()=>expect(localStorage.getItem('equity-journal.price-update-interval-minutes')).toBe('30'))
+  })
 })

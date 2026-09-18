@@ -3,6 +3,7 @@ import { Button, ButtonGroup, Callout, Card, Spinner, Tooltip } from '@blueprint
 import { useApp } from '../app/AppContext'
 import type { Security, SecurityJournalEntry, SecurityPrice } from '../domain/types'
 import { fetchYahooPriceHistory, isTauriDesktop, yahooTimestampDate, type YahooPricePoint } from '../utils/yahooFinance'
+import { PRICE_HISTORY_CHANGED_EVENT } from '../utils/priceUpdates'
 
 export const PRICE_RANGES=['1M','2M','6M','1Y','2Y','5Y','10Y','YTD'] as const
 export type PriceRange=typeof PRICE_RANGES[number]
@@ -65,12 +66,17 @@ export function SecurityPriceChart({security,journalRevision=0,onJournalEntryCli
   const app=useApp(),[prices,setPrices]=useState<SecurityPrice[]>([]),[journalEntries,setJournalEntries]=useState<SecurityJournalEntry[]>([]),[range,setRange]=useState<PriceRange>('1Y'),[loading,setLoading]=useState(true),[error,setError]=useState('')
   const load=useCallback(async(force=false)=>{setLoading(true);setError('');try{
     const cached=(await app.repository.listSecurityPrices(security.id)).filter((price)=>price.sourceSymbol.toUpperCase()===security.symbol.toUpperCase())
-    if(cached.length&&!force){setPrices(cached);return}
+    if(cached.length>=2&&!force){setPrices(cached);return}
     if(!force&&!isTauriDesktop()){setPrices(cached);return}
     const history=await fetchYahooPriceHistory(security.symbol,'10y'),records=history.prices.map((price)=>({priceDate:yahooTimestampDate(price.timestamp,history.timeZone),close:price.close,adjustedClose:price.adjustedClose}))
     setPrices(await app.repository.saveSecurityPrices(security.id,security.symbol,history.currency||security.currency,records))
   }catch(reason){setError(reason instanceof Error?reason.message:String(reason))}finally{setLoading(false)}},[app.repository,security.currency,security.id,security.symbol])
   useEffect(()=>{void load()},[load])
+  useEffect(()=>{
+    const refreshCached=(event:Event)=>{const ids=(event as CustomEvent<{securityIds:string[]}>).detail?.securityIds;if(!ids?.includes(security.id))return;void app.repository.listSecurityPrices(security.id).then((cached)=>setPrices(cached.filter((price)=>price.sourceSymbol.toUpperCase()===security.symbol.toUpperCase())))}
+    window.addEventListener(PRICE_HISTORY_CHANGED_EVENT,refreshCached)
+    return()=>window.removeEventListener(PRICE_HISTORY_CHANGED_EVENT,refreshCached)
+  },[app.repository,security.id,security.symbol])
   useEffect(()=>{let active=true;app.repository.listJournalEntries(security.id).then((entries)=>{if(active)setJournalEntries(entries)}).catch(()=>{if(active)setJournalEntries([])});return()=>{active=false}},[app.repository,security.id,journalRevision])
   const visible=useMemo(()=>pricesInRange(prices,range),[prices,range]),first=visible[0],last=visible.at(-1),change=first&&last?(last.adjustedClose/first.adjustedClose-1)*100:0,currency=last?.currency||security.currency
   return <Card className="content-panel price-chart-card" elevation={0}><header><div><h2>Price history</h2>{last&&<p><strong>{formatPrice(last.adjustedClose)} {currency}</strong><span className={change<0?'negative':'positive'}>{change>=0?'+':''}{change.toFixed(1)}%</span><small>Adjusted close · through {last.priceDate}</small></p>}</div><div className="price-chart-actions"><ButtonGroup className="price-range-buttons" aria-label="Price chart range">{PRICE_RANGES.map((item)=><Button key={item} text={item} active={range===item} small onClick={()=>setRange(item)}/>)}</ButtonGroup><Tooltip content="Refresh prices from Yahoo Finance" hoverOpenDelay={500}><Button icon="refresh" minimal aria-label="Refresh prices" loading={loading} onClick={()=>void load(true)}/></Tooltip></div></header>

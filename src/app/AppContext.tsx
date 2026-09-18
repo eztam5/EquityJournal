@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
 import { createRepository, type EquityRepository } from '../data'
 import type { SecurityInput } from '../data/repository'
 import type { ResearchTopic, Security, SecurityLinkTemplate, Tag, Taxonomy, ThemeMode, View, Watchlist } from '../domain/types'
@@ -6,6 +6,8 @@ import { loadSecurityDisplayMode, SECURITY_DISPLAY_MODE_KEY, type SecurityDispla
 import { removeSecurityDocumentDirectory } from '../utils/securityDocumentStorage'
 import { cleanupOrphanedEditorImages, removeTopicAttachmentDirectory } from '../utils/editorImageStorage'
 import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
+import { isTauriDesktop } from '../utils/yahooFinance'
+import { loadPriceUpdateIntervalMinutes, normalizePriceUpdateIntervalMinutes, notifyPriceHistoryChanged, PRICE_UPDATE_INTERVAL_KEY, updateLatestSecurityPrices } from '../utils/priceUpdates'
 
 interface AppContextValue {
   repository: EquityRepository
@@ -21,10 +23,12 @@ interface AppContextValue {
   canGoBack: boolean
   theme: ThemeMode
   securityDisplayMode: SecurityDisplayMode
+  priceUpdateIntervalMinutes: number
   setView(view: View): void
   goBack(): void
   setTheme(theme: ThemeMode): void
   setSecurityDisplayMode(mode: SecurityDisplayMode): void
+  setPriceUpdateIntervalMinutes(minutes: number): void
   openSecurity(id: string): void
   openResearchTopic(id: string): void
   refresh(): Promise<void>
@@ -72,6 +76,9 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const goBack=useCallback(()=>dispatchNavigation({type:'back'}),[])
   const [theme, setThemeState] = useState<ThemeMode>(() => (localStorage.getItem(THEME_KEY) as ThemeMode | null) ?? 'dark')
   const [securityDisplayMode, setSecurityDisplayModeState] = useState<SecurityDisplayMode>(loadSecurityDisplayMode)
+  const [priceUpdateIntervalMinutes, setPriceUpdateIntervalMinutesState] = useState(loadPriceUpdateIntervalMinutes)
+  const priceUpdateRunning=useRef(false)
+  const priceUpdateKey=useMemo(()=>securities.map((security)=>`${security.id}:${security.symbol}:${security.currency}`).sort().join('|'),[securities])
   const [recentIds, setRecentIds] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') }
     catch { return [] }
@@ -89,6 +96,20 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
     repository.initialize().then(()=>cleanupOrphanedEditorImages(repository)).then(refresh).then(() => setReady(true)).catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
   }, [refresh, repository])
 
+  useEffect(()=>{
+    if(!ready||!isTauriDesktop()||securities.length===0)return
+    let active=true
+    const update=async()=>{
+      if(priceUpdateRunning.current)return
+      priceUpdateRunning.current=true
+      try{const result=await updateLatestSecurityPrices(repository,securities);if(active)notifyPriceHistoryChanged(result.updatedSecurityIds)}
+      finally{priceUpdateRunning.current=false}
+    }
+    void update()
+    const timer=window.setInterval(()=>void update(),priceUpdateIntervalMinutes*60*1000)
+    return()=>{active=false;window.clearInterval(timer)}
+  },[ready,repository,priceUpdateKey,priceUpdateIntervalMinutes])
+
   useEffect(() => {
     const actual = theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme
     document.documentElement.dataset.theme = actual
@@ -99,9 +120,11 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
 
   useEffect(() => { localStorage.setItem(RECENT_KEY, JSON.stringify(recentIds)) }, [recentIds])
   useEffect(() => { localStorage.setItem(SECURITY_DISPLAY_MODE_KEY, securityDisplayMode) }, [securityDisplayMode])
+  useEffect(() => { localStorage.setItem(PRICE_UPDATE_INTERVAL_KEY, String(priceUpdateIntervalMinutes)) }, [priceUpdateIntervalMinutes])
 
   const setTheme = (next: ThemeMode) => setThemeState(next)
   const setSecurityDisplayMode = (next: SecurityDisplayMode) => setSecurityDisplayModeState(next)
+  const setPriceUpdateIntervalMinutes = (minutes: number) => setPriceUpdateIntervalMinutesState(normalizePriceUpdateIntervalMinutes(minutes))
   const openSecurity = (id: string) => {
     if (!securities.some((security) => security.id === id)) return
     setRecentIds((ids) => [id, ...ids.filter((value) => value !== id)].slice(0, 5))
@@ -140,7 +163,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const deleteResearchTopic=async(id:string)=>{await repository.deleteResearchTopic(id);await removeTopicAttachmentDirectory(id).catch(()=>{});if(view.type==='topic'&&view.id===id)replaceView({type:'topics'});await refresh()}
 
   const recent = recentIds.map((id) => securities.find((security) => security.id === id)).filter((value): value is Security => Boolean(value))
-  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, canGoBack:navigation.history.length>0, theme, securityDisplayMode, setView, goBack, setTheme, setSecurityDisplayMode, openSecurity, openResearchTopic, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, updateWatchlist, moveWatchlist, deleteWatchlist, addTaxonomy, updateTaxonomy, deleteTaxonomy, addResearchTopic, updateResearchTopic, deleteResearchTopic, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, navigation.history.length, theme, securityDisplayMode, setView, goBack, refresh])
+  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, canGoBack:navigation.history.length>0, theme, securityDisplayMode, priceUpdateIntervalMinutes, setView, goBack, setTheme, setSecurityDisplayMode, setPriceUpdateIntervalMinutes, openSecurity, openResearchTopic, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, updateWatchlist, moveWatchlist, deleteWatchlist, addTaxonomy, updateTaxonomy, deleteTaxonomy, addResearchTopic, updateResearchTopic, deleteResearchTopic, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, navigation.history.length, theme, securityDisplayMode, priceUpdateIntervalMinutes, setView, goBack, refresh])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
 
