@@ -60,6 +60,7 @@ git push origin v0.0.2
 - Five recently viewed securities
 - Dark, light, and system themes with persistence and a native macOS View menu
 - Per-security rich-text notes with autosave
+- Locally cached Yahoo Finance price history with selectable chart ranges
 - Paragraph, Heading 1, and Heading 2
 - Bold, italic, underline, strikethrough, text color, and highlight color
 - Bulleted and numbered lists with Tab and Shift+Tab nesting

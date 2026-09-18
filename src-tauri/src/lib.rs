@@ -19,6 +19,98 @@ struct DocumentStorageConfig {
     path: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct YahooPricePoint {
+    timestamp: i64,
+    close: f64,
+    adjusted_close: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct YahooPriceHistory {
+    symbol: String,
+    currency: String,
+    exchange_name: String,
+    time_zone: String,
+    company_name: String,
+    prices: Vec<YahooPricePoint>,
+}
+
+#[derive(Deserialize)]
+struct YahooChartResponse { chart: YahooChart }
+#[derive(Deserialize)]
+struct YahooChart { result: Option<Vec<YahooChartResult>>, error: Option<YahooChartError> }
+#[derive(Deserialize)]
+struct YahooChartError { description: Option<String> }
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct YahooChartResult { meta: YahooChartMeta, timestamp: Option<Vec<i64>>, indicators: YahooIndicators }
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct YahooChartMeta { symbol: String, currency: Option<String>, exchange_name: Option<String>, exchange_timezone_name: Option<String>, long_name: Option<String>, short_name: Option<String> }
+#[derive(Deserialize)]
+struct YahooIndicators { quote: Option<Vec<YahooQuote>>, adjclose: Option<Vec<YahooAdjustedClose>> }
+#[derive(Deserialize)]
+struct YahooQuote { close: Option<Vec<Option<f64>>> }
+#[derive(Deserialize)]
+struct YahooAdjustedClose { adjclose: Option<Vec<Option<f64>>> }
+
+fn yahoo_chart_url(host: &str, symbol: &str, range: &str) -> Result<reqwest::Url, String> {
+    let mut url = reqwest::Url::parse(&format!("https://{host}/v8/finance/chart/")).map_err(|error| error.to_string())?;
+    url.path_segments_mut().map_err(|_| "Could not build the Yahoo Finance URL.".to_string())?.pop_if_empty().push(symbol);
+    url.query_pairs_mut().append_pair("range", range).append_pair("interval", "1d").append_pair("events", "div,splits");
+    Ok(url)
+}
+
+#[tauri::command]
+async fn fetch_yahoo_prices(symbol: String, range: Option<String>) -> Result<YahooPriceHistory, String> {
+    let symbol = symbol.trim().to_uppercase();
+    if symbol.is_empty() || symbol.len() > 32 { return Err("Enter a valid Yahoo Finance symbol.".to_string()); }
+    let range = range.unwrap_or_else(|| "max".to_string());
+    if !matches!(range.as_str(), "1mo" | "10y") { return Err("Unsupported price-history range.".to_string()); }
+
+    let client = reqwest::Client::builder().user_agent("Mozilla/5.0 (compatible; EquityJournal/0.1)").timeout(std::time::Duration::from_secs(20)).build().map_err(|error| error.to_string())?;
+    let mut response = None;
+    let mut last_status = None;
+    let mut last_error = None;
+    for host in ["query1.finance.yahoo.com", "query2.finance.yahoo.com"] {
+        let url = yahoo_chart_url(host, &symbol, &range)?;
+        match client.get(url).send().await {
+            Ok(candidate) if candidate.status().is_success() => { response = Some(candidate); break; }
+            Ok(candidate) => { last_status = Some(candidate.status()); }
+            Err(error) => { last_error = Some(error.to_string()); }
+        }
+    }
+    let response = response.ok_or_else(|| match last_status {
+        Some(reqwest::StatusCode::NOT_FOUND) => format!("Yahoo Finance could not find the symbol {symbol}."),
+        Some(reqwest::StatusCode::TOO_MANY_REQUESTS) => "Yahoo Finance is temporarily rate-limiting price requests. Please try again shortly.".to_string(),
+        Some(status) => format!("Yahoo Finance returned an error ({status})."),
+        None => format!("Could not reach Yahoo Finance: {}", last_error.unwrap_or_else(|| "unknown network error".to_string())),
+    })?;
+    let body: YahooChartResponse = response.json().await.map_err(|error| format!("Yahoo Finance returned an unexpected response: {error}"))?;
+    if let Some(error) = body.chart.error { return Err(error.description.unwrap_or_else(|| "Yahoo Finance could not load this symbol.".to_string())); }
+    let result = body.chart.result.and_then(|mut results| results.drain(..).next()).ok_or_else(|| format!("Yahoo Finance returned no prices for {symbol}."))?;
+    let timestamps = result.timestamp.unwrap_or_default();
+    let closes = result.indicators.quote.and_then(|mut quotes| quotes.drain(..).next()).and_then(|quote| quote.close).unwrap_or_default();
+    let adjusted = result.indicators.adjclose.and_then(|mut values| values.drain(..).next()).and_then(|value| value.adjclose).unwrap_or_default();
+    let prices = timestamps.into_iter().enumerate().filter_map(|(index, timestamp)| {
+        let close = closes.get(index).copied().flatten()?;
+        let adjusted_close = adjusted.get(index).copied().flatten().unwrap_or(close);
+        if close.is_finite() && adjusted_close.is_finite() && close > 0.0 && adjusted_close > 0.0 { Some(YahooPricePoint { timestamp, close, adjusted_close }) } else { None }
+    }).collect::<Vec<_>>();
+    if prices.is_empty() { return Err(format!("Yahoo Finance returned no daily prices for {symbol}.")); }
+    Ok(YahooPriceHistory {
+        symbol: result.meta.symbol,
+        currency: result.meta.currency.unwrap_or_default(),
+        exchange_name: result.meta.exchange_name.unwrap_or_default(),
+        time_zone: result.meta.exchange_timezone_name.unwrap_or_else(|| "UTC".to_string()),
+        company_name: result.meta.long_name.or(result.meta.short_name).unwrap_or_default(),
+        prices,
+    })
+}
+
 struct ThemeMenu {
     dark: CheckMenuItem<tauri::Wry>,
     light: CheckMenuItem<tauri::Wry>,
@@ -315,6 +407,11 @@ pub fn run() {
         description: "editor_images",
         sql: include_str!("../migrations/008_editor_images.sql"),
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 9,
+        description: "security_prices",
+        sql: include_str!("../migrations/009_security_prices.sql"),
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()
@@ -326,7 +423,7 @@ pub fn run() {
                 .add_migrations("sqlite:equity-journal.sqlite3", migrations)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![set_theme_menu, get_database_config, save_database_config, change_database_path, get_document_storage_config, change_document_storage_path, import_security_document, open_security_document, reveal_security_document, remove_security_document, remove_security_document_directory, store_editor_image, load_editor_image, remove_editor_image, remove_topic_attachment_directory])
+        .invoke_handler(tauri::generate_handler![set_theme_menu, get_database_config, save_database_config, change_database_path, fetch_yahoo_prices, get_document_storage_config, change_document_storage_path, import_security_document, open_security_document, reveal_security_document, remove_security_document, remove_security_document_directory, store_editor_image, load_editor_image, remove_editor_image, remove_topic_attachment_directory])
         .setup(|app| {
             let dark = CheckMenuItemBuilder::new("Dark").id("theme-dark").checked(true).build(app)?;
             let light = CheckMenuItemBuilder::new("Light").id("theme-light").build(app)?;
@@ -377,4 +474,16 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running EquityJournal");
+}
+
+#[cfg(test)]
+mod yahoo_url_tests {
+    use super::yahoo_chart_url;
+
+    #[test]
+    fn builds_a_single_slash_before_the_encoded_symbol() {
+        let url = yahoo_chart_url("query1.finance.yahoo.com", "AMR", "10y").expect("valid Yahoo URL");
+        assert_eq!(url.path(), "/v8/finance/chart/AMR");
+        assert_eq!(url.query(), Some("range=10y&interval=1d&events=div%2Csplits"));
+    }
 }

@@ -238,4 +238,17 @@ describe('LocalRepository',()=>{
     expect((await repository.loadResearchTopicNote(topic.id)).contentHtml).toBe('')
     expect(await repository.listResearchTopicJournalEntries(topic.id)).toEqual([])
   })
+  it('persists prices and invalidates them when the Yahoo symbol changes',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'AAPL',currency:'USD',name:'Apple'})
+    await repository.saveSecurityPrices(security.id,'AAPL','USD',[{priceDate:'2026-09-16',close:230,adjustedClose:229.5},{priceDate:'2026-09-17',close:232,adjustedClose:231.5}])
+
+    expect(await repository.listSecurityPrices(security.id)).toEqual([
+      expect.objectContaining({priceDate:'2026-09-16',sourceSymbol:'AAPL',adjustedClose:229.5}),
+      expect.objectContaining({priceDate:'2026-09-17',sourceSymbol:'AAPL',adjustedClose:231.5}),
+    ])
+
+    await repository.updateSecurity({...security,symbol:'AAPL.SW'})
+    expect(await repository.listSecurityPrices(security.id)).toEqual([])
+  })
 })

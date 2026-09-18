@@ -30,7 +30,7 @@ function preview(html: string) {
 
 type JournalEntry = Pick<SecurityJournalEntry,'id'|'entryDate'|'contentHtml'|'createdAt'|'updatedAt'>
 
-export function ResearchJournal({ securityId, topicId, onSaved }: { securityId?: string; topicId?: string; onSaved?:()=>void|Promise<void> }) {
+export function ResearchJournal({ securityId, topicId, selectedEntryId, onSaved }: { securityId?: string; topicId?: string; selectedEntryId?:string; onSaved?:()=>void|Promise<void> }) {
   const app = useApp()
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [draft, setDraft] = useState<DraftEntry>()
@@ -57,13 +57,13 @@ export function ResearchJournal({ securityId, topicId, onSaved }: { securityId?:
     listEntries().then((next) => {
       if (!active) return
       setEntries(next)
-      const selected = next[0]
+      const selected = next.find((entry)=>entry.id===selectedEntryId)??next[0]
       if (selected) setDraft({ id: selected.id, entryDate: selected.entryDate, contentHtml: selected.contentHtml })
     }).catch((reason) => {
       if (active) setStatus(reason instanceof Error ? reason.message : String(reason))
     }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [listEntries])
+  }, [listEntries,selectedEntryId])
 
   const save = async () => {
     if (!draft) return true

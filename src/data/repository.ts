@@ -1,4 +1,4 @@
-import type { EditorImage, EditorImageContentType, EditorImageOwnerType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, ResearchTopicRelations, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import type { EditorImage, EditorImageContentType, EditorImageOwnerType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, ResearchTopicRelations, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 
 export type JournalEntryInput = Pick<SecurityJournalEntry, 'securityId' | 'entryDate' | 'contentHtml'> & { id?: string }
 export type TopicJournalEntryInput = Pick<ResearchTopicJournalEntry, 'topicId' | 'entryDate' | 'contentHtml'> & { id?: string }
@@ -12,6 +12,8 @@ export interface EquityRepository {
   addSecurity(input: SecurityInput): Promise<Security>
   updateSecurity(security: Security): Promise<void>
   deleteSecurity(id: string): Promise<void>
+  listSecurityPrices(securityId: string): Promise<SecurityPrice[]>
+  saveSecurityPrices(securityId: string, sourceSymbol: string, currency: string, prices: Array<Pick<SecurityPrice, 'priceDate' | 'close' | 'adjustedClose'>>): Promise<SecurityPrice[]>
   listWatchlists(): Promise<Watchlist[]>
   addWatchlist(name: string): Promise<Watchlist>
   updateWatchlist(watchlist: Watchlist): Promise<void>

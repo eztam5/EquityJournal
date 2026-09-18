@@ -1,8 +1,9 @@
-import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, Taxonomy, Watchlist } from '../domain/types'
+import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, Tag, Taxonomy, Watchlist } from '../domain/types'
 import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, extractEditorImageIds, type EditorImageInput, type EditorImageReferenceScope, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
 
 interface LocalData {
   securities: Security[]
+  securityPrices: SecurityPrice[]
   watchlists: Watchlist[]
   watchlistSecurities: Array<{ watchlistId: string; securityId: string }>
   taxonomies: Taxonomy[]
@@ -23,7 +24,7 @@ interface LocalData {
 
 const STORAGE_KEY = 'equity-journal.development-database.v1'
 const emptyData = (): LocalData => ({
-  securities: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [], securityDocuments: [], editorImages: [], editorImageReferences: [], securityLinkTemplates: [], researchTopics: [], researchTopicNotes: [], researchTopicJournalEntries: [], researchTopicSecurities: [], researchTopicTags: [],
+  securities: [], securityPrices: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [], securityDocuments: [], editorImages: [], editorImageReferences: [], securityLinkTemplates: [], researchTopics: [], researchTopicNotes: [], researchTopicJournalEntries: [], researchTopicSecurities: [], researchTopicTags: [],
 })
 
 export class LocalRepository implements EquityRepository {
@@ -69,7 +70,10 @@ export class LocalRepository implements EquityRepository {
   async updateSecurity(security: Security) {
     const next = { ...security, symbol: cleanRequired(security.symbol, 'a symbol').toUpperCase(), alternativeId: security.alternativeId.trim(), currency: cleanRequired(security.currency, 'a currency').toUpperCase(), name: cleanRequired(security.name, 'a company name') }
     if (this.data.securities.some((x) => x.id !== next.id && x.symbol.toLowerCase() === next.symbol.toLowerCase())) throw new Error('A security with this symbol already exists.')
-    this.data.securities = this.data.securities.map((x) => x.id === next.id ? next : x); this.persist()
+    const previous=this.data.securities.find((item)=>item.id===next.id)
+    this.data.securities = this.data.securities.map((x) => x.id === next.id ? next : x)
+    if(previous&&previous.symbol!==next.symbol)this.data.securityPrices=this.data.securityPrices.filter((price)=>price.securityId!==next.id)
+    this.persist()
   }
   async deleteSecurity(id: string) {
     this.data.securities = this.data.securities.filter((x) => x.id !== id)
@@ -78,9 +82,17 @@ export class LocalRepository implements EquityRepository {
     this.data.notes = this.data.notes.filter((x) => x.securityId !== id)
     this.data.journalEntries = this.data.journalEntries.filter((x) => x.securityId !== id)
     this.data.securityDocuments = this.data.securityDocuments.filter((x) => x.securityId !== id)
+    this.data.securityPrices = this.data.securityPrices.filter((x) => x.securityId !== id)
     const imageIds=new Set(this.data.editorImages.filter((image)=>image.ownerType==='security'&&image.ownerId===id).map((image)=>image.id))
     this.data.editorImages=this.data.editorImages.filter((image)=>!imageIds.has(image.id));this.data.editorImageReferences=this.data.editorImageReferences.filter((reference)=>!imageIds.has(reference.imageId))
     this.data.researchTopicSecurities = this.data.researchTopicSecurities.filter((x) => x.securityId !== id); this.persist()
+  }
+  async listSecurityPrices(securityId:string) { return this.data.securityPrices.filter((price)=>price.securityId===securityId).toSorted((left,right)=>left.priceDate.localeCompare(right.priceDate)) }
+  async saveSecurityPrices(securityId:string,sourceSymbol:string,currency:string,prices:Array<Pick<SecurityPrice,'priceDate'|'close'|'adjustedClose'>>) {
+    const fetchedAt=new Date().toISOString(),symbol=cleanRequired(sourceSymbol,'a symbol').toUpperCase(),normalizedCurrency=currency.trim().toUpperCase()
+    this.data.securityPrices=this.data.securityPrices.filter((price)=>price.securityId!==securityId)
+    this.data.securityPrices.push(...prices.map((price)=>({...price,securityId,currency:normalizedCurrency,sourceSymbol:symbol,fetchedAt})))
+    this.persist();return this.listSecurityPrices(securityId)
   }
   async listWatchlists() { return this.data.watchlists.toSorted((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name)) }
   async addWatchlist(value: string) {

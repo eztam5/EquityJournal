@@ -8,6 +8,16 @@ export interface Security {
   currency: string
 }
 
+export interface SecurityPrice {
+  securityId: string
+  priceDate: string
+  close: number
+  adjustedClose: number
+  currency: string
+  sourceSymbol: string
+  fetchedAt: string
+}
+
 export interface SecurityLinkTemplate {
   id: string
   linkText: string

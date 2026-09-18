@@ -52,6 +52,22 @@ describe('SecurityDetailView research notes',()=>{
     expect(screen.getByText('US0378331005')).toBeInTheDocument()
   })
 
+  it('shows cached price history with all requested chart ranges',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    await repository.saveSecurityPrices(security.id,'AAPL','USD',[{priceDate:'2025-09-18',close:200,adjustedClose:200},{priceDate:'2026-09-18',close:250,adjustedClose:250}])
+    await repository.saveJournalEntry({securityId:security.id,entryDate:'2026-03-12',contentHtml:'<p>Reviewed the annual report</p>'})
+    render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
+
+    expect(await screen.findByRole('img',{name:/adjusted closing price/i})).toBeInTheDocument()
+    expect(screen.getByText('+25.0%')).toBeInTheDocument()
+    for(const range of ['1M','2M','6M','1Y','2Y','5Y','10Y','YTD'])expect(screen.getByRole('button',{name:range})).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button',{name:'Open journal entry from 2026-03-12'}))
+    expect(await screen.findByDisplayValue('2026-03-12')).toBeInTheDocument()
+    expect(screen.getAllByText('Reviewed the annual report')).toHaveLength(2)
+    expect(screen.getByRole('tab',{name:'Journal'})).toHaveAttribute('aria-selected','true')
+  })
+
   it('opens the existing edit-security dialog from the detail header',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})

@@ -1,5 +1,5 @@
 import Database from '@tauri-apps/plugin-sql'
-import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, extractEditorImageIds, type EditorImageInput, type EditorImageReferenceScope, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
 
 type DbRow = Record<string, string | number | null>
@@ -37,8 +37,22 @@ export class TauriRepository implements EquityRepository {
     const name = cleanRequired(s.name, 'a company name'), symbol = cleanRequired(s.symbol, 'a symbol').toUpperCase(), alternativeId=s.alternativeId.trim(), currency = cleanRequired(s.currency, 'a currency').toUpperCase()
     try { await this.db.execute('UPDATE securities SET name=$1,symbol=$2,alternative_id=$3,currency=$4 WHERE id=$5', [name,symbol,alternativeId,currency,s.id]) }
     catch { throw new Error('A security with this symbol already exists.') }
+    await this.db.execute('DELETE FROM security_prices WHERE security_id=$1 AND source_symbol<>$2',[s.id,symbol])
   }
   async deleteSecurity(id: string) { await this.db.execute("DELETE FROM editor_images WHERE owner_type='security' AND owner_id=$1",[id]);await this.db.execute('DELETE FROM securities WHERE id=$1', [id]) }
+  async listSecurityPrices(securityId:string):Promise<SecurityPrice[]> {
+    const rows=await this.db.select<DbRow[]>('SELECT security_id,price_date,close,adjusted_close,currency,source_symbol,fetched_at FROM security_prices WHERE security_id=$1 ORDER BY price_date',[securityId])
+    return rows.map((row)=>({securityId:String(row.security_id),priceDate:String(row.price_date),close:Number(row.close),adjustedClose:Number(row.adjusted_close),currency:String(row.currency),sourceSymbol:String(row.source_symbol),fetchedAt:String(row.fetched_at)}))
+  }
+  async saveSecurityPrices(securityId:string,sourceSymbol:string,currency:string,prices:Array<Pick<SecurityPrice,'priceDate'|'close'|'adjustedClose'>>):Promise<SecurityPrice[]> {
+    const fetchedAt=new Date().toISOString(),symbol=cleanRequired(sourceSymbol,'a symbol').toUpperCase(),normalizedCurrency=currency.trim().toUpperCase()
+    for(let offset=0;offset<prices.length;offset+=100){
+      const batch=prices.slice(offset,offset+100),parameters:unknown[]=[];let bindIndex=0
+      const values=batch.map((price)=>{const row=[securityId,price.priceDate,price.close,price.adjustedClose,normalizedCurrency,symbol,fetchedAt],slots=row.map(()=>`$${++bindIndex}`);parameters.push(...row);return `(${slots.join(',')})`}).join(',')
+      if(values)await this.db.execute(`INSERT INTO security_prices (security_id,price_date,close,adjusted_close,currency,source_symbol,fetched_at) VALUES ${values} ON CONFLICT(security_id,price_date) DO UPDATE SET close=excluded.close,adjusted_close=excluded.adjusted_close,currency=excluded.currency,source_symbol=excluded.source_symbol,fetched_at=excluded.fetched_at`,parameters)
+    }
+    return this.listSecurityPrices(securityId)
+  }
   async listWatchlists(): Promise<Watchlist[]> {
     const rows=await this.db.select<DbRow[]>('SELECT id,name,sort_order FROM watchlists ORDER BY sort_order,lower(name),id')
     return rows.map((row)=>({id:String(row.id),name:String(row.name),sortOrder:Number(row.sort_order)}))

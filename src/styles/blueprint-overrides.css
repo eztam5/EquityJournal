@@ -109,6 +109,38 @@ table.security-table.bp6-html-table tbody tr.security-selected:hover > td { back
 .notes-card { padding: 18px 0; overflow: visible; }
 .info-card { grid-template-columns: 110px 150px 90px minmax(160px, 1.4fr) minmax(150px, 1fr); gap: 18px; }
 .info-card > div { min-width: 0; }
+.price-chart-card { margin-bottom: 18px; padding: 14px 20px 10px; }
+.price-chart-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.price-chart-card h2 { margin: 0 0 4px; font-size: 18px; }
+.price-chart-card header p { display: flex; align-items: baseline; gap: 8px; margin: 0; }
+.price-chart-card header p > span { font-size: 12px; font-weight: 600; }
+.price-chart-card header p > span.positive { color: #238636; }
+.price-chart-card header p > span.negative { color: var(--danger); }
+.price-chart-card header p small { color: var(--muted); font-size: 11px; }
+.price-chart-actions { display: flex; align-items: center; gap: 5px; }
+.price-range-buttons { flex-wrap: wrap; justify-content: flex-end; }
+.price-range-buttons .bp6-button { min-width: 36px; min-height: 26px; padding: 2px 7px; font-size: 11px; }
+.security-price-svg { width: 100%; height: clamp(220px, 28vw, 340px); display: block; margin-top: 8px; overflow: visible; }
+.price-grid-line { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.price-line { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.price-journal-marker { cursor: pointer; outline: none; }
+.price-journal-marker > circle:not(.price-journal-marker-halo) { fill: var(--window); stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.price-journal-marker-halo { fill: color-mix(in srgb, var(--accent) 20%, transparent); stroke: none; }
+.price-journal-marker:hover .price-journal-marker-halo,
+.price-journal-marker:focus .price-journal-marker-halo { fill: color-mix(in srgb, var(--accent) 38%, transparent); }
+.price-axis-label { fill: var(--muted); font-size: 11px; }
+.price-axis-title { fill: var(--secondary); font-size: 11px; font-weight: 600; }
+.price-chart-loading,.price-chart-empty { min-height: 230px; display: flex; align-items: center; justify-content: center; gap: 9px; color: var(--muted); }
+.price-chart-message.bp6-callout { margin: 12px 0 0; }
+.price-chart-card > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; color: var(--muted); font-size: 10px; }
+.price-journal-legend { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.price-journal-legend i { width: 8px; height: 8px; border: 2px solid var(--accent); border-radius: 50%; background: var(--window); }
+.security-price-preview { display: grid; grid-template-columns: minmax(150px,1fr) minmax(180px,1.5fr); align-items: center; gap: 4px 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--sidebar); }
+.security-price-preview > div { min-width: 0; display: grid; gap: 2px; }
+.security-price-preview > div span,.security-price-preview > small { color: var(--muted); font-size: 11px; }
+.security-price-preview > small { grid-column: 1 / -1; }
+.price-sparkline { width: 100%; height: 48px; overflow: visible; }
+.price-sparkline path { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .security-links > div { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .security-links .bp6-button { min-height: 22px; padding: 0 4px; justify-content: flex-start; }
 .notes-card > header { padding: 0 20px; margin-bottom: 12px; }
@@ -146,6 +178,8 @@ table.security-table.bp6-html-table tbody tr.security-selected:hover > td { back
 table.document-table.bp6-html-table th:last-child,
 table.document-table.bp6-html-table td:last-child { width: 132px; text-align: right; white-space: nowrap; }
 @media (max-width: 760px) {
+  .price-chart-card > header { flex-direction: column; }
+  .price-chart-actions { width: 100%; justify-content: space-between; }
   .journal-workspace { grid-template-columns: 1fr; }
   .journal-timeline { border-right: 0; border-bottom: 1px solid var(--border); }
 }
