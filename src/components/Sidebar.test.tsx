@@ -79,6 +79,35 @@ describe('Sidebar taxonomy navigation',()=>{
     expect(await repository.listWatchlists()).toEqual([expect.objectContaining({name:'High Quality'})])
   })
 
+  it('places Update quotes second in the All Securities context menu',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/></AppProvider>)
+
+    fireEvent.contextMenu(screen.getByRole('button',{name:'All Securities'}),{clientX:20,clientY:30})
+
+    expect((await screen.findAllByRole('menuitem')).map((item)=>item.textContent)).toEqual(['New security','Update quotes'])
+  })
+
+  it('updates only the securities in the selected watchlist',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const apple=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    await repository.addSecurity({symbol:'MSFT',name:'Microsoft',currency:'USD'})
+    const watchlist=await repository.addWatchlist('Quality')
+    await repository.setWatchlistSecurity(watchlist.id,apple.id,true)
+    const fetch=vi.fn().mockResolvedValue({ok:true,json:async()=>({chart:{result:[{meta:{symbol:'AAPL',currency:'USD',exchangeName:'NMS',exchangeTimezoneName:'America/New_York'},timestamp:[Date.UTC(2026,8,18,20)/1000],indicators:{quote:[{close:[250]}],adjclose:[{adjclose:[250]}]}}]}})})
+    vi.stubGlobal('fetch',fetch)
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/></AppProvider>)
+
+    fireEvent.contextMenu(await screen.findByRole('button',{name:'Quality'}),{clientX:20,clientY:30})
+    const items=await screen.findAllByRole('menuitem')
+    expect(items.slice(0,2).map((item)=>item.textContent)).toEqual(['Rename','Update quotes'])
+    fireEvent.click(screen.getByRole('menuitem',{name:'Update quotes'}))
+
+    await waitFor(()=>expect(fetch).toHaveBeenCalledTimes(1))
+    expect(String(fetch.mock.calls[0][0])).toContain('/AAPL?')
+    expect(String(fetch.mock.calls[0][0])).not.toContain('MSFT')
+  })
+
   it('edits a taxonomy from its context menu',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     await repository.addTaxonomy({name:'Industry',description:'Company classification',color:'#4F7CAC'})

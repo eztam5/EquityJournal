@@ -207,6 +207,9 @@ table.document-table.bp6-html-table td:last-child { width: 132px; text-align: ri
 .security-table.bp6-html-table td { padding: 2px 12px; font-size: 12px; line-height: 1.1; vertical-align: middle; }
 table.security-table.bp6-html-table th:last-child, table.security-table.bp6-html-table td:last-child { width: 68px; text-align: right; white-space: nowrap; }
 table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-compact.security-table td { padding-bottom: 2px; padding-top: 2px; }
+.security-table .security-daily-change { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.security-table .security-daily-change.positive { color: #238636; font-weight: 600; }
+.security-table .security-daily-change.negative { color: var(--danger); font-weight: 600; }
 .security-table .sort-header.bp6-button { min-height: 24px; padding: 0; color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; }
 .column-chooser.bp6-menu { min-width: 285px; padding: 5px; }
 .column-chooser-row { height: 30px; display: grid; grid-template-columns: minmax(150px, 1fr) 26px 26px; align-items: center; border-radius: 3px; }

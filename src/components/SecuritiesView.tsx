@@ -2,20 +2,22 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEven
 import { Button, HTMLTable, Icon, InputGroup, Menu, MenuItem, PopoverNext, showContextMenu } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import { resolveSecurityLink } from '../data/repository'
-import type { Security, SecurityLinkTemplate } from '../domain/types'
+import type { Security, SecurityLinkTemplate, SecurityPrice } from '../domain/types'
 import { openExternalUrl } from '../utils/externalLinks'
 import { copyHtmlTableToClipboard, copyTextToClipboard, csvFileName, exportTableAsCsv, exportTableAsHtml, saveCsvExport, type ExportTable } from '../utils/tableExport'
 import { announceWatchlistDragHover, isAdditiveSelectionModifier, watchlistDropTargetAt } from '../utils/watchlistSecurityDrag'
+import { PRICE_HISTORY_CHANGED_EVENT } from '../utils/priceUpdates'
 import { ConfirmDialog, SecurityForm } from './Forms'
 import { PageHeader, PageToolbarIconBar, PageToolbarIconButton } from './PageHeader'
 
-export type SecuritySortKey = 'symbol'|'alternativeId'|'name'|'currency'
+export type SecuritySortKey = 'symbol'|'alternativeId'|'name'|'currency'|'todayChange'
 export type SecurityColumnKey = SecuritySortKey|`link:${string}`
 export type SortDirection = 'asc'|'desc'
 
 export interface SecurityColumnPreferences {
   order: SecurityColumnKey[]
   visible: SecurityColumnKey[]
+  version: number
 }
 
 interface SecurityColumnDefinition {
@@ -26,15 +28,17 @@ interface SecurityColumnDefinition {
 }
 
 const COLUMN_PREFERENCES_KEY = 'equity-journal.visible-security-columns'
+const COLUMN_PREFERENCES_VERSION = 2
 const BUILTIN_COLUMNS: SecurityColumnDefinition[] = [
   {key:'symbol',label:'Symbol',sortKey:'symbol'},
   {key:'alternativeId',label:'Alternative ID',sortKey:'alternativeId'},
   {key:'name',label:'Company',sortKey:'name'},
   {key:'currency',label:'Currency',sortKey:'currency'},
+  {key:'todayChange',label:'Today %',sortKey:'todayChange'},
 ]
 
 const isColumnKey = (value: unknown): value is SecurityColumnKey => typeof value==='string'&&(BUILTIN_COLUMNS.some((column)=>column.key===value)||(value.startsWith('link:')&&value.length>5))
-const isSecuritySortKey = (value: SecurityColumnKey): value is SecuritySortKey => BUILTIN_COLUMNS.some((column)=>column.key===value)
+const isSecuritySortKey = (value: SecurityColumnKey): value is SecuritySortKey => value==='symbol'||value==='alternativeId'||value==='name'||value==='currency'||value==='todayChange'
 const uniqueColumnKeys = (values: unknown[]): SecurityColumnKey[] => [...new Set(values.filter(isColumnKey))]
 
 export function loadSecurityColumnPreferences(): SecurityColumnPreferences {
@@ -42,26 +46,44 @@ export function loadSecurityColumnPreferences(): SecurityColumnPreferences {
   try {
     const stored:unknown=JSON.parse(localStorage.getItem(COLUMN_PREFERENCES_KEY)??'null')
     if(stored&&typeof stored==='object'){
-      const value=stored as {order?:unknown;visible?:unknown}
+      const value=stored as {order?:unknown;visible?:unknown;version?:unknown}
       if(Array.isArray(value.order)&&Array.isArray(value.visible)){
         const visible=uniqueColumnKeys(value.visible)
         const order=uniqueColumnKeys([...value.order,...visible,...defaults])
-        if(visible.length)return{order,visible}
+        if(visible.length){
+          const migratedVisible:SecurityColumnKey[]=value.version===COLUMN_PREFERENCES_VERSION||visible.includes('todayChange')?visible:[...visible,'todayChange']
+          return{order,visible:migratedVisible,version:COLUMN_PREFERENCES_VERSION}
+        }
       }
     }
   }catch{/* Use the default layout when a stored preference is malformed. */}
-  return{order:defaults,visible:defaults}
+  return{order:defaults,visible:defaults,version:COLUMN_PREFERENCES_VERSION}
 }
 
 export function loadVisibleSecurityColumns(): SecurityColumnKey[] {
   return loadSecurityColumnPreferences().visible
 }
 
-export function sortSecurities(rows:Security[],key:SecuritySortKey,direction:SortDirection) {
+export function sortSecurities(rows:Security[],key:SecuritySortKey,direction:SortDirection,todayChanges:Record<string,number>={}) {
   return rows.toSorted((left,right)=>{
-    const comparison=left[key].localeCompare(right[key],undefined,{numeric:true,sensitivity:'base'})
+    const comparison=key==='todayChange'?(todayChanges[left.id]??0)-(todayChanges[right.id]??0):left[key].localeCompare(right[key],undefined,{numeric:true,sensitivity:'base'})
     return comparison===0?left.id.localeCompare(right.id):direction==='asc'?comparison:-comparison
   })
+}
+
+export function localPriceDate(now=new Date()):string {
+  const pad=(value:number)=>String(value).padStart(2,'0')
+  return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`
+}
+
+export function todayPriceChange(prices:SecurityPrice[],today=localPriceDate()):number {
+  const ordered=prices.toSorted((left,right)=>left.priceDate.localeCompare(right.priceDate)),latest=ordered.at(-1),previous=ordered.at(-2)
+  if(!latest||!previous||latest.priceDate!==today||previous.close<=0)return 0
+  return (latest.close/previous.close-1)*100
+}
+
+export function formatTodayPriceChange(change:number):string {
+  return `${change>0?'+':''}${change.toFixed(2)}%`
 }
 
 function SortHeader({label,column,sortKey,direction,onSort}:{label:string;column:SecuritySortKey;sortKey:SecuritySortKey;direction:SortDirection;onSort(column:SecuritySortKey):void}) {
@@ -82,6 +104,7 @@ function ColumnChooserRow({column,index,count,visible,lastVisible,onToggle,onMov
 export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const app=useApp()
   const[rows,setRows]=useState<Security[]>([])
+  const[todayChanges,setTodayChanges]=useState<Record<string,number>>({})
   const[creating,setCreating]=useState(false)
   const[editing,setEditing]=useState<Security>()
   const[deleting,setDeleting]=useState<Security>()
@@ -98,6 +121,18 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const selectionAnchorId=useRef<string|null>(null)
 
   useEffect(()=>{app.repository.listSecurities(watchlistId).then(setRows)},[app.repository,app.securities,watchlistId])
+  useEffect(()=>{
+    let active=true,request=0
+    const load=async()=>{
+      const current=++request
+      const values=await Promise.all(rows.map(async(security)=>[security.id,todayPriceChange((await app.repository.listSecurityPrices(security.id)).filter((price)=>price.sourceSymbol.toUpperCase()===security.symbol.toUpperCase()))] as const))
+      if(active&&current===request)setTodayChanges(Object.fromEntries(values))
+    }
+    void load()
+    const refresh=()=>void load()
+    window.addEventListener(PRICE_HISTORY_CHANGED_EVENT,refresh)
+    return()=>{active=false;window.removeEventListener(PRICE_HISTORY_CHANGED_EVENT,refresh)}
+  },[app.repository,rows])
   useEffect(()=>{selectionAnchorId.current=null;setSelectedSecurityIds(new Set());setSearchQuery('')},[watchlistId])
   useEffect(()=>setSelectedSecurityIds((current)=>{const visibleIds=new Set(rows.map((row)=>row.id));if(selectionAnchorId.current&&!visibleIds.has(selectionAnchorId.current))selectionAnchorId.current=null;const next=new Set([...current].filter((id)=>visibleIds.has(id)));return next.size===current.size?current:next}),[rows])
   useEffect(()=>{const clear=(event:KeyboardEvent)=>{if(event.key==='Escape'){selectionAnchorId.current=null;setSelectedSecurityIds(new Set())}};document.addEventListener('keydown',clear);return()=>document.removeEventListener('keydown',clear)},[])
@@ -117,7 +152,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
       const missing=availableKeys.filter((key)=>!current.order.includes(key))
       const hasVisible=availableKeys.some((key)=>current.visible.includes(key))
       if(!missing.length&&hasVisible)return current
-      return{order:[...current.order,...missing],visible:hasVisible?current.visible:[...current.visible,'symbol']}
+      return{...current,order:[...current.order,...missing],visible:hasVisible?current.visible:[...current.visible,'symbol']}
     })
   },[availableKeys.join('|')])
 
@@ -128,7 +163,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   },[preferences.visible,sortKey,visibleColumns])
 
   const filteredRows=useMemo(()=>{const query=searchQuery.trim().toLocaleLowerCase();return query?rows.filter((security)=>security.symbol.toLocaleLowerCase().includes(query)||security.name.toLocaleLowerCase().includes(query)):rows},[rows,searchQuery])
-  const sortedRows=useMemo(()=>sortSecurities(filteredRows,sortKey,direction),[filteredRows,sortKey,direction])
+  const sortedRows=useMemo(()=>sortSecurities(filteredRows,sortKey,direction,todayChanges),[filteredRows,sortKey,direction,todayChanges])
   const sort=(column:SecuritySortKey)=>{if(column===sortKey)setDirection((current)=>current==='asc'?'desc':'asc');else{setSortKey(column);setDirection('asc')}}
   const toggleColumn=(column:SecurityColumnKey)=>setPreferences((current)=>{const visible=current.visible.includes(column);if(visible&&visibleColumns.length===1)return current;return{...current,visible:visible?current.visible.filter((key)=>key!==column):[...current.visible,column]}})
   const reorderColumn=(source:SecurityColumnKey,target:SecurityColumnKey)=>setPreferences((current)=>{const order=orderedColumns.map((column)=>column.key),sourceIndex=order.indexOf(source),targetIndex=order.indexOf(target);if(sourceIndex<0||targetIndex<0||sourceIndex===targetIndex)return current;order.splice(sourceIndex,1);order.splice(targetIndex,0,source);return{...current,order:[...order,...current.order.filter((key)=>!order.includes(key))]}})
@@ -139,6 +174,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     if(column.key==='alternativeId')return{text:security.alternativeId}
     if(column.key==='name')return{text:security.name}
     if(column.key==='currency')return{text:security.currency}
+    if(column.key==='todayChange')return{text:formatTodayPriceChange(todayChanges[security.id]??0)}
     const url=column.template?resolveSecurityLink(column.template,security):null
     return{text:url??'',href:url??undefined}
   }))}
@@ -161,6 +197,10 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     if(column.key==='alternativeId')return <td key={column.key}>{security.alternativeId||'—'}</td>
     if(column.key==='name')return <td key={column.key}>{security.name}</td>
     if(column.key==='currency')return <td key={column.key}>{security.currency}</td>
+    if(column.key==='todayChange'){
+      const change=todayChanges[security.id]??0
+      return <td className={`security-daily-change${change>0?' positive':change<0?' negative':''}`} key={column.key}>{formatTodayPriceChange(change)}</td>
+    }
     const url=column.template?resolveSecurityLink(column.template,security):null
     return <td className="security-link-cell" key={column.key}><Button variant="minimal" size="small" icon="share" text="Open" aria-label={`Open ${column.label}`} disabled={!url} title={url?`Open ${column.label}`:`Set an Alternative ID to use ${column.label}`} onClick={(event)=>{event.stopPropagation();if(url)void openExternalUrl(url)}}/></td>
   }

@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppProvider, useApp } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
-import { SecuritiesView } from './SecuritiesView'
+import { localPriceDate, SecuritiesView } from './SecuritiesView'
+import { PRICE_HISTORY_CHANGED_EVENT } from '../utils/priceUpdates'
 
 function WatchlistViewHarness({watchlistId}:{watchlistId:string}) {
   const app=useApp()
@@ -31,12 +32,12 @@ describe('SecuritiesView visible columns',()=>{
 
     fireEvent.click(within(menu).getByRole('button',{name:'Move Yahoo Finance up'}))
     fireEvent.click(within(menu).getByRole('button',{name:'Move Yahoo Finance up'}))
-    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Yahoo Finance','Company','Currency',''])
-    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','link:yahoo','name','currency'],visible:['symbol','name','currency','link:yahoo']})
+    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Company','Yahoo Finance','Currency','Today %',''])
+    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','name','link:yahoo','currency','todayChange'],visible:['symbol','name','currency','todayChange','link:yahoo'],version:2})
   })
 
   it('does not allow hiding the final visible column',async()=>{
-    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['symbol','alternativeId','name','currency'],visible:['symbol']}))
+    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['symbol','alternativeId','name','currency','todayChange'],visible:['symbol'],version:2}))
     const repository=new LocalRepository();await repository.initialize()
     render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
 
@@ -139,8 +140,23 @@ describe('SecuritiesView visible columns',()=>{
     fireEvent.click(screen.getByRole('button',{name:'Export'}))
     fireEvent.click(await screen.findByRole('menuitem',{name:'Export as CSV to Clipboard'}))
 
-    await waitFor(()=>expect(writeText).toHaveBeenCalledWith('Symbol,Alternative ID,Company,Currency\r\nAAPL,US0378331005,Apple Inc.,USD\r\nMSFT,US5949181045,Microsoft,USD'))
+    await waitFor(()=>expect(writeText).toHaveBeenCalledWith('Symbol,Alternative ID,Company,Currency,Today %\r\nAAPL,US0378331005,Apple Inc.,USD,0.00%\r\nMSFT,US5949181045,Microsoft,USD,0.00%'))
     expect(await screen.findByRole('status')).toHaveTextContent('CSV copied to clipboard')
+  })
+
+  it('shows and refreshes today’s percentage change using stored closes',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'}),today=localPriceDate(),previousDate=new Date(`${today}T12:00:00Z`)
+    previousDate.setUTCDate(previousDate.getUTCDate()-1)
+    const previous=previousDate.toISOString().slice(0,10)
+    await repository.saveSecurityPrices(security.id,'AAPL','USD',[{priceDate:previous,close:100,adjustedClose:100},{priceDate:today,close:105,adjustedClose:105}])
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+
+    expect(await screen.findByText('+5.00%')).toHaveClass('positive')
+    await repository.saveSecurityPrices(security.id,'AAPL','USD',[{priceDate:today,close:95,adjustedClose:95}])
+    window.dispatchEvent(new CustomEvent(PRICE_HISTORY_CHANGED_EVENT,{detail:{securityIds:[security.id]}}))
+
+    expect(await screen.findByText('-5.00%')).toHaveClass('negative')
   })
 
   it('filters All Securities by symbol or company name without querying again',async()=>{

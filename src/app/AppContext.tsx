@@ -7,7 +7,7 @@ import { removeSecurityDocumentDirectory } from '../utils/securityDocumentStorag
 import { cleanupOrphanedEditorImages, removeTopicAttachmentDirectory } from '../utils/editorImageStorage'
 import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
 import { isTauriDesktop } from '../utils/yahooFinance'
-import { loadPriceUpdateIntervalMinutes, normalizePriceUpdateIntervalMinutes, notifyPriceHistoryChanged, PRICE_UPDATE_INTERVAL_KEY, updateLatestSecurityPrices } from '../utils/priceUpdates'
+import { catchUpMissingSecurityPrices, currentLocalPriceDate, ensureSecurityPriceHistory, loadPriceUpdateIntervalMinutes, normalizePriceUpdateIntervalMinutes, notifyPriceHistoryChanged, PRICE_UPDATE_INTERVAL_KEY, updateLatestSecurityPrices } from '../utils/priceUpdates'
 
 interface AppContextValue {
   repository: EquityRepository
@@ -29,6 +29,7 @@ interface AppContextValue {
   setTheme(theme: ThemeMode): void
   setSecurityDisplayMode(mode: SecurityDisplayMode): void
   setPriceUpdateIntervalMinutes(minutes: number): void
+  updateQuotes(watchlistId?: string): Promise<void>
   openSecurity(id: string): void
   openResearchTopic(id: string): void
   refresh(): Promise<void>
@@ -78,6 +79,9 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const [securityDisplayMode, setSecurityDisplayModeState] = useState<SecurityDisplayMode>(loadSecurityDisplayMode)
   const [priceUpdateIntervalMinutes, setPriceUpdateIntervalMinutesState] = useState(loadPriceUpdateIntervalMinutes)
   const priceUpdateRunning=useRef(false)
+  const startupPriceCatchUp=useRef<Promise<void>|null>(null)
+  const securitiesRef=useRef(securities)
+  securitiesRef.current=securities
   const priceUpdateKey=useMemo(()=>securities.map((security)=>`${security.id}:${security.symbol}:${security.currency}`).sort().join('|'),[securities])
   const [recentIds, setRecentIds] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') }
@@ -96,19 +100,32 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
     repository.initialize().then(()=>cleanupOrphanedEditorImages(repository)).then(refresh).then(() => setReady(true)).catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
   }, [refresh, repository])
 
+  const updateQuotes=useCallback(async(watchlistId?:string)=>{
+    if(priceUpdateRunning.current)return
+    priceUpdateRunning.current=true
+    try{
+      const targets=watchlistId?await repository.listSecurities(watchlistId):securitiesRef.current
+      const result=await updateLatestSecurityPrices(repository,targets)
+      notifyPriceHistoryChanged(result.updatedSecurityIds)
+    }finally{priceUpdateRunning.current=false}
+  },[repository])
+
   useEffect(()=>{
     if(!ready||!isTauriDesktop()||securities.length===0)return
     let active=true
-    const update=async()=>{
-      if(priceUpdateRunning.current)return
-      priceUpdateRunning.current=true
-      try{const result=await updateLatestSecurityPrices(repository,securities);if(active)notifyPriceHistoryChanged(result.updatedSecurityIds)}
-      finally{priceUpdateRunning.current=false}
+    if(!startupPriceCatchUp.current){
+      startupPriceCatchUp.current=(async()=>{
+        priceUpdateRunning.current=true
+        try{
+          const result=await catchUpMissingSecurityPrices(repository,securitiesRef.current,currentLocalPriceDate())
+          notifyPriceHistoryChanged(result.updatedSecurityIds)
+        }finally{priceUpdateRunning.current=false}
+      })()
     }
-    void update()
-    const timer=window.setInterval(()=>void update(),priceUpdateIntervalMinutes*60*1000)
+    void startupPriceCatchUp.current.then(()=>{if(active)return updateQuotes()})
+    const timer=window.setInterval(()=>void updateQuotes(),priceUpdateIntervalMinutes*60*1000)
     return()=>{active=false;window.clearInterval(timer)}
-  },[ready,repository,priceUpdateKey,priceUpdateIntervalMinutes])
+  },[ready,repository,priceUpdateKey,priceUpdateIntervalMinutes,updateQuotes])
 
   useEffect(() => {
     const actual = theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme
@@ -131,13 +148,18 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
     setView({ type: 'security', id })
   }
   const openResearchTopic = (id: string) => { if(researchTopics.some((topic)=>topic.id===id))setView({type:'topic',id}) }
+  const ensurePriceHistory=async(security:Security)=>{
+    if(!isTauriDesktop())return
+    try{if(await ensureSecurityPriceHistory(repository,security))notifyPriceHistoryChanged([security.id])}catch{/* A quote failure must not prevent saving the security itself. */}
+  }
   const addSecurity = async (input: SecurityInput) => {
     const result = await repository.addSecurity(input)
     if (view.type === 'watchlist') await repository.setWatchlistSecurity(view.id, result.id, true)
+    await ensurePriceHistory(result)
     await refresh()
     return result
   }
-  const updateSecurity = async (input: Security) => { await repository.updateSecurity(input); await refresh() }
+  const updateSecurity = async (input: Security) => { await repository.updateSecurity(input);await ensurePriceHistory({...input,symbol:input.symbol.trim().toUpperCase(),currency:input.currency.trim().toUpperCase()});await refresh() }
   const deleteSecurity = async (id: string) => {
     await repository.deleteSecurity(id); await removeSecurityDocumentDirectory(id).catch(()=>{}); setRecentIds((ids) => ids.filter((value) => value !== id))
     if (view.type === 'security' && view.id === id) replaceView({ type: 'all-securities' })
@@ -163,7 +185,7 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const deleteResearchTopic=async(id:string)=>{await repository.deleteResearchTopic(id);await removeTopicAttachmentDirectory(id).catch(()=>{});if(view.type==='topic'&&view.id===id)replaceView({type:'topics'});await refresh()}
 
   const recent = recentIds.map((id) => securities.find((security) => security.id === id)).filter((value): value is Security => Boolean(value))
-  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, canGoBack:navigation.history.length>0, theme, securityDisplayMode, priceUpdateIntervalMinutes, setView, goBack, setTheme, setSecurityDisplayMode, setPriceUpdateIntervalMinutes, openSecurity, openResearchTopic, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, updateWatchlist, moveWatchlist, deleteWatchlist, addTaxonomy, updateTaxonomy, deleteTaxonomy, addResearchTopic, updateResearchTopic, deleteResearchTopic, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, navigation.history.length, theme, securityDisplayMode, priceUpdateIntervalMinutes, setView, goBack, refresh])
+  const value = useMemo<AppContextValue>(() => ({ repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, canGoBack:navigation.history.length>0, theme, securityDisplayMode, priceUpdateIntervalMinutes, setView, goBack, setTheme, setSecurityDisplayMode, setPriceUpdateIntervalMinutes, updateQuotes, openSecurity, openResearchTopic, refresh, addSecurity, updateSecurity, deleteSecurity, addWatchlist, updateWatchlist, moveWatchlist, deleteWatchlist, addTaxonomy, updateTaxonomy, deleteTaxonomy, addResearchTopic, updateResearchTopic, deleteResearchTopic, listTags: (id) => repository.listTags(id) }), [repository, ready, error, securities, watchlists, taxonomies, securityLinkTemplates, researchTopics, recent, view, navigation.history.length, theme, securityDisplayMode, priceUpdateIntervalMinutes, setView, goBack, refresh, updateQuotes])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
 
