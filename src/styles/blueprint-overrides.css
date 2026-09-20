@@ -139,6 +139,16 @@ table.security-table.bp6-html-table tbody tr.security-selected:hover > td { back
 .security-price-preview > div { min-width: 0; display: grid; gap: 2px; }
 .security-price-preview > div span,.security-price-preview > small { color: var(--muted); font-size: 11px; }
 .security-price-preview > small { grid-column: 1 / -1; }
+.security-search-results { max-height: 220px; margin-top: -8px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--window); box-shadow: 0 8px 24px color-mix(in srgb, #000 14%, transparent); }
+.security-search-results > button { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 6px 10px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; text-align: left; }
+.security-search-results > button:last-of-type { border-bottom: 0; }
+.security-search-results > button:hover { background: var(--hover); }
+.security-search-results > button > span { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.security-search-results > button strong { flex: none; }
+.security-search-results > button span span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.security-search-results > button small { flex: none; color: var(--muted); font-size: 10px; white-space: nowrap; }
+.security-search-status { padding: 10px; color: var(--muted); font-size: 11px; }
+.security-search-status.error { color: var(--danger); }
 .price-sparkline { width: 100%; height: 48px; overflow: visible; }
 .price-sparkline path { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .security-links > div { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }

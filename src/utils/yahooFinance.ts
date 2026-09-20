@@ -13,6 +13,14 @@ export interface YahooPriceHistory {
   prices: YahooPricePoint[]
 }
 
+export interface YahooSecuritySearchResult {
+  symbol: string
+  name: string
+  exchange: string
+  exchangeName: string
+  quoteType: string
+}
+
 export function isTauriDesktop() { return '__TAURI_INTERNALS__' in window }
 
 function normalizeHistory(value:YahooPriceHistory):YahooPriceHistory {
@@ -36,6 +44,26 @@ export async function fetchYahooPriceHistory(symbol:string,range:'1d'|'1mo'|'10y
   if(!result)throw new Error(`Yahoo Finance returned no prices for ${normalized}.`)
   const closes=result.indicators.quote?.[0]?.close??[],adjusted=result.indicators.adjclose?.[0]?.adjclose??[]
   return normalizeHistory({symbol:result.meta.symbol,currency:result.meta.currency??'',exchangeName:result.meta.exchangeName??'',timeZone:result.meta.exchangeTimezoneName??'UTC',companyName:result.meta.longName??result.meta.shortName??'',prices:(result.timestamp??[]).flatMap((timestamp,index)=>{const close=closes[index],adjustedClose=adjusted[index]??close;return close&&adjustedClose?[{timestamp,close,adjustedClose}]:[]})})
+}
+
+export async function searchYahooSecurities(query:string):Promise<YahooSecuritySearchResult[]> {
+  const normalized=query.trim()
+  if(normalized.length<2)return []
+  if(isTauriDesktop()){
+    const{invoke}=await import('@tauri-apps/api/core')
+    return invoke<YahooSecuritySearchResult[]>('search_yahoo_securities',{query:normalized})
+  }
+  const params=new URLSearchParams({q:normalized,quotesCount:'8',newsCount:'0'})
+  const response=await fetch(`https://query2.finance.yahoo.com/v1/finance/search?${params}`)
+  if(!response.ok)throw new Error(`Yahoo Finance search returned an error (${response.status}).`)
+  const body=await response.json() as {quotes?:Array<{symbol?:string;shortname?:string;longname?:string;exchange?:string;exchDisp?:string;quoteType?:string;isYahooFinance?:boolean}>}
+  const seen=new Set<string>()
+  return (body.quotes??[]).flatMap((quote)=>{
+    const symbol=quote.symbol?.trim().toUpperCase()
+    if(!symbol||quote.isYahooFinance===false||seen.has(symbol))return []
+    seen.add(symbol)
+    return [{symbol,name:quote.longname??quote.shortname??symbol,exchange:quote.exchange??'',exchangeName:quote.exchDisp??'',quoteType:quote.quoteType??''}]
+  })
 }
 
 export function yahooTimestampDate(timestamp:number,timeZone='UTC') {

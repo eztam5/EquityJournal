@@ -38,6 +38,22 @@ struct YahooPriceHistory {
     prices: Vec<YahooPricePoint>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct YahooSecuritySearchResult {
+    symbol: String,
+    name: String,
+    exchange: String,
+    exchange_name: String,
+    quote_type: String,
+}
+
+#[derive(Deserialize)]
+struct YahooSearchResponse { quotes: Option<Vec<YahooSearchQuote>> }
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct YahooSearchQuote { symbol: Option<String>, shortname: Option<String>, longname: Option<String>, exchange: Option<String>, exch_disp: Option<String>, quote_type: Option<String>, is_yahoo_finance: Option<bool> }
+
 #[derive(Deserialize)]
 struct YahooChartResponse { chart: YahooChart }
 #[derive(Deserialize)]
@@ -62,6 +78,38 @@ fn yahoo_chart_url(host: &str, symbol: &str, range: &str) -> Result<reqwest::Url
     url.path_segments_mut().map_err(|_| "Could not build the Yahoo Finance URL.".to_string())?.pop_if_empty().push(symbol);
     url.query_pairs_mut().append_pair("range", range).append_pair("interval", "1d").append_pair("events", "div,splits");
     Ok(url)
+}
+
+fn yahoo_search_url(host: &str, query: &str) -> Result<reqwest::Url, String> {
+    let mut url = reqwest::Url::parse(&format!("https://{host}/v1/finance/search")).map_err(|error| error.to_string())?;
+    url.query_pairs_mut().append_pair("q", query).append_pair("quotesCount", "8").append_pair("newsCount", "0");
+    Ok(url)
+}
+
+#[tauri::command]
+async fn search_yahoo_securities(query: String) -> Result<Vec<YahooSecuritySearchResult>, String> {
+    let query = query.trim();
+    if query.len() < 2 { return Ok(Vec::new()); }
+    if query.len() > 100 { return Err("Enter a shorter security search.".to_string()); }
+    let client = reqwest::Client::builder().user_agent("Mozilla/5.0 (compatible; EquityJournal/0.1)").timeout(std::time::Duration::from_secs(15)).build().map_err(|error| error.to_string())?;
+    let mut response = None;
+    let mut last_error = None;
+    for host in ["query2.finance.yahoo.com", "query1.finance.yahoo.com"] {
+        match client.get(yahoo_search_url(host, query)?).send().await {
+            Ok(candidate) if candidate.status().is_success() => { response = Some(candidate); break; }
+            Ok(candidate) => { last_error = Some(format!("Yahoo Finance returned an error ({}).", candidate.status())); }
+            Err(error) => { last_error = Some(format!("Could not reach Yahoo Finance: {error}")); }
+        }
+    }
+    let body: YahooSearchResponse = response.ok_or_else(|| last_error.unwrap_or_else(|| "Yahoo Finance search is unavailable.".to_string()))?.json().await.map_err(|error| format!("Yahoo Finance returned an unexpected search response: {error}"))?;
+    let mut seen = std::collections::HashSet::new();
+    Ok(body.quotes.unwrap_or_default().into_iter().filter_map(|quote| {
+        if quote.is_yahoo_finance == Some(false) { return None; }
+        let symbol = quote.symbol?.trim().to_uppercase();
+        if symbol.is_empty() || !seen.insert(symbol.clone()) { return None; }
+        let name = quote.longname.or(quote.shortname).unwrap_or_else(|| symbol.clone());
+        Some(YahooSecuritySearchResult { symbol, name, exchange: quote.exchange.unwrap_or_default(), exchange_name: quote.exch_disp.unwrap_or_default(), quote_type: quote.quote_type.unwrap_or_default() })
+    }).collect())
 }
 
 #[tauri::command]
@@ -423,7 +471,7 @@ pub fn run() {
                 .add_migrations("sqlite:equity-journal.sqlite3", migrations)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![set_theme_menu, get_database_config, save_database_config, change_database_path, fetch_yahoo_prices, get_document_storage_config, change_document_storage_path, import_security_document, open_security_document, reveal_security_document, remove_security_document, remove_security_document_directory, store_editor_image, load_editor_image, remove_editor_image, remove_topic_attachment_directory])
+        .invoke_handler(tauri::generate_handler![set_theme_menu, get_database_config, save_database_config, change_database_path, fetch_yahoo_prices, search_yahoo_securities, get_document_storage_config, change_document_storage_path, import_security_document, open_security_document, reveal_security_document, remove_security_document, remove_security_document_directory, store_editor_image, load_editor_image, remove_editor_image, remove_topic_attachment_directory])
         .setup(|app| {
             let dark = CheckMenuItemBuilder::new("Dark").id("theme-dark").checked(true).build(app)?;
             let light = CheckMenuItemBuilder::new("Light").id("theme-light").build(app)?;
@@ -478,12 +526,19 @@ pub fn run() {
 
 #[cfg(test)]
 mod yahoo_url_tests {
-    use super::yahoo_chart_url;
+    use super::{yahoo_chart_url, yahoo_search_url};
 
     #[test]
     fn builds_a_single_slash_before_the_encoded_symbol() {
         let url = yahoo_chart_url("query1.finance.yahoo.com", "AMR", "10y").expect("valid Yahoo URL");
         assert_eq!(url.path(), "/v8/finance/chart/AMR");
         assert_eq!(url.query(), Some("range=10y&interval=1d&events=div%2Csplits"));
+    }
+
+    #[test]
+    fn builds_an_encoded_security_search_url() {
+        let url = yahoo_search_url("query2.finance.yahoo.com", "Berkshire Hathaway").expect("valid Yahoo search URL");
+        assert_eq!(url.path(), "/v1/finance/search");
+        assert_eq!(url.query(), Some("q=Berkshire+Hathaway&quotesCount=8&newsCount=0"));
     }
 }
