@@ -320,9 +320,10 @@ fn change_document_storage_path(app: tauri::AppHandle, new_path: String) -> Resu
         if canonical_new.starts_with(old) || old.starts_with(&canonical_new) { return Err("The new document folder cannot contain, or be contained by, the current folder.".into()); }
         copy_directory(&old.join("securities"), &canonical_new.join("securities"))?;
         copy_directory(&old.join("topics"), &canonical_new.join("topics"))?;
+        copy_directory(&old.join("favicons"), &canonical_new.join("favicons"))?;
     }
     save_document_storage_config(&canonical_new)?;
-    if let Some(old) = canonical_old { let _ = fs::remove_dir_all(old.join("securities"));let _ = fs::remove_dir_all(old.join("topics")); }
+    if let Some(old) = canonical_old { let _ = fs::remove_dir_all(old.join("securities"));let _ = fs::remove_dir_all(old.join("topics"));let _ = fs::remove_dir_all(old.join("favicons")); }
     Ok(())
 }
 
@@ -369,6 +370,51 @@ fn remove_security_document_directory(app: tauri::AppHandle, security_id: String
     let path = document_storage_path(&app)?.join("securities").join(security_id);
     if path.exists() { fs::remove_dir_all(path).map_err(|error| error.to_string())?; }
     Ok(())
+}
+
+// Fetch through the desktop backend so site CORS policies do not block icons.
+#[tauri::command]
+async fn fetch_favicon_resource(url: String) -> Result<Vec<u8>, String> {
+    let url = reqwest::Url::parse(&url).map_err(|error| error.to_string())?;
+    if !matches!(url.scheme(), "http" | "https") { return Err("Invalid favicon URL".into()); }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(4))
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .build().map_err(|error| error.to_string())?;
+    let mut response = client.get(url).send().await.map_err(|error| error.to_string())?
+        .error_for_status().map_err(|error| error.to_string())?;
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|error| error.to_string())? {
+        if bytes.len() + chunk.len() > 1024 * 1024 { return Err("Favicon resource too large".into()); }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
+}
+
+fn favicon_format(bytes: &[u8]) -> Option<(&'static str, &'static str)> {
+    editor_image_format(bytes).or_else(|| {
+        if bytes.len() >= 6 && bytes.starts_with(&[0, 0, 1, 0]) { Some(("image/x-icon", "ico")) } else { None }
+    })
+}
+
+#[tauri::command]
+fn store_favicon(app: tauri::AppHandle, id: String, bytes: Vec<u8>) -> Result<String, String> {
+    safe_path_part(&id, "favicon identifier")?;
+    if bytes.len() > 1024 * 1024 { return Err("Favicon too large".into()); }
+    let (_, extension) = favicon_format(&bytes).ok_or("Unsupported favicon format")?;
+    let relative = format!("favicons/{id}.{extension}");
+    let path = document_storage_path(&app)?.join(&relative);
+    fs::create_dir_all(path.parent().ok_or("Invalid favicon path")?).map_err(|error| error.to_string())?;
+    fs::write(path, bytes).map_err(|error| error.to_string())?;
+    Ok(relative)
+}
+
+#[tauri::command]
+fn load_favicon(app: tauri::AppHandle, storage_path: String) -> Result<Vec<u8>, String> {
+    if !storage_path.starts_with("favicons/") { return Err("Invalid favicon path".into()); }
+    let bytes = fs::read(resolve_document_path(&app, &storage_path)?).map_err(|error| error.to_string())?;
+    favicon_format(&bytes).ok_or("Invalid favicon")?;
+    Ok(bytes)
 }
 
 fn editor_image_format(bytes: &[u8]) -> Option<(&'static str, &'static str)> {
@@ -460,6 +506,11 @@ pub fn run() {
         description: "security_prices",
         sql: include_str!("../migrations/009_security_prices.sql"),
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 10,
+        description: "security_link_favicons",
+        sql: include_str!("../migrations/010_security_link_favicons.sql"),
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()
@@ -471,7 +522,7 @@ pub fn run() {
                 .add_migrations("sqlite:equity-journal.sqlite3", migrations)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![set_theme_menu, get_database_config, save_database_config, change_database_path, fetch_yahoo_prices, search_yahoo_securities, get_document_storage_config, change_document_storage_path, import_security_document, open_security_document, reveal_security_document, remove_security_document, remove_security_document_directory, store_editor_image, load_editor_image, remove_editor_image, remove_topic_attachment_directory])
+        .invoke_handler(tauri::generate_handler![fetch_favicon_resource, store_favicon, load_favicon, set_theme_menu, get_database_config, save_database_config, change_database_path, fetch_yahoo_prices, search_yahoo_securities, get_document_storage_config, change_document_storage_path, import_security_document, open_security_document, reveal_security_document, remove_security_document, remove_security_document_directory, store_editor_image, load_editor_image, remove_editor_image, remove_topic_attachment_directory])
         .setup(|app| {
             let dark = CheckMenuItemBuilder::new("Dark").id("theme-dark").checked(true).build(app)?;
             let light = CheckMenuItemBuilder::new("Light").id("theme-light").build(app)?;

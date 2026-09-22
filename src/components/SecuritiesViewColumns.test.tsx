@@ -26,14 +26,35 @@ describe('SecuritiesView visible columns',()=>{
 
     await waitFor(()=>expect(screen.queryByRole('columnheader',{name:/Alternative ID/})).not.toBeInTheDocument())
     expect(screen.queryByText('US0378331005')).not.toBeInTheDocument()
-    fireEvent.click(await within(menu).findByRole('menuitemcheckbox',{name:'Yahoo Finance'}))
-    expect(await screen.findByRole('columnheader',{name:'Yahoo Finance'})).toBeInTheDocument()
+    expect(await screen.findByRole('columnheader',{name:'Links'})).toBeInTheDocument()
     expect(screen.getByRole('button',{name:'Open Yahoo Finance'})).toBeInTheDocument()
 
-    fireEvent.click(within(menu).getByRole('button',{name:'Move Yahoo Finance up'}))
-    fireEvent.click(within(menu).getByRole('button',{name:'Move Yahoo Finance up'}))
-    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Company','Yahoo Finance','Currency','Today %',''])
-    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','name','link:yahoo','currency','todayChange'],visible:['symbol','name','currency','todayChange','link:yahoo'],version:2})
+    fireEvent.click(within(menu).getByRole('button',{name:'Move Links up'}))
+    fireEvent.click(within(menu).getByRole('button',{name:'Move Links up'}))
+    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Company','Links','Currency','Today %',''])
+    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','name','links','currency','todayChange'],visible:['symbol','name','currency','todayChange','links'],version:3})
+  })
+
+  it('combines saved website columns into one cell with URL tooltips',async()=>{
+    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['symbol','link:yahoo','link:tikr'],visible:['symbol','link:yahoo','link:tikr'],version:2}))
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    await repository.saveSecurityLinkTemplates([
+      {id:'yahoo',linkText:'Yahoo Finance',urlPattern:'https://finance.yahoo.com/quote/{SYMBOL}',sortOrder:0},
+      {id:'tikr',linkText:'TIKR',urlPattern:'https://app.tikr.com/{SYMBOL}',sortOrder:1},
+      {id:'isin',linkText:'ISIN research',urlPattern:'https://example.com/{ALTERNATIVE_ID}',sortOrder:2},
+    ])
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    const yahoo=await screen.findByRole('button',{name:'Open Yahoo Finance'})
+    const tikr=screen.getByRole('button',{name:'Open TIKR'})
+    expect(yahoo.closest('td')).toBe(tikr.closest('td'))
+    expect(within(yahoo.closest('td')!).getAllByRole('button')).toHaveLength(2)
+    expect(yahoo).toHaveAttribute('title','https://finance.yahoo.com/quote/AAPL')
+    expect(tikr).toHaveAttribute('title','https://app.tikr.com/AAPL')
+    expect(screen.queryByRole('button',{name:'Open ISIN research'})).not.toBeInTheDocument()
+    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Links',''])
+    expect(yahoo.textContent).toBe('')
+    expect(tikr.textContent).toBe('')
   })
 
   it('does not allow hiding the final visible column',async()=>{

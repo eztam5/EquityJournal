@@ -48,7 +48,10 @@ describe('SecurityDetailView research notes',()=>{
 
     render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
 
-    expect(await screen.findByRole('button',{name:'Yahoo Finance'})).toBeInTheDocument()
+    const link=await screen.findByRole('button',{name:'Yahoo Finance'})
+    expect(link).toHaveAttribute('title','https://finance.yahoo.com/quote/AAPL')
+    expect(link).toHaveTextContent('')
+    expect(link.querySelector('[data-icon="share"]')).toBeInTheDocument()
     expect(screen.getByText('US0378331005')).toBeInTheDocument()
   })
 

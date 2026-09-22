@@ -2,16 +2,17 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEven
 import { Button, HTMLTable, Icon, InputGroup, Menu, MenuItem, PopoverNext, showContextMenu } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import { resolveSecurityLink } from '../data/repository'
-import type { Security, SecurityLinkTemplate, SecurityPrice } from '../domain/types'
+import type { Security, SecurityPrice } from '../domain/types'
 import { openExternalUrl } from '../utils/externalLinks'
 import { copyHtmlTableToClipboard, copyTextToClipboard, csvFileName, exportTableAsCsv, exportTableAsHtml, saveCsvExport, type ExportTable } from '../utils/tableExport'
 import { announceWatchlistDragHover, isAdditiveSelectionModifier, watchlistDropTargetAt } from '../utils/watchlistSecurityDrag'
 import { PRICE_HISTORY_CHANGED_EVENT } from '../utils/priceUpdates'
+import { SecurityLinkIcon } from './SecurityLinkIcon'
 import { ConfirmDialog, SecurityForm } from './Forms'
 import { PageHeader, PageToolbarIconBar, PageToolbarIconButton } from './PageHeader'
 
 export type SecuritySortKey = 'symbol'|'alternativeId'|'name'|'currency'|'todayChange'
-export type SecurityColumnKey = SecuritySortKey|`link:${string}`
+export type SecurityColumnKey = SecuritySortKey|'links'
 export type SortDirection = 'asc'|'desc'
 
 export interface SecurityColumnPreferences {
@@ -24,22 +25,22 @@ interface SecurityColumnDefinition {
   key: SecurityColumnKey
   label: string
   sortKey?: SecuritySortKey
-  template?: SecurityLinkTemplate
 }
 
 const COLUMN_PREFERENCES_KEY = 'equity-journal.visible-security-columns'
-const COLUMN_PREFERENCES_VERSION = 2
+const COLUMN_PREFERENCES_VERSION = 3
 const BUILTIN_COLUMNS: SecurityColumnDefinition[] = [
   {key:'symbol',label:'Symbol',sortKey:'symbol'},
   {key:'alternativeId',label:'Alternative ID',sortKey:'alternativeId'},
   {key:'name',label:'Company',sortKey:'name'},
   {key:'currency',label:'Currency',sortKey:'currency'},
   {key:'todayChange',label:'Today %',sortKey:'todayChange'},
+  {key:'links',label:'Links'},
 ]
 
-const isColumnKey = (value: unknown): value is SecurityColumnKey => typeof value==='string'&&(BUILTIN_COLUMNS.some((column)=>column.key===value)||(value.startsWith('link:')&&value.length>5))
+const isColumnKey = (value: unknown): value is SecurityColumnKey => typeof value==='string'&&BUILTIN_COLUMNS.some((column)=>column.key===value)
 const isSecuritySortKey = (value: SecurityColumnKey): value is SecuritySortKey => value==='symbol'||value==='alternativeId'||value==='name'||value==='currency'||value==='todayChange'
-const uniqueColumnKeys = (values: unknown[]): SecurityColumnKey[] => [...new Set(values.filter(isColumnKey))]
+const uniqueColumnKeys = (values: unknown[]): SecurityColumnKey[] => [...new Set(values.map((value)=>typeof value==='string'&&value.startsWith('link:')?'links':value).filter(isColumnKey))]
 
 export function loadSecurityColumnPreferences(): SecurityColumnPreferences {
   const defaults=BUILTIN_COLUMNS.map((column)=>column.key)
@@ -51,7 +52,7 @@ export function loadSecurityColumnPreferences(): SecurityColumnPreferences {
         const visible=uniqueColumnKeys(value.visible)
         const order=uniqueColumnKeys([...value.order,...visible,...defaults])
         if(visible.length){
-          const migratedVisible:SecurityColumnKey[]=value.version===COLUMN_PREFERENCES_VERSION||visible.includes('todayChange')?visible:[...visible,'todayChange']
+          const migratedVisible:SecurityColumnKey[]=(typeof value.version==='number'&&value.version>=2)||visible.includes('todayChange')?visible:[...visible,'todayChange']
           return{order,visible:migratedVisible,version:COLUMN_PREFERENCES_VERSION}
         }
       }
@@ -94,7 +95,7 @@ function SortHeader({label,column,sortKey,direction,onSort}:{label:string;column
 function ColumnChooserRow({column,index,count,visible,lastVisible,onToggle,onMove}:{column:SecurityColumnDefinition;index:number;count:number;visible:boolean;lastVisible:boolean;onToggle():void;onMove(offset:number):void}) {
   return <li role="none" className="column-chooser-row">
     <button type="button" className="column-visibility-toggle" role="menuitemcheckbox" aria-checked={visible} aria-disabled={lastVisible} onClick={onToggle}>
-      <span className="column-check">{visible&&<Icon icon="tick" size={13}/>}</span><span>{column.label}</span>{column.template&&<small aria-hidden="true">Link</small>}
+      <span className="column-check">{visible&&<Icon icon="tick" size={13}/>}</span><span>{column.label}</span>
     </button>
     <Button variant="minimal" size="small" icon="arrow-up" aria-label={`Move ${column.label} up`} disabled={index===0} onClick={()=>onMove(-1)}/>
     <Button variant="minimal" size="small" icon="arrow-down" aria-label={`Move ${column.label} down`} disabled={index===count-1} onClick={()=>onMove(1)}/>
@@ -138,8 +139,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   useEffect(()=>{const clear=(event:KeyboardEvent)=>{if(event.key==='Escape'){selectionAnchorId.current=null;setSelectedSecurityIds(new Set())}};document.addEventListener('keydown',clear);return()=>document.removeEventListener('keydown',clear)},[])
   useEffect(()=>{localStorage.setItem(COLUMN_PREFERENCES_KEY,JSON.stringify(preferences))},[preferences])
 
-  const linkColumns:SecurityColumnDefinition[]=app.securityLinkTemplates.map((template)=>({key:`link:${template.id}`,label:template.linkText,template}))
-  const availableColumns=[...BUILTIN_COLUMNS,...linkColumns]
+  const availableColumns=BUILTIN_COLUMNS.filter((column)=>column.key!=='links'||app.securityLinkTemplates.length>0)
   const availableKeys=availableColumns.map((column)=>column.key)
   const orderedColumns=[...availableColumns].toSorted((left,right)=>{
     const leftIndex=preferences.order.indexOf(left.key),rightIndex=preferences.order.indexOf(right.key)
@@ -175,8 +175,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     if(column.key==='name')return{text:security.name}
     if(column.key==='currency')return{text:security.currency}
     if(column.key==='todayChange')return{text:formatTodayPriceChange(todayChanges[security.id]??0)}
-    const url=column.template?resolveSecurityLink(column.template,security):null
-    return{text:url??'',href:url??undefined}
+    return{text:app.securityLinkTemplates.map((template)=>resolveSecurityLink(template,security)).filter(Boolean).join(' | ')}
   }))}
   const csvExport=exportTableAsCsv(tableForExport)
   const runExport=async(action:()=>Promise<void|boolean>,success:string)=>{setExportStatus('');try{if(await action()!==false)setExportStatus(success)}catch(reason){setExportStatus(`Export failed: ${reason instanceof Error?reason.message:String(reason)}`)}}
@@ -201,8 +200,8 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
       const change=todayChanges[security.id]??0
       return <td className={`security-daily-change${change>0?' positive':change<0?' negative':''}`} key={column.key} aria-label={formatTodayPriceChange(change)}><span className="security-change-display"><span aria-hidden="true">{change>0?'▲':change<0?'▼':'—'}</span><span className="security-change-value">{Math.abs(change).toFixed(2)}%</span></span></td>
     }
-    const url=column.template?resolveSecurityLink(column.template,security):null
-    return <td className="security-link-cell" key={column.key}><Button variant="minimal" size="small" icon="share" text="Open" aria-label={`Open ${column.label}`} disabled={!url} title={url?`Open ${column.label}`:`Set an Alternative ID to use ${column.label}`} onClick={(event)=>{event.stopPropagation();if(url)void openExternalUrl(url)}}/></td>
+    const links=app.securityLinkTemplates.flatMap((template)=>{const url=resolveSecurityLink(template,security);return url?[{...template,url}]:[]})
+    return <td className="security-link-cell" key={column.key}><div className="security-table-links">{links.length?links.map((link)=><Button key={link.id} variant="minimal" size="small" icon={<SecurityLinkIcon path={link.faviconPath}/>} aria-label={`Open ${link.linkText}`} title={link.url} onDoubleClick={(event)=>event.stopPropagation()} onClick={(event)=>{event.stopPropagation();void openExternalUrl(link.url)}}/>):'—'}</div></td>
   }
 
   const searching=searchQuery.trim().length>0

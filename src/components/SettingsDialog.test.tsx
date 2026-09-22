@@ -4,6 +4,8 @@ import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
 import { SettingsDialog } from './SettingsDialog'
 
+vi.mock('../utils/securityLinkFavicons',async(importOriginal)=>({...await importOriginal<typeof import('../utils/securityLinkFavicons')>(),fetchSecurityLinkFavicon:vi.fn(async()=> 'favicons/test.ico')}))
+
 describe('SettingsDialog navigation',()=>{
   afterEach(()=>{cleanup();localStorage.clear()})
 
@@ -38,7 +40,7 @@ describe('SettingsDialog navigation',()=>{
     fireEvent.click(screen.getByRole('button',{name:'Save'}))
 
     await waitFor(()=>expect(onClose).toHaveBeenCalled())
-    expect(await repository.listSecurityLinkTemplates()).toEqual([expect.objectContaining({linkText:'Yahoo Finance',urlPattern:'https://finance.yahoo.com/quote/{SYMBOL}',sortOrder:0})])
+    expect(await repository.listSecurityLinkTemplates()).toEqual([expect.objectContaining({linkText:'Yahoo Finance',urlPattern:'https://finance.yahoo.com/quote/{SYMBOL}',sortOrder:0,faviconPath:'favicons/test.ico'})])
   })
 
   it('persists the security-name display mode from General settings',async()=>{

@@ -208,13 +208,13 @@ export class TauriRepository implements EquityRepository {
   async listOrphanedEditorImages(before:string) { const rows=await this.db.select<DbRow[]>('SELECT id,owner_type,owner_id,original_filename,storage_path,mime_type,file_size,sha256,orphaned_at,created_at,updated_at FROM editor_images WHERE orphaned_at IS NOT NULL AND orphaned_at<$1 ORDER BY orphaned_at',[before]);return rows.map(mapEditorImage) }
   async deleteEditorImage(id:string) { await this.db.execute('DELETE FROM editor_images WHERE id=$1',[id]) }
   async listSecurityLinkTemplates():Promise<SecurityLinkTemplate[]> {
-    const rows=await this.db.select<DbRow[]>('SELECT id,link_text,url_pattern,sort_order FROM security_link_templates ORDER BY sort_order,id')
-    return rows.map((row)=>({id:String(row.id),linkText:String(row.link_text),urlPattern:String(row.url_pattern),sortOrder:Number(row.sort_order)}))
+    const rows=await this.db.select<DbRow[]>('SELECT id,link_text,url_pattern,sort_order,favicon_path FROM security_link_templates ORDER BY sort_order,id')
+    return rows.map((row)=>({id:String(row.id),faviconPath:row.favicon_path?String(row.favicon_path):undefined,linkText:String(row.link_text),urlPattern:String(row.url_pattern),sortOrder:Number(row.sort_order)}))
   }
   async saveSecurityLinkTemplates(templates:SecurityLinkTemplate[]) {
     const cleaned=templates.map(cleanSecurityLinkTemplate)
     const existing=await this.listSecurityLinkTemplates()
-    for (const template of cleaned) await this.db.execute('INSERT INTO security_link_templates (id,link_text,url_pattern,sort_order) VALUES ($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET link_text=excluded.link_text,url_pattern=excluded.url_pattern,sort_order=excluded.sort_order',[template.id,template.linkText,template.urlPattern,template.sortOrder])
+    for (const template of cleaned) await this.db.execute('INSERT INTO security_link_templates (id,link_text,url_pattern,sort_order,favicon_path) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(id) DO UPDATE SET link_text=excluded.link_text,url_pattern=excluded.url_pattern,sort_order=excluded.sort_order,favicon_path=excluded.favicon_path',[template.id,template.linkText,template.urlPattern,template.sortOrder,template.faviconPath??null])
     const retained=new Set(cleaned.map((template)=>template.id))
     for (const template of existing) if (!retained.has(template.id)) await this.db.execute('DELETE FROM security_link_templates WHERE id=$1',[template.id])
     return cleaned

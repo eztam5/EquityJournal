@@ -9,10 +9,10 @@ const MAX_IMAGE_SIZE=10*1024*1024
 export const EDITOR_IMAGE_ORPHAN_GRACE_MS=7*24*60*60*1000
 
 function openBrowserDb(){return new Promise<IDBDatabase>((resolve,reject)=>{const request=indexedDB.open(BROWSER_DB,1);request.onupgradeneeded=()=>request.result.createObjectStore(BROWSER_STORE);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}
-function browserFileOperation<T>(mode:IDBTransactionMode,operation:(store:IDBObjectStore)=>IDBRequest<T>){const dbPromise=openBrowserDb();return dbPromise.then((db)=>new Promise<T>((resolve,reject)=>{const transaction=db.transaction(BROWSER_STORE,mode),request=operation(transaction.objectStore(BROWSER_STORE));request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);transaction.oncomplete=()=>db.close()}))}
+export function browserFileOperation<T>(mode:IDBTransactionMode,operation:(store:IDBObjectStore)=>IDBRequest<T>){const dbPromise=openBrowserDb();return dbPromise.then((db)=>new Promise<T>((resolve,reject)=>{const transaction=db.transaction(BROWSER_STORE,mode),request=operation(transaction.objectStore(BROWSER_STORE));request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);transaction.oncomplete=()=>db.close()}))}
 function fileNameFromPath(path:string){return path.split(/[\\/]/).pop()||'image'}
 async function readSource(source:EditorImageSource){if(source.kind==='file')return{filename:source.file.name||'pasted-image',bytes:new Uint8Array(await source.file.arrayBuffer())};const{readFile}=await import('@tauri-apps/plugin-fs');return{filename:fileNameFromPath(source.path),bytes:await readFile(source.path)}}
-function imageFormat(bytes:Uint8Array):{mimeType:string;extension:string}|undefined{
+export function imageFormat(bytes:Uint8Array):{mimeType:string;extension:string}|undefined{
   if(bytes.length>=8&&[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((value,index)=>bytes[index]===value))return{mimeType:'image/png',extension:'png'}
   if(bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)return{mimeType:'image/jpeg',extension:'jpg'}
   const header=String.fromCharCode(...bytes.slice(0,12))

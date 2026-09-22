@@ -19,6 +19,7 @@ export interface SecurityPrice {
 }
 
 export interface SecurityLinkTemplate {
+  faviconPath?: string
   id: string
   linkText: string
   urlPattern: string

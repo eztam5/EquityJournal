@@ -20,11 +20,11 @@ describe('sortSecurities',()=>{
   })
   it('loads valid visible-column preferences in table order',()=>{
     localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['currency','link:yahoo','symbol'],visible:['currency','link:yahoo','symbol']}))
-    expect(loadVisibleSecurityColumns()).toEqual(['currency','link:yahoo','symbol','todayChange'])
+    expect(loadVisibleSecurityColumns()).toEqual(['currency','links','symbol','todayChange'])
   })
   it('loads ordered column preferences',()=>{
     localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['name','link:yahoo','symbol'],visible:['link:yahoo','name']}))
-    expect(loadSecurityColumnPreferences()).toEqual({order:['name','link:yahoo','symbol','alternativeId','currency','todayChange'],visible:['link:yahoo','name','todayChange'],version:2})
+    expect(loadSecurityColumnPreferences()).toEqual({order:['name','links','symbol','alternativeId','currency','todayChange'],visible:['links','name','todayChange'],version:3})
   })
 })
 
