@@ -199,7 +199,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     if(column.key==='currency')return <td key={column.key}>{security.currency}</td>
     if(column.key==='todayChange'){
       const change=todayChanges[security.id]??0
-      return <td className={`security-daily-change${change>0?' positive':change<0?' negative':''}`} key={column.key}>{formatTodayPriceChange(change)}</td>
+      return <td className={`security-daily-change${change>0?' positive':change<0?' negative':''}`} key={column.key} aria-label={formatTodayPriceChange(change)}><span className="security-change-display"><span aria-hidden="true">{change>0?'▲':change<0?'▼':'—'}</span><span className="security-change-value">{Math.abs(change).toFixed(2)}%</span></span></td>
     }
     const url=column.template?resolveSecurityLink(column.template,security):null
     return <td className="security-link-cell" key={column.key}><Button variant="minimal" size="small" icon="share" text="Open" aria-label={`Open ${column.label}`} disabled={!url} title={url?`Open ${column.label}`:`Set an Alternative ID to use ${column.label}`} onClick={(event)=>{event.stopPropagation();if(url)void openExternalUrl(url)}}/></td>

@@ -152,11 +152,11 @@ describe('SecuritiesView visible columns',()=>{
     await repository.saveSecurityPrices(security.id,'AAPL','USD',[{priceDate:previous,close:100,adjustedClose:100},{priceDate:today,close:105,adjustedClose:105}])
     render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
 
-    expect(await screen.findByText('+5.00%')).toHaveClass('positive')
+    expect(await screen.findByRole('cell',{name:'+5.00%'})).toHaveClass('positive')
     await repository.saveSecurityPrices(security.id,'AAPL','USD',[{priceDate:today,close:95,adjustedClose:95}])
     window.dispatchEvent(new CustomEvent(PRICE_HISTORY_CHANGED_EVENT,{detail:{securityIds:[security.id]}}))
 
-    expect(await screen.findByText('-5.00%')).toHaveClass('negative')
+    expect(await screen.findByRole('cell',{name:'-5.00%'})).toHaveClass('negative')
   })
 
   it('filters All Securities by symbol or company name without querying again',async()=>{
