@@ -1,3 +1,5 @@
+import { trackPriceActivity } from './priceActivity'
+
 export interface YahooPricePoint {
   timestamp: number
   close: number
@@ -29,7 +31,11 @@ function normalizeHistory(value:YahooPriceHistory):YahooPriceHistory {
   return {...value,symbol:value.symbol.toUpperCase(),prices}
 }
 
-export async function fetchYahooPriceHistory(symbol:string,range:'1d'|'1mo'|'10y'='10y'):Promise<YahooPriceHistory> {
+export function fetchYahooPriceHistory(symbol:string,range:'1d'|'1mo'|'10y'='10y'):Promise<YahooPriceHistory> {
+  return trackPriceActivity(()=>loadYahooPriceHistory(symbol,range))
+}
+
+async function loadYahooPriceHistory(symbol:string,range:'1d'|'1mo'|'10y'):Promise<YahooPriceHistory> {
   const normalized=symbol.trim().toUpperCase()
   if(!normalized)throw new Error('Enter a Yahoo Finance symbol first.')
   if(isTauriDesktop()){

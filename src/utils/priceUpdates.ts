@@ -1,3 +1,4 @@
+import { trackPriceActivity } from './priceActivity'
 import type { EquityRepository } from '../data/repository'
 import type { Security } from '../domain/types'
 import { fetchYahooPriceHistory, yahooTimestampDate, type YahooPriceHistory } from './yahooFinance'
@@ -27,7 +28,11 @@ export interface PriceUpdateResult {
   failures:Array<{securityId:string;symbol:string;message:string}>
 }
 
-export async function updateLatestSecurityPrices(repository:EquityRepository,securities:Security[],fetcher:PriceFetcher=fetchYahooPriceHistory):Promise<PriceUpdateResult> {
+export function updateLatestSecurityPrices(repository:EquityRepository,securities:Security[],fetcher:PriceFetcher=fetchYahooPriceHistory):Promise<PriceUpdateResult> {
+  return trackPriceActivity(()=>runUpdateLatestSecurityPrices(repository,securities,fetcher))
+}
+
+async function runUpdateLatestSecurityPrices(repository:EquityRepository,securities:Security[],fetcher:PriceFetcher=fetchYahooPriceHistory):Promise<PriceUpdateResult> {
   const updatedSecurityIds:string[]=[],failures:PriceUpdateResult['failures']=[]
   for(const security of securities){
     try{
@@ -40,7 +45,11 @@ export async function updateLatestSecurityPrices(repository:EquityRepository,sec
   return {updatedSecurityIds,failures}
 }
 
-export async function ensureSecurityPriceHistory(repository:EquityRepository,security:Security,fetcher:HistoryFetcher=fetchYahooPriceHistory):Promise<boolean> {
+export function ensureSecurityPriceHistory(repository:EquityRepository,security:Security,fetcher:HistoryFetcher=fetchYahooPriceHistory):Promise<boolean> {
+  return trackPriceActivity(()=>runEnsureSecurityPriceHistory(repository,security,fetcher))
+}
+
+async function runEnsureSecurityPriceHistory(repository:EquityRepository,security:Security,fetcher:HistoryFetcher=fetchYahooPriceHistory):Promise<boolean> {
   const symbol=security.symbol.trim().toUpperCase()
   const cached=(await repository.listSecurityPrices(security.id)).filter((price)=>price.sourceSymbol.toUpperCase()===symbol)
   if(cached.length>=2)return false
@@ -49,7 +58,11 @@ export async function ensureSecurityPriceHistory(repository:EquityRepository,sec
   return true
 }
 
-export async function catchUpMissingSecurityPrices(repository:EquityRepository,securities:Security[],today:string,fetcher:CatchUpFetcher=fetchYahooPriceHistory):Promise<PriceUpdateResult> {
+export function catchUpMissingSecurityPrices(repository:EquityRepository,securities:Security[],today:string,fetcher:CatchUpFetcher=fetchYahooPriceHistory):Promise<PriceUpdateResult> {
+  return trackPriceActivity(()=>runCatchUpMissingSecurityPrices(repository,securities,today,fetcher))
+}
+
+async function runCatchUpMissingSecurityPrices(repository:EquityRepository,securities:Security[],today:string,fetcher:CatchUpFetcher=fetchYahooPriceHistory):Promise<PriceUpdateResult> {
   const updatedSecurityIds:string[]=[],failures:PriceUpdateResult['failures']=[]
   for(const security of securities){
     try{

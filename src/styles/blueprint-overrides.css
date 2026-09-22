@@ -318,3 +318,11 @@ table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-com
 
 .security-table-links { display: flex; align-items: center; gap: 1px; }
 .security-table-links .bp6-button.bp6-small { min-width: 18px; padding: 0 1px; }
+
+.sidebar { display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-navigation { flex: 1; min-height: 0; overflow-y: auto; }
+.sidebar-price-status { flex: none; height: 12px; padding-top: 9px; }
+.sidebar-price-progress { width: 76px; height: 3px; overflow: hidden; border-radius: 2px; background: var(--border); }
+.sidebar-price-progress > span { display: block; width: 30px; height: 100%; border-radius: inherit; background: var(--accent); animation: sidebar-price-loading 1.2s ease-in-out infinite; }
+@keyframes sidebar-price-loading { from { transform: translateX(-30px); } to { transform: translateX(76px); } }
+@media (prefers-reduced-motion: reduce) { .sidebar-price-progress > span { animation: none; transform: translateX(23px); } }
