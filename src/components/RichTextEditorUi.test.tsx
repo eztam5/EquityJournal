@@ -57,4 +57,35 @@ describe('RichTextEditor internal reference picker',()=>{
     await waitFor(()=>expect(onChange).toHaveBeenCalled())
     expect(onChange.mock.calls.at(-1)?.[0]).toContain('<h3>Supporting detail</h3>')
   })
+
+  it('removes a pasted font family when applying a heading preset',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const onChange=vi.fn()
+    render(<AppProvider repository={repository}><RichTextEditor content={'<p><span style="font-family: Comic Sans MS; color: rgb(194, 85, 85)">Pasted research</span></p>'} onChange={onChange}/></AppProvider>)
+    const editor=document.querySelector<HTMLElement>('.rich-editor')!
+    fireEvent.keyDown(editor,{key:'a',ctrlKey:true})
+
+    fireEvent.change(await screen.findByRole('combobox',{name:'Paragraph style'}),{target:{value:'h2'}})
+
+    await waitFor(()=>expect(onChange).toHaveBeenCalled())
+    const html=onChange.mock.calls.at(-1)?.[0] as string
+    expect(html).toContain('<h2>')
+    expect(html).not.toContain('font-family')
+    expect(html).toContain('color: rgb(194, 85, 85)')
+  })
+
+  it('removes a pasted font family when applying a block quote',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const onChange=vi.fn()
+    render(<AppProvider repository={repository}><RichTextEditor content={'<p><span style="font-family: Georgia">Quoted research</span></p>'} onChange={onChange}/></AppProvider>)
+    const editor=document.querySelector<HTMLElement>('.rich-editor')!
+    fireEvent.keyDown(editor,{key:'a',ctrlKey:true})
+
+    fireEvent.click(await screen.findByRole('button',{name:'Block quote'}))
+
+    await waitFor(()=>expect(onChange).toHaveBeenCalled())
+    const html=onChange.mock.calls.at(-1)?.[0] as string
+    expect(html).toContain('<blockquote>')
+    expect(html).not.toContain('font-family')
+  })
 })
