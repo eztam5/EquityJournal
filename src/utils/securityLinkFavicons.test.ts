@@ -1,11 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchSecurityLinkFavicon, securityLinkOrigin } from './securityLinkFavicons'
+import { fetchSecurityLinkFavicon, securityLinkOrigin, storeSecurityLinkFavicon } from './securityLinkFavicons'
 const {invoke}=vi.hoisted(()=>({invoke:vi.fn()}))
 vi.mock('@tauri-apps/api/core',()=>({invoke}))
 afterEach(()=>{vi.clearAllMocks();delete (window as unknown as Record<string,unknown>).__TAURI_INTERNALS__})
 const bytes=(text:string)=>Array.from(new TextEncoder().encode(text))
 
 describe('security link favicons',()=>{
+  it('stores manually supplied icons in the managed favicon folder',async()=>{
+    Object.assign(window,{__TAURI_INTERNALS__:{}})
+    invoke.mockResolvedValue('favicons/manual.png')
+    const png=new Uint8Array([137,80,78,71,13,10,26,10])
+    expect(await storeSecurityLinkFavicon(png)).toBe('favicons/manual.png')
+    expect(invoke).toHaveBeenCalledWith('store_favicon',{id:expect.any(String),bytes:Array.from(png)})
+  })
+  it('rejects unsupported and oversized uploads before writing files',async()=>{
+    await expect(storeSecurityLinkFavicon(new Uint8Array([1,2,3]))).rejects.toThrow('Choose an ICO')
+    await expect(storeSecurityLinkFavicon(new Uint8Array(1024*1024+1))).rejects.toThrow('1 MB')
+    expect(invoke).not.toHaveBeenCalled()
+  })
   it('extracts the origin without substituting ticker placeholders',()=>{
     expect(securityLinkOrigin('https://finance.example.com/quote/{SYMBOL}?id={ALTERNATIVE_ID}')).toBe('https://finance.example.com')
     expect(securityLinkOrigin('javascript:alert(1)')).toBeNull()

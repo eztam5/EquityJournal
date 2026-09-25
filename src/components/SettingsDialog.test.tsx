@@ -2,12 +2,13 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppProvider } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
+import { uploadSecurityLinkFavicon } from '../utils/securityLinkFavicons'
 import { SettingsDialog } from './SettingsDialog'
 
-vi.mock('../utils/securityLinkFavicons',async(importOriginal)=>({...await importOriginal<typeof import('../utils/securityLinkFavicons')>(),fetchSecurityLinkFavicon:vi.fn(async()=> 'favicons/test.ico')}))
+vi.mock('../utils/securityLinkFavicons',async(importOriginal)=>({...await importOriginal<typeof import('../utils/securityLinkFavicons')>(),fetchSecurityLinkFavicon:vi.fn(async()=> 'favicons/test.ico'),uploadSecurityLinkFavicon:vi.fn()}))
 
 describe('SettingsDialog navigation',()=>{
-  afterEach(()=>{cleanup();localStorage.clear()})
+  afterEach(()=>{cleanup();localStorage.clear();vi.mocked(uploadSecurityLinkFavicon).mockReset()})
 
   it('opens on General and navigates to Database Connection',()=>{
     render(<AppProvider repository={new LocalRepository()}><SettingsDialog isOpen onClose={vi.fn()}/></AppProvider>)
@@ -41,6 +42,31 @@ describe('SettingsDialog navigation',()=>{
 
     await waitFor(()=>expect(onClose).toHaveBeenCalled())
     expect(await repository.listSecurityLinkTemplates()).toEqual([expect.objectContaining({linkText:'Yahoo Finance',urlPattern:'https://finance.yahoo.com/quote/{SYMBOL}',sortOrder:0,faviconPath:'favicons/test.ico'})])
+  })
+
+  it('saves a manually uploaded icon instead of fetching another one',async()=>{
+    const repository=new LocalRepository();await repository.initialize();const onClose=vi.fn()
+    await repository.saveSecurityLinkTemplates([{id:'roic',linkText:'ROIC',urlPattern:'https://www.roic.ai/quote/{SYMBOL}',sortOrder:0}])
+    vi.mocked(uploadSecurityLinkFavicon).mockResolvedValue('favicons/manual.png')
+    render(<AppProvider repository={repository}><SettingsDialog isOpen onClose={onClose}/></AppProvider>)
+    fireEvent.click(screen.getByRole('button',{name:'Security Links'}))
+    fireEvent.click(await screen.findByRole('button',{name:'Upload icon for ROIC'}))
+    await waitFor(()=>expect(screen.getByRole('button',{name:'Save'})).toBeEnabled())
+    fireEvent.click(screen.getByRole('button',{name:'Save'}))
+    await waitFor(()=>expect(onClose).toHaveBeenCalled())
+    expect((await repository.listSecurityLinkTemplates())[0].faviconPath).toBe('favicons/manual.png')
+  })
+
+  it('shows upload errors and preserves the existing icon',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.saveSecurityLinkTemplates([{id:'roic',linkText:'ROIC',urlPattern:'https://www.roic.ai/quote/{SYMBOL}',sortOrder:0,faviconPath:'favicons/existing.ico'}])
+    vi.mocked(uploadSecurityLinkFavicon).mockRejectedValue(new Error('Icons must be 1 MB or smaller.'))
+    render(<AppProvider repository={repository}><SettingsDialog isOpen onClose={vi.fn()}/></AppProvider>)
+    fireEvent.click(screen.getByRole('button',{name:'Security Links'}))
+    fireEvent.click(await screen.findByRole('button',{name:'Upload icon for ROIC'}))
+    expect(await screen.findByText('Icons must be 1 MB or smaller.')).toBeInTheDocument()
+    expect(screen.getByRole('button',{name:'Save'})).toBeEnabled()
+    expect((await repository.listSecurityLinkTemplates())[0].faviconPath).toBe('favicons/existing.ico')
   })
 
   it('persists the security-name display mode from General settings',async()=>{
