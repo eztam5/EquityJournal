@@ -37,6 +37,24 @@ describe('Sidebar taxonomy navigation',()=>{
     expect(screen.queryByText('Software')).not.toBeInTheDocument()
   })
 
+  it('opens the owning taxonomy from parent and leaf tags without toggling the tree',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const taxonomy=await repository.addTaxonomy({name:'Research Workflow',description:'',color:'#4F7CAC'})
+    const backlog=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Backlog',description:'',color:taxonomy.color})
+    await repository.addTag({taxonomyId:taxonomy.id,parentId:backlog.id,name:'Deep dive now',description:'',color:taxonomy.color})
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/></AppProvider>)
+    fireEvent.click(await screen.findByRole('button',{name:'Expand Research Workflow'}))
+    fireEvent.click(await screen.findByRole('button',{name:'Backlog'}))
+    expect(screen.getByRole('button',{name:'Research Workflow'})).toHaveClass('active')
+    expect(screen.queryByRole('button',{name:'Deep dive now'})).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'All Securities'}))
+    fireEvent.click(screen.getByRole('button',{name:'Expand Backlog'}))
+    expect(screen.getByRole('button',{name:'Research Workflow'})).not.toHaveClass('active')
+    fireEvent.click(screen.getByRole('button',{name:'Deep dive now'}))
+    expect(screen.getByRole('button',{name:'Research Workflow'})).toHaveClass('active')
+    expect(screen.getByRole('button',{name:'Collapse Backlog'})).toBeInTheDocument()
+  })
+
   it('uses the configured company-name-only labels in its taxonomy tree',async()=>{
     localStorage.setItem('equity-journal.security-display-mode','name-only')
     const repository=new LocalRepository();await repository.initialize()
