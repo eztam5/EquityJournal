@@ -58,6 +58,24 @@ describe('RichTextEditor internal reference picker',()=>{
     expect(onChange.mock.calls.at(-1)?.[0]).toContain('<h3>Supporting detail</h3>')
   })
 
+  it('normalizes clipboard fonts, colors, sizes and spacing while keeping document structure',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const onChange=vi.fn()
+    render(<AppProvider repository={repository}><RichTextEditor content="" onChange={onChange}/></AppProvider>)
+    const editor=document.querySelector<HTMLElement>('.rich-editor')!
+    const html='<h2 style="font-family: Georgia; font-size: 48px">Research</h2><p class="source" style="line-height: 3; margin-left: 60px"><font face="Arial" size="7" color="red"><span style="font-family: Georgia; font-size: 36px; color: red; background-color: yellow; font-weight: 700; font-style: italic">Cash flow</span></font> <a href="https://example.com">Source</a> <mark data-color="yellow">Highlighted</mark></p><ul><li>First point</li></ul>'
+    fireEvent.paste(editor,{clipboardData:{files:[],getData:(type:string)=>type==='text/html'?html:''}})
+    await waitFor(()=>expect(onChange).toHaveBeenCalled())
+    const saved=onChange.mock.calls.at(-1)?.[0] as string
+    expect(saved).toContain('<h2>Research</h2>')
+    expect(saved).toContain('<strong>')
+    expect(saved).toContain('<em>')
+    expect(saved).toContain('href="https://example.com"')
+    expect(saved).toContain('<ul><li><p>First point</p></li></ul>')
+    expect(saved).toContain('Highlighted')
+    expect(saved).not.toMatch(/font-family|font-size|color|background|line-height|margin-left|<mark|<font/)
+  })
+
   it('removes a pasted font family when applying a heading preset',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const onChange=vi.fn()
