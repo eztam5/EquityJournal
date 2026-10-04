@@ -104,6 +104,7 @@ function ColumnChooserRow({column,index,count,visible,lastVisible,onToggle,onMov
 
 export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const app=useApp()
+  const page=useRef<HTMLElement>(null)
   const[rows,setRows]=useState<Security[]>([])
   const[todayChanges,setTodayChanges]=useState<Record<string,number>>({})
   const[creating,setCreating]=useState(false)
@@ -120,6 +121,18 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const hoveredWatchlistId=useRef<string|null>(null)
   const suppressSelectionClick=useRef(false)
   const selectionAnchorId=useRef<string|null>(null)
+
+  useEffect(()=>{
+    const container=page.current
+    const header=container?.querySelector<HTMLElement>('.securities-page-header')
+    if(!container||!header)return
+    const updateHeaderHeight=()=>container.style.setProperty('--securities-header-height',`${header.getBoundingClientRect().height}px`)
+    updateHeaderHeight()
+    if(typeof ResizeObserver==='undefined')return
+    const observer=new ResizeObserver(updateHeaderHeight)
+    observer.observe(header)
+    return()=>observer.disconnect()
+  },[])
 
   useEffect(()=>{app.repository.listSecurities(watchlistId).then(setRows)},[app.repository,app.securities,watchlistId])
   useEffect(()=>{
@@ -206,7 +219,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
 
   const searching=searchQuery.trim().length>0
   const description=searching?`${filteredRows.length} of ${rows.length} ${rows.length===1?'security':'securities'}`:`${rows.length} ${rows.length===1?'security':'securities'}`
-  return <main className="content page"><PageHeader className="securities-page-header" title={title} description={<>{description}{exportStatus&&<span className="export-status" role="status"> · {exportStatus}</span>}</>} actions={<PageToolbarIconBar label="Security controls"><InputGroup className="security-search" type="search" autoCorrect="off" autoComplete="off" autoCapitalize="none" spellCheck={false} leftIcon="search" placeholder="Search securities" aria-label="Search securities" value={searchQuery} onChange={(event)=>setSearchQuery(event.target.value)} rightElement={searchQuery?<Button variant="minimal" icon="cross" aria-label="Clear search" onClick={()=>setSearchQuery('')}/>:undefined}/><PageToolbarIconButton icon="add" label="New security" onClick={()=>setCreating(true)}/><PopoverNext content={exportMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="export" label="Export"/></PopoverNext><PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="properties" label="Columns"/></PopoverNext></PageToolbarIconBar>}/>
+  return <main ref={page} className="content page securities-page"><PageHeader className="securities-page-header" title={title} description={<>{description}{exportStatus&&<span className="export-status" role="status"> · {exportStatus}</span>}</>} actions={<PageToolbarIconBar label="Security controls"><InputGroup className="security-search" type="search" autoCorrect="off" autoComplete="off" autoCapitalize="none" spellCheck={false} leftIcon="search" placeholder="Search securities" aria-label="Search securities" value={searchQuery} onChange={(event)=>setSearchQuery(event.target.value)} rightElement={searchQuery?<Button variant="minimal" icon="cross" aria-label="Clear search" onClick={()=>setSearchQuery('')}/>:undefined}/><PageToolbarIconButton icon="add" label="New security" onClick={()=>setCreating(true)}/><PopoverNext content={exportMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="export" label="Export"/></PopoverNext><PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="properties" label="Columns"/></PopoverNext></PageToolbarIconBar>}/>
     <div className="content-panel data-card"><HTMLTable className="security-table" compact interactive striped><thead><tr>{visibleColumns.map(renderHeader)}<th aria-label="Actions"/></tr></thead><tbody>{sortedRows.map((security)=>{const selected=selectedSecurityIds.has(security.id);return <tr key={security.id} className={`security-draggable-row ${selected?'security-selected':''}`} aria-selected={selected} onClick={(event)=>selectSecurity(event,security)} onPointerDown={(event)=>startSecurityDrag(event,security)} onPointerMove={moveSecurityDrag} onPointerUp={(event)=>void finishSecurityDrag(event)} onPointerCancel={resetSecurityDrag} onDoubleClick={()=>app.openSecurity(security.id)} onContextMenu={(event)=>openMenu(event,security)}>{visibleColumns.map((column)=>renderCell(column,security))}<td><PopoverNext content={securityMenu(security)} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button variant="minimal" size="small" icon="more" aria-label={`Actions for ${security.name}`}/></PopoverNext></td></tr>})}</tbody></HTMLTable>{rows.length===0?<div className="empty-state">No securities yet.</div>:searching&&filteredRows.length===0?<div className="empty-state">No securities match “{searchQuery.trim()}”.</div>:null}</div>
     {creating&&<SecurityForm onClose={()=>setCreating(false)}/>} {editing&&<SecurityForm security={editing} onClose={()=>setEditing(undefined)}/>} {deleting&&<ConfirmDialog title="Delete security" message={`Permanently delete ${deleting.name} from the database?`} confirmLabel="Delete" onClose={()=>setDeleting(undefined)} onConfirm={()=>app.deleteSecurity(deleting.id)}/>}
   </main>
