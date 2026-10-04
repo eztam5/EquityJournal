@@ -264,6 +264,9 @@ table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-com
 .topic-tag-rules .bp6-section-header-title,
 .topic-tag-rules .bp6-control { font-size: 12px; }
 
+.content.page.taxonomy-page { height: 100%; min-height: 0; overflow: auto; }
+.taxonomy-page > .page-header { position: sticky; top: 0; z-index: 10; }
+.taxonomy-page > .taxonomy-card { overflow: visible; }
 .taxonomy-card .bp6-tree { background: transparent; font-size: 12px; }
 .taxonomy-search.bp6-input-group { width: min(300px, 42vw); flex: none; }
 .security-search.bp6-input-group { width: min(260px, 32vw); flex: none; }

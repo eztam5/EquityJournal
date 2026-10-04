@@ -140,7 +140,7 @@ export function TaxonomyView({ id }: { id: string }) {
     childNodes: model.map(convert),
   }]
 
-  return <main className="content page">
+  return <main className="content page taxonomy-page">
     <PageHeader title={taxonomy.name} description={taxonomy.description || 'Build a hierarchical classification for your research.'} actions={<PageToolbarIconBar label="Taxonomy controls"><InputGroup
       className="taxonomy-search"
       type="search"
