@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, ButtonGroup, Callout, Card, Spinner, Tooltip } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { Security, SecurityJournalEntry, SecurityPrice } from '../domain/types'
@@ -43,7 +43,21 @@ export function PriceSparkline({prices,label='Price preview'}:{prices:YahooPrice
 }
 
 function PriceChartSvg({prices,currency,securityId,journalEntries,onJournalEntryClick}:{prices:SecurityPrice[];currency:string;securityId:string;journalEntries:SecurityJournalEntry[];onJournalEntryClick?(entry:SecurityJournalEntry):void}) {
-  const values=prices.map((price)=>({date:price.priceDate,value:price.adjustedClose})),geometry=chartGeometry(values),base=values[0].value
+  const svgRef=useRef<SVGSVGElement>(null),[size,setSize]=useState({width:1000,height:320})
+  useEffect(()=>{
+    const svg=svgRef.current
+    if(!svg)return
+    const updateSize=()=>{
+      const {width,height}=svg.getBoundingClientRect()
+      if(width>146&&height>70)setSize((previous)=>previous.width===width&&previous.height===height?previous:{width,height})
+    }
+    updateSize()
+    if(typeof ResizeObserver==='undefined')return
+    const observer=new ResizeObserver(updateSize)
+    observer.observe(svg)
+    return()=>observer.disconnect()
+  },[])
+  const values=prices.map((price)=>({date:price.priceDate,value:price.adjustedClose})),geometry=chartGeometry(values,size.width,size.height),base=values[0].value
   const line=geometry.points.map((point,index)=>`${index?'L':'M'}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' '),bottomY=geometry.height-geometry.bottom,area=`${line} L${geometry.points.at(-1)!.x.toFixed(1)},${bottomY} L${geometry.points[0].x.toFixed(1)},${bottomY} Z`,gradientId=`price-area-${securityId.replace(/[^a-zA-Z0-9_-]/g,'')}`
   const yTicks=Array.from({length:5},(_,index)=>{const ratio=index/4,value=geometry.max-(geometry.max-geometry.min)*ratio;return {y:geometry.top+geometry.plotHeight*ratio,value,percent:(value/base-1)*100}})
   const xIndexes=[0,.25,.5,.75,1].map((ratio)=>Math.round((prices.length-1)*ratio)).filter((value,index,items)=>items.indexOf(value)===index)
@@ -52,13 +66,13 @@ function PriceChartSvg({prices,currency,securityId,journalEntries,onJournalEntry
     const x=geometry.left+(dateValue(entry.entryDate)-firstDate)/dateSpan*geometry.plotWidth,rightIndex=Math.max(1,geometry.points.findIndex((point)=>point.x>=x)),left=geometry.points[rightIndex-1],right=geometry.points[rightIndex]??left,ratio=right.x===left.x?0:(x-left.x)/(right.x-left.x),y=left.y+(right.y-left.y)*ratio
     return {entry,x,y}
   })
-  return <svg className="security-price-svg" viewBox="0 0 1000 320" role="img" aria-label={`Adjusted closing price in ${currency} with percentage change`}>
+  return <svg ref={svgRef} className="security-price-svg" viewBox={`0 0 ${size.width} ${size.height}`} role="img" aria-label={`Adjusted closing price in ${currency} with percentage change`}>
     <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--accent)" stopOpacity=".2"/><stop offset="1" stopColor="var(--accent)" stopOpacity="0"/></linearGradient></defs>
     {yTicks.map((tick)=><g key={tick.y}><line className="price-grid-line" x1={geometry.left} x2={geometry.width-geometry.right} y1={tick.y} y2={tick.y}/><text className="price-axis-label" x={geometry.left-10} y={tick.y+4} textAnchor="end">{formatPrice(tick.value)}</text><text className="price-axis-label" x={geometry.width-geometry.right+10} y={tick.y+4}>{tick.percent>=0?'+':''}{tick.percent.toFixed(1)}%</text></g>)}
     <path className="price-area" d={area} fill={`url(#${gradientId})`}/><path className="price-line" d={line}/>
     {markers.map(({entry,x,y})=><g key={entry.id} className="price-journal-marker" role="button" tabIndex={0} aria-label={`Open journal entry from ${entry.entryDate}`} onClick={()=>onJournalEntryClick?.(entry)} onKeyDown={(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onJournalEntryClick?.(entry)}}}><title>Journal entry · {entry.entryDate}</title><circle className="price-journal-marker-halo" cx={x} cy={y} r="8"/><circle cx={x} cy={y} r="4"/></g>)}
     {xIndexes.map((index)=><text className="price-axis-label" key={prices[index].priceDate} x={geometry.points[index].x} y={geometry.height-12} textAnchor={index===0?'start':index===prices.length-1?'end':'middle'}>{formatDate(prices[index].priceDate)}</text>)}
-    <text className="price-axis-title" x="12" y="18">{currency||'Price'}</text><text className="price-axis-title" x="988" y="18" textAnchor="end">Change</text>
+    <text className="price-axis-title" x="12" y="18">{currency||'Price'}</text><text className="price-axis-title" x={geometry.width-12} y="18" textAnchor="end">Change</text>
   </svg>
 }
 
