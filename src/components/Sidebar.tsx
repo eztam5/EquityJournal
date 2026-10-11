@@ -5,7 +5,7 @@ import type { Taxonomy, Watchlist } from '../domain/types'
 import { ConfirmDialog, TaxonomyForm, WatchlistForm } from './Forms'
 import { buildTaxonomyTreeModel, type TaxonomyTreeModelNode } from './taxonomyTreeModel'
 import { formatSecurityLabel } from '../utils/securityLabels'
-import { WATCHLIST_DRAG_HOVER_EVENT } from '../utils/watchlistSecurityDrag'
+import { CLASSIFICATION_DRAG_HOVER_EVENT, WATCHLIST_DRAG_HOVER_EVENT } from '../utils/watchlistSecurityDrag'
 import { TAXONOMY_TREE_CHANGED_EVENT } from '../utils/taxonomyTreeChanges'
 import { PriceActivityIndicator } from './PriceActivityIndicator'
 import { TaxonomyMarker } from './TaxonomyMarker'
@@ -14,6 +14,8 @@ function SectionHeader({ title, onAdd, menu }: { title: string; onAdd?: () => vo
 
 export function Sidebar({ onNewSecurity, onNewWatchlist, onNewTaxonomy, onNewTopic }: { onNewSecurity():void;onNewWatchlist():void;onNewTaxonomy():void;onNewTopic():void }) {
   const app=useApp();const[dropTarget,setDropTarget]=useState('');const[editingTaxonomy,setEditingTaxonomy]=useState<Taxonomy>();const[deletingTaxonomy,setDeletingTaxonomy]=useState<Taxonomy>();const[deletingWatchlist,setDeletingWatchlist]=useState<Watchlist>();const[renamingWatchlist,setRenamingWatchlist]=useState<Watchlist>()
+  const[classificationDropTarget,setClassificationDropTarget]=useState<string|null>(null)
+  useEffect(()=>{const update=(event:Event)=>setClassificationDropTarget((event as CustomEvent<string|null>).detail);window.addEventListener(CLASSIFICATION_DRAG_HOVER_EVENT,update);return()=>window.removeEventListener(CLASSIFICATION_DRAG_HOVER_EVENT,update)},[])
   const[expandedTaxonomyNodes,setExpandedTaxonomyNodes]=useState<Set<string>>(()=>new Set())
   const[taxonomyTrees,setTaxonomyTrees]=useState<Record<string,TaxonomyTreeModelNode[]>>({})
   const[loadingTaxonomies,setLoadingTaxonomies]=useState<Set<string>>(()=>new Set())
@@ -58,7 +60,7 @@ export function Sidebar({ onNewSecurity, onNewWatchlist, onNewTaxonomy, onNewTop
     const key=tagNodeKey(node.id),isExpanded=expandedTaxonomyNodes.has(key),hasChildren=node.children.length>0
     const style={'--taxonomy-depth':depth} as React.CSSProperties
     const marker=<TaxonomyMarker color={node.tag.color} expanded={isExpanded} expandable={hasChildren}/>
-    return <Fragment key={node.id}><div className="taxonomy-sidebar-row" style={style}>{hasChildren?<Button variant="minimal" size="small" className="taxonomy-sidebar-toggle" icon={marker} aria-label={`${isExpanded?'Collapse':'Expand'} ${node.tag.name}`} onClick={()=>toggleTag(node.id)}/>:<span className="taxonomy-sidebar-toggle-spacer">{marker}</span>}<Button fill alignText="start" variant="minimal" className="nav-item taxonomy-sidebar-label" text={node.tag.name} title={node.tag.name} onClick={()=>app.setView({type:'taxonomy',id:node.tag.taxonomyId})}/></div>{isExpanded&&node.children.map((child)=>renderTaxonomyNode(child,depth+1))}</Fragment>
+    return <Fragment key={node.id}><div className="taxonomy-sidebar-row" style={style} data-classification-tag-id={node.id} data-classification-taxonomy-id={node.tag.taxonomyId}>{hasChildren?<Button variant="minimal" size="small" className="taxonomy-sidebar-toggle" icon={marker} aria-label={`${isExpanded?'Collapse':'Expand'} ${node.tag.name}`} onClick={()=>toggleTag(node.id)}/>:<span className="taxonomy-sidebar-toggle-spacer">{marker}</span>}<Button fill alignText="start" variant="minimal" className={`nav-item taxonomy-sidebar-label ${classificationDropTarget===node.id?'drop-target':''}`} text={node.tag.name} title={node.tag.name} onClick={()=>app.setView({type:'taxonomy',id:node.tag.taxonomyId})}/></div>{isExpanded&&node.children.map((child)=>renderTaxonomyNode(child,depth+1))}</Fragment>
   }
   return <><aside className="sidebar"><div className="sidebar-navigation">
     <div className="sidebar-section"><SectionHeader title="Securities" menu={<PopoverNext content={<Menu className="sidebar-add-menu"><MenuItem icon="add" text="New security" onClick={onNewSecurity}/><MenuItem icon="folder-new" text="New watchlist" onClick={onNewWatchlist}/></Menu>} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button variant="minimal" size="small" icon="add" aria-label="Add security or watchlist"/></PopoverNext>}/>

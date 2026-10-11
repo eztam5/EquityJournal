@@ -178,6 +178,36 @@ describe('Sidebar taxonomy navigation',()=>{
     expect(await screen.findByRole('menuitem',{name:'Move up'})).toHaveAttribute('aria-disabled','true')
   })
 
+  it.each([false,true])('assigns classifications from a securities table (watchlist: %s)',async(inWatchlist)=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const apple=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    const microsoft=await repository.addSecurity({symbol:'MSFT',name:'Microsoft',currency:'USD'})
+    const watchlist=await repository.addWatchlist('Quality')
+    for(const security of [apple,microsoft])await repository.setWatchlistSecurity(watchlist.id,security.id,true)
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const existing=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Existing',description:'',color:taxonomy.color})
+    const tag=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Software',description:'',color:taxonomy.color})
+    await repository.copySecurityTag(apple.id,existing.id)
+    await repository.copySecurityTag(apple.id,tag.id)
+    render(<AppProvider repository={repository}><Sidebar onNewSecurity={vi.fn()} onNewWatchlist={vi.fn()} onNewTaxonomy={vi.fn()} onNewTopic={vi.fn()}/><SecuritiesView watchlistId={inWatchlist?watchlist.id:undefined}/></AppProvider>)
+    fireEvent.click(await screen.findByRole('button',{name:'Expand Industry'}))
+    const target=await screen.findByRole('button',{name:'Software'})
+    const row=(await screen.findByText('Apple Inc.')).closest('tr')!
+    fireEvent.click(row)
+    fireEvent.click(screen.getByText('Microsoft').closest('tr')!,{shiftKey:true})
+    class TestPointerEvent extends MouseEvent { pointerId:number;constructor(type:string,init:PointerEventInit){super(type,init);this.pointerId=init.pointerId??0} }
+    vi.stubGlobal('PointerEvent',TestPointerEvent)
+    Object.defineProperty(document,'elementFromPoint',{configurable:true,value:vi.fn(()=>target)})
+    fireEvent.pointerDown(row,{button:0,pointerId:1,clientX:10,clientY:10})
+    fireEvent.pointerMove(row,{pointerId:1,clientX:30,clientY:30})
+    expect(target).toHaveClass('drop-target')
+    fireEvent.pointerUp(row,{pointerId:1,clientX:30,clientY:30})
+    await waitFor(async()=>expect((await repository.listTaggedSecurities(taxonomy.id)).filter((item)=>item.tagId===tag.id).map((item)=>item.id).sort()).toEqual([apple.id,microsoft.id].sort()))
+    expect((await repository.listTaggedSecurities(taxonomy.id)).some((item)=>item.id===apple.id&&item.tagId===existing.id)).toBe(true)
+    expect(target).not.toHaveClass('drop-target')
+    expect(await screen.findByRole('button',{name:'Expand Software'})).toBeInTheDocument()
+  })
+
   it('adds a security to the watchlist with pointer-based dragging',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
