@@ -333,3 +333,10 @@ table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-com
 .sidebar-price-progress > span { display: block; width: 30px; height: 100%; border-radius: inherit; background: var(--accent); animation: sidebar-price-loading 1.2s ease-in-out infinite; }
 @keyframes sidebar-price-loading { from { transform: translateX(-30px); } to { transform: translateX(76px); } }
 @media (prefers-reduced-motion: reduce) { .sidebar-price-progress > span { animation: none; transform: translateX(23px); } }
+
+.security-table thead th { position: relative; }
+.security-column-resizer { position: absolute; top: 0; right: -3px; bottom: 0; width: 7px; cursor: col-resize; touch-action: none; z-index: 1; }
+.security-column-resizer:hover, .security-column-resizer:focus-visible { background: var(--accent); }
+.security-table-resized th, .security-table-resized td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.security-table-resized thead th { overflow: visible; }
+.security-table-resized .sort-header { max-width: calc(100% - 4px); overflow: hidden; }

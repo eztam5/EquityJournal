@@ -20,6 +20,7 @@ export interface SecurityColumnPreferences {
   order: SecurityColumnKey[]
   visible: SecurityColumnKey[]
   version: number
+  widths?: Partial<Record<SecurityColumnKey|'actions',number>>
 }
 
 interface SecurityColumnDefinition {
@@ -30,6 +31,8 @@ interface SecurityColumnDefinition {
 
 const COLUMN_PREFERENCES_KEY = 'equity-journal.visible-security-columns'
 const COLUMN_PREFERENCES_VERSION = 3
+const DEFAULT_COLUMN_WIDTHS={symbol:140,alternativeId:180,name:280,currency:110,todayChange:110,links:140,actions:68}
+const MIN_COLUMN_WIDTH=60
 const BUILTIN_COLUMNS: SecurityColumnDefinition[] = [
   {key:'symbol',label:'Symbol',sortKey:'symbol'},
   {key:'alternativeId',label:'Alternative ID',sortKey:'alternativeId'},
@@ -48,13 +51,17 @@ export function loadSecurityColumnPreferences(): SecurityColumnPreferences {
   try {
     const stored:unknown=JSON.parse(localStorage.getItem(COLUMN_PREFERENCES_KEY)??'null')
     if(stored&&typeof stored==='object'){
-      const value=stored as {order?:unknown;visible?:unknown;version?:unknown}
+      const value=stored as {order?:unknown;visible?:unknown;version?:unknown;widths?:unknown}
       if(Array.isArray(value.order)&&Array.isArray(value.visible)){
         const visible=uniqueColumnKeys(value.visible)
         const order=uniqueColumnKeys([...value.order,...visible,...defaults])
         if(visible.length){
           const migratedVisible:SecurityColumnKey[]=(typeof value.version==='number'&&value.version>=2)||visible.includes('todayChange')?visible:[...visible,'todayChange']
-          return{order,visible:migratedVisible,version:COLUMN_PREFERENCES_VERSION}
+          const widths:NonNullable<SecurityColumnPreferences['widths']>={}
+          if(value.widths&&typeof value.widths==='object')for(const [key,width] of Object.entries(value.widths)){
+            if((isColumnKey(key)||key==='actions')&&typeof width==='number'&&Number.isFinite(width)&&width>=MIN_COLUMN_WIDTH)widths[key]=width
+          }
+          return{order,visible:migratedVisible,version:COLUMN_PREFERENCES_VERSION,...(Object.keys(widths).length?{widths}:{})}
         }
       }
     }
@@ -88,11 +95,6 @@ export function formatTodayPriceChange(change:number):string {
   return `${change>0?'+':''}${change.toFixed(2)}%`
 }
 
-function SortHeader({label,column,sortKey,direction,onSort}:{label:string;column:SecuritySortKey;sortKey:SecuritySortKey;direction:SortDirection;onSort(column:SecuritySortKey):void}) {
-  const active=column===sortKey
-  return <th aria-sort={active?(direction==='asc'?'ascending':'descending'):'none'}><Button className="sort-header" variant="minimal" size="small" alignText="start" text={label} rightIcon={active?(direction==='asc'?'sort-asc':'sort-desc'):undefined} onClick={()=>onSort(column)}/></th>
-}
-
 function ColumnChooserRow({column,index,count,visible,lastVisible,onToggle,onMove}:{column:SecurityColumnDefinition;index:number;count:number;visible:boolean;lastVisible:boolean;onToggle():void;onMove(offset:number):void}) {
   return <li role="none" className="column-chooser-row">
     <button type="button" className="column-visibility-toggle" role="menuitemcheckbox" aria-checked={visible} aria-disabled={lastVisible} onClick={onToggle}>
@@ -117,6 +119,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const[searchQuery,setSearchQuery]=useState('')
   const[exportStatus,setExportStatus]=useState('')
   const[selectedSecurityIds,setSelectedSecurityIds]=useState<Set<string>>(()=>new Set())
+  const columnResize=useRef<{key:SecurityColumnKey|'actions';x:number;width:number;pointerId:number}|null>(null)
   const pendingDrag=useRef<{securities:Security[];pointerId:number;x:number;y:number}|null>(null)
   const draggingSecurities=useRef<Security[]>([])
   const hoveredWatchlistId=useRef<string|null>(null)
@@ -204,7 +207,32 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const columnMenu=<Menu aria-label="Visible columns" className="column-chooser">{orderedColumns.map((column,index)=><ColumnChooserRow key={column.key} column={column} index={index} count={orderedColumns.length} visible={preferences.visible.includes(column.key)} lastVisible={preferences.visible.includes(column.key)&&visibleColumns.length===1} onToggle={()=>toggleColumn(column.key)} onMove={(offset)=>moveColumn(column.key,offset)}/>)}</Menu>
   const exportMenu=<Menu aria-label="Export table" className="table-export-menu"><MenuItem icon="clipboard" text="Export as CSV to Clipboard" onClick={()=>void runExport(()=>copyTextToClipboard(csvExport),'CSV copied to clipboard')}/><MenuItem icon="th" text="Export as HTML table to Clipboard" onClick={()=>void runExport(()=>copyHtmlTableToClipboard(exportTableAsHtml(tableForExport),csvExport),'HTML table copied to clipboard')}/><MenuItem icon="floppy-disk" text="Export as CSV to File" onClick={()=>void runExport(()=>saveCsvExport(csvExport,csvFileName(title)),'CSV file saved')}/></Menu>
 
-  const renderHeader=(column:SecurityColumnDefinition)=>column.sortKey?<SortHeader key={column.key} label={column.label} column={column.sortKey} sortKey={sortKey} direction={direction} onSort={sort}/>:<th key={column.key}>{column.label}</th>
+  const startColumnResize=(event:PointerEvent<HTMLSpanElement>,key:SecurityColumnKey|'actions')=>{
+    if(event.button!==0)return
+    event.preventDefault();event.stopPropagation()
+    const table=event.currentTarget.closest('table')!
+    const widths={...preferences.widths}
+    table.querySelectorAll<HTMLElement>('thead th[data-column-key]').forEach((header)=>{
+      const column=header.dataset.columnKey as SecurityColumnKey|'actions'
+      widths[column]=Math.max(MIN_COLUMN_WIDTH,header.getBoundingClientRect().width||DEFAULT_COLUMN_WIDTHS[column])
+    })
+    columnResize.current={key,x:event.clientX,width:widths[key]!,pointerId:event.pointerId}
+    setPreferences((current)=>({...current,widths}))
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+  const resizeHandle=(key:SecurityColumnKey|'actions',label:string)=><span className="security-column-resizer" role="separator" aria-label={`Resize ${label} column`} aria-orientation="vertical" tabIndex={0}
+    onClick={(event)=>{event.preventDefault();event.stopPropagation()}}
+    onPointerDown={(event)=>startColumnResize(event,key)}
+    onPointerMove={(event)=>{const resize=columnResize.current;if(!resize||resize.pointerId!==event.pointerId)return;event.preventDefault();setPreferences((current)=>({...current,widths:{...current.widths,[key]:Math.max(MIN_COLUMN_WIDTH,resize.width+event.clientX-resize.x)}}))}}
+    onPointerUp={(event)=>{columnResize.current=null;event.currentTarget.releasePointerCapture?.(event.pointerId)}}
+    onPointerCancel={()=>{columnResize.current=null}}
+    onKeyDown={(event)=>{if(event.key!=='ArrowLeft'&&event.key!=='ArrowRight')return;event.preventDefault();setPreferences((current)=>({...current,widths:{...current.widths,[key]:Math.max(MIN_COLUMN_WIDTH,(current.widths?.[key]??DEFAULT_COLUMN_WIDTHS[key])+(event.key==='ArrowRight'?10:-10))}}))}}/>
+  const renderHeader=(column:SecurityColumnDefinition)=>{
+    const active=column.sortKey===sortKey
+    return <th key={column.key} data-column-key={column.key} aria-label={column.label} aria-sort={column.sortKey?(active?(direction==='asc'?'ascending':'descending'):'none'):undefined}>{column.sortKey?<Button className="sort-header" variant="minimal" size="small" alignText="start" text={column.label} rightIcon={active?(direction==='asc'?'sort-asc':'sort-desc'):undefined} onClick={()=>sort(column.sortKey!)}/>:column.label}{resizeHandle(column.key,column.label)}</th>
+  }
+  const sizedColumns=[...visibleColumns.map((column)=>column.key),'actions'] as Array<SecurityColumnKey|'actions'>
+  const tableWidth=preferences.widths?sizedColumns.reduce((sum,key)=>sum+(preferences.widths?.[key]??DEFAULT_COLUMN_WIDTHS[key]),0):undefined
   const renderCell=(column:SecurityColumnDefinition,security:Security)=>{
     if(column.key==='symbol')return <td className="symbol" key={column.key}>{security.symbol}</td>
     if(column.key==='alternativeId')return <td key={column.key}>{security.alternativeId||'—'}</td>
@@ -221,7 +249,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const searching=searchQuery.trim().length>0
   const description=searching?`${filteredRows.length} of ${rows.length} ${rows.length===1?'security':'securities'}`:`${rows.length} ${rows.length===1?'security':'securities'}`
   return <main ref={page} className="content page securities-page"><PageHeader className="securities-page-header" title={title} description={<>{description}{exportStatus&&<span className="export-status" role="status"> · {exportStatus}</span>}</>} actions={<PageToolbarIconBar label="Security controls"><InputGroup className="security-search" type="search" autoCorrect="off" autoComplete="off" autoCapitalize="none" spellCheck={false} leftIcon="search" placeholder="Search securities" aria-label="Search securities" value={searchQuery} onChange={(event)=>setSearchQuery(event.target.value)} rightElement={searchQuery?<Button variant="minimal" icon="cross" aria-label="Clear search" onClick={()=>setSearchQuery('')}/>:undefined}/><PageToolbarIconButton icon="add" label="New security" onClick={()=>setCreating(true)}/><PopoverNext content={exportMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="export" label="Export"/></PopoverNext><PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="properties" label="Columns"/></PopoverNext></PageToolbarIconBar>}/>
-    <div className="content-panel data-card"><HTMLTable className="security-table" compact interactive striped><thead><tr>{visibleColumns.map(renderHeader)}<th aria-label="Actions"/></tr></thead><tbody>{sortedRows.map((security)=>{const selected=selectedSecurityIds.has(security.id);return <tr key={security.id} className={`security-draggable-row ${selected?'security-selected':''}`} aria-selected={selected} onClick={(event)=>selectSecurity(event,security)} onPointerDown={(event)=>startSecurityDrag(event,security)} onPointerMove={moveSecurityDrag} onPointerUp={(event)=>void finishSecurityDrag(event)} onPointerCancel={resetSecurityDrag} onDoubleClick={()=>app.openSecurity(security.id)} onContextMenu={(event)=>openMenu(event,security)}>{visibleColumns.map((column)=>renderCell(column,security))}<td><PopoverNext content={securityMenu(security)} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button variant="minimal" size="small" icon="more" aria-label={`Actions for ${security.name}`}/></PopoverNext></td></tr>})}</tbody></HTMLTable>{rows.length===0?<div className="empty-state">No securities yet.</div>:searching&&filteredRows.length===0?<div className="empty-state">No securities match “{searchQuery.trim()}”.</div>:null}</div>
+    <div className="content-panel data-card"><HTMLTable className={`security-table ${preferences.widths?'security-table-resized':''}`} style={tableWidth?{width:tableWidth,tableLayout:'fixed'}:undefined} compact interactive striped><colgroup>{sizedColumns.map((key)=><col key={key} style={preferences.widths?{width:preferences.widths[key]??DEFAULT_COLUMN_WIDTHS[key]}:undefined}/>)}</colgroup><thead><tr>{visibleColumns.map(renderHeader)}<th aria-label="Actions" data-column-key="actions">{resizeHandle('actions','Actions')}</th></tr></thead><tbody>{sortedRows.map((security)=>{const selected=selectedSecurityIds.has(security.id);return <tr key={security.id} className={`security-draggable-row ${selected?'security-selected':''}`} aria-selected={selected} onClick={(event)=>selectSecurity(event,security)} onPointerDown={(event)=>startSecurityDrag(event,security)} onPointerMove={moveSecurityDrag} onPointerUp={(event)=>void finishSecurityDrag(event)} onPointerCancel={resetSecurityDrag} onDoubleClick={()=>app.openSecurity(security.id)} onContextMenu={(event)=>openMenu(event,security)}>{visibleColumns.map((column)=>renderCell(column,security))}<td><PopoverNext content={securityMenu(security)} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button variant="minimal" size="small" icon="more" aria-label={`Actions for ${security.name}`}/></PopoverNext></td></tr>})}</tbody></HTMLTable>{rows.length===0?<div className="empty-state">No securities yet.</div>:searching&&filteredRows.length===0?<div className="empty-state">No securities match “{searchQuery.trim()}”.</div>:null}</div>
     {creating&&<SecurityForm onClose={()=>setCreating(false)}/>} {editing&&<SecurityForm security={editing} onClose={()=>setEditing(undefined)}/>} {deleting&&<ConfirmDialog title="Delete security" message={`Permanently delete ${deleting.name} from the database?`} confirmLabel="Delete" onClose={()=>setDeleting(undefined)} onConfirm={()=>app.deleteSecurity(deleting.id)}/>}
   </main>
 }

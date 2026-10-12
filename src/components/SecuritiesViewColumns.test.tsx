@@ -13,6 +13,28 @@ function WatchlistViewHarness({watchlistId}:{watchlistId:string}) {
 describe('SecuritiesView visible columns',()=>{
   afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks()})
 
+  it('persists dragged column widths and restores them on remount',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    const view=render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    await screen.findByText('Apple Inc.')
+    class TestPointerEvent extends MouseEvent { pointerId:number;constructor(type:string,init:PointerEventInit){super(type,init);this.pointerId=init.pointerId??0} }
+    vi.stubGlobal('PointerEvent',TestPointerEvent)
+    const handle=screen.getByRole('separator',{name:'Resize Symbol column'})
+    fireEvent.pointerDown(handle,{button:0,pointerId:1,clientX:140})
+    fireEvent.pointerMove(handle,{pointerId:1,clientX:220})
+    fireEvent.pointerUp(handle,{pointerId:1,clientX:220})
+    expect(screen.getByRole('columnheader',{name:'Symbol'})).toHaveAttribute('aria-sort','ascending')
+    await waitFor(()=>expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')!).widths.symbol).toBe(220))
+    view.unmount()
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    await screen.findByText('Apple Inc.')
+    expect(document.querySelector('col')).toHaveStyle({width:'220px'})
+    fireEvent.keyDown(screen.getByRole('separator',{name:'Resize Symbol column'}),{key:'ArrowLeft'})
+    expect(document.querySelector('col')).toHaveStyle({width:'210px'})
+    vi.unstubAllGlobals()
+  })
+
   it('hides selected columns and persists the preference',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     await repository.addSecurity({symbol:'AAPL',alternativeId:'US0378331005',name:'Apple Inc.',currency:'USD'})
