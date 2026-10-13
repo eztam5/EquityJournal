@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { Button, Callout, Icon, InputGroup, Tree, type TreeNodeInfo } from '@blueprintjs/core'
+import { Button, Callout, Icon, InputGroup, Menu, MenuItem, PopoverNext, Tree, type TreeNodeInfo } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { Tag, TaggedSecurity } from '../domain/types'
 import { ConfirmDialog, TagForm, TaxonomyForm } from './Forms'
@@ -9,6 +9,7 @@ import { useTaxonomyDragAndDrop, type TaxonomyDropOperation } from './useTaxonom
 import { formatSecurityLabel } from '../utils/securityLabels'
 import { PageHeader, PageToolbarIconBar, PageToolbarIconButton } from './PageHeader'
 import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
+import { copyHtmlTableToClipboard, copyTextToClipboard, csvFileName, exportTableAsCsv, exportTableAsHtml, saveCsvExport, type ExportTable } from '../utils/tableExport'
 import { TaxonomyMarker } from './TaxonomyMarker'
 
 export function TaxonomyView({ id }: { id: string }) {
@@ -21,6 +22,7 @@ export function TaxonomyView({ id }: { id: string }) {
   const [form, setForm] = useState<{ parent?: Tag; tag?: Tag } | null>(null)
   const [editingTaxonomy, setEditingTaxonomy] = useState(false)
   const [deleting, setDeleting] = useState<Tag>()
+  const [exportStatus,setExportStatus]=useState('')
   const [interactionError, setInteractionError] = useState('')
 
   const load = useCallback(async () => {
@@ -72,6 +74,24 @@ export function TaxonomyView({ id }: { id: string }) {
   const canCollapseAll=!searching&&expandableIds.some((nodeId)=>expanded.has(nodeId))
 
   if (!taxonomy) return <main className="content page"><div className="empty-state">Taxonomy not found.</div></main>
+
+  const tableForExport:ExportTable={headers:['Type','Classification','Symbol','Alternative ID','Company','Currency','Description'],rows:[]}
+  const exportNodes=(nodes:TaxonomyTreeModelNode[],parents:string[])=>{
+    for(const node of nodes){
+      if(node.kind==='tag'){
+        const path=[...parents,node.tag.name]
+        tableForExport.rows.push(['Tag',path.join(' / '),'','','','',node.tag.description].map((text)=>({text})))
+        exportNodes(node.children,path)
+      }else{
+        const security=node.security
+        tableForExport.rows.push(['Security',parents.join(' / '),security.symbol,security.alternativeId,security.name,security.currency,''].map((text)=>({text})))
+      }
+    }
+  }
+  exportNodes(model,[taxonomy.name])
+  const csvExport=exportTableAsCsv(tableForExport)
+  const runExport=async(action:()=>Promise<void|boolean>,success:string)=>{setExportStatus('');try{if(await action()!==false)setExportStatus(success)}catch(reason){setExportStatus(`Export failed: ${reason instanceof Error?reason.message:String(reason)}`)}}
+  const exportMenu=<Menu aria-label="Export table" className="table-export-menu"><MenuItem icon="clipboard" text="Export as CSV to Clipboard" onClick={()=>void runExport(()=>copyTextToClipboard(csvExport),'CSV copied to clipboard')}/><MenuItem icon="th" text="Export as HTML table to Clipboard" onClick={()=>void runExport(()=>copyHtmlTableToClipboard(exportTableAsHtml(tableForExport),csvExport),'HTML table copied to clipboard')}/><MenuItem icon="floppy-disk" text="Export as CSV to File" onClick={()=>void runExport(()=>saveCsvExport(csvExport,csvFileName(taxonomy.name)),'CSV file saved')}/></Menu>
 
   const toggle = (value: string) => setExpanded((current) => {
     const next = new Set(current)
@@ -141,7 +161,7 @@ export function TaxonomyView({ id }: { id: string }) {
   }]
 
   return <main className="content page taxonomy-page">
-    <PageHeader title={taxonomy.name} description={taxonomy.description || 'Build a hierarchical classification for your research.'} actions={<PageToolbarIconBar label="Taxonomy controls"><InputGroup
+    <PageHeader title={taxonomy.name} description={<>{taxonomy.description || 'Build a hierarchical classification for your research.'}{exportStatus&&<span className="export-status" role="status"> · {exportStatus}</span>}</>} actions={<PageToolbarIconBar label="Taxonomy controls"><InputGroup
       className="taxonomy-search"
       type="search"
       leftIcon="search"
@@ -150,7 +170,7 @@ export function TaxonomyView({ id }: { id: string }) {
       value={search}
       onChange={(event) => setSearch(event.target.value)}
       rightElement={search ? <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setSearch('')}/> : undefined}
-    /><PageToolbarIconButton icon="expand-all" label="Expand entire taxonomy" disabled={!canExpandAll} onClick={()=>setExpanded(new Set(expandableIds))}/><PageToolbarIconButton icon="collapse-all" label="Collapse entire taxonomy" disabled={!canCollapseAll} onClick={()=>setExpanded(new Set())}/></PageToolbarIconBar>}/>
+    /><PageToolbarIconButton icon="expand-all" label="Expand entire taxonomy" disabled={!canExpandAll} onClick={()=>setExpanded(new Set(expandableIds))}/><PageToolbarIconButton icon="collapse-all" label="Collapse entire taxonomy" disabled={!canCollapseAll} onClick={()=>setExpanded(new Set())}/><PopoverNext content={exportMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="export" label="Export"/></PopoverNext></PageToolbarIconBar>}/>
     <div className="content-panel taxonomy-card" {...drag.pointerHandlers}>
       <Tree
         compact
