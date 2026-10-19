@@ -13,12 +13,12 @@ function WatchlistViewHarness({watchlistId}:{watchlistId:string}) {
 describe('SecuritiesView visible columns',()=>{
   afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks()})
 
-  it('shows watchlist charts in a separate optional column',async()=>{
+  it.each([false,true])('shows charts in a separate optional column (watchlist: %s)',async(inWatchlist)=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
     const watchlist=await repository.addWatchlist('Quality')
     await repository.setWatchlistSecurity(watchlist.id,security.id,true)
-    render(<AppProvider repository={repository}><SecuritiesView watchlistId={watchlist.id}/></AppProvider>)
+    render(<AppProvider repository={repository}><SecuritiesView watchlistId={inWatchlist?watchlist.id:undefined}/></AppProvider>)
     const name=await screen.findByText('Apple Inc.')
     expect(screen.getByRole('columnheader',{name:'Price chart (1M)'})).toBeInTheDocument()
     expect(name.closest('td')).not.toContainElement(screen.getByTitle('Not enough cached price history'))
@@ -68,8 +68,8 @@ describe('SecuritiesView visible columns',()=>{
 
     fireEvent.click(within(menu).getByRole('button',{name:'Move Links up'}))
     fireEvent.click(within(menu).getByRole('button',{name:'Move Links up'}))
-    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Company','Links','Currency','Today %',''])
-    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','name','links','currency','todayChange','priceChart'],visible:['symbol','name','priceChart','currency','todayChange','links'],version:4})
+    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Company','Price chart (1M)','Links','Currency','Today %',''])
+    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','name','priceChart','links','currency','todayChange'],visible:['symbol','name','priceChart','currency','todayChange','links'],version:4})
   })
 
   it('combines saved website columns into one cell with URL tooltips',async()=>{
@@ -89,13 +89,13 @@ describe('SecuritiesView visible columns',()=>{
     expect(yahoo).toHaveAttribute('title','https://finance.yahoo.com/quote/AAPL')
     expect(tikr).toHaveAttribute('title','https://app.tikr.com/AAPL')
     expect(screen.queryByRole('button',{name:'Open ISIN research'})).not.toBeInTheDocument()
-    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Links',''])
+    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Links','Price chart (1M)',''])
     expect(yahoo.textContent).toBe('')
     expect(tikr.textContent).toBe('')
   })
 
   it('does not allow hiding the final visible column',async()=>{
-    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['symbol','alternativeId','name','currency','todayChange'],visible:['symbol'],version:2}))
+    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['symbol','alternativeId','name','currency','todayChange'],visible:['symbol'],version:4}))
     const repository=new LocalRepository();await repository.initialize()
     render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
 
@@ -198,7 +198,7 @@ describe('SecuritiesView visible columns',()=>{
     fireEvent.click(screen.getByRole('button',{name:'Export'}))
     fireEvent.click(await screen.findByRole('menuitem',{name:'Export as CSV to Clipboard'}))
 
-    await waitFor(()=>expect(writeText).toHaveBeenCalledWith('Symbol,Alternative ID,Company,Currency,Today %\r\nAAPL,US0378331005,Apple Inc.,USD,0.00%\r\nMSFT,US5949181045,Microsoft,USD,0.00%'))
+    await waitFor(()=>expect(writeText).toHaveBeenCalledWith('Symbol,Alternative ID,Company,Price chart (1M),Currency,Today %\r\nAAPL,US0378331005,Apple Inc.,,USD,0.00%\r\nMSFT,US5949181045,Microsoft,,USD,0.00%'))
     expect(await screen.findByRole('status')).toHaveTextContent('CSV copied to clipboard')
   })
 

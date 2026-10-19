@@ -161,7 +161,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   useEffect(()=>{const clear=(event:KeyboardEvent)=>{if(event.key==='Escape'){selectionAnchorId.current=null;setSelectedSecurityIds(new Set())}};document.addEventListener('keydown',clear);return()=>document.removeEventListener('keydown',clear)},[])
   useEffect(()=>{localStorage.setItem(COLUMN_PREFERENCES_KEY,JSON.stringify(preferences))},[preferences])
 
-  const availableColumns=BUILTIN_COLUMNS.filter((column)=>(column.key!=='links'||app.securityLinkTemplates.length>0)&&(column.key!=='priceChart'||Boolean(watchlistId)))
+  const availableColumns=BUILTIN_COLUMNS.filter((column)=>column.key!=='links'||app.securityLinkTemplates.length>0)
   const availableKeys=availableColumns.map((column)=>column.key)
   const orderedColumns=[...availableColumns].toSorted((left,right)=>{
     const leftIndex=preferences.order.indexOf(left.key),rightIndex=preferences.order.indexOf(right.key)
