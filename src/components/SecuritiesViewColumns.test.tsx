@@ -13,6 +13,21 @@ function WatchlistViewHarness({watchlistId}:{watchlistId:string}) {
 describe('SecuritiesView visible columns',()=>{
   afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks()})
 
+  it('shows watchlist charts in a separate optional column',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
+    const watchlist=await repository.addWatchlist('Quality')
+    await repository.setWatchlistSecurity(watchlist.id,security.id,true)
+    render(<AppProvider repository={repository}><SecuritiesView watchlistId={watchlist.id}/></AppProvider>)
+    const name=await screen.findByText('Apple Inc.')
+    expect(screen.getByRole('columnheader',{name:'Price chart (1M)'})).toBeInTheDocument()
+    expect(name.closest('td')).not.toContainElement(screen.getByTitle('Not enough cached price history'))
+    fireEvent.click(screen.getByRole('button',{name:'Columns'}))
+    fireEvent.click(await screen.findByRole('menuitemcheckbox',{name:'Price chart (1M)'}))
+    expect(screen.queryByRole('columnheader',{name:'Price chart (1M)'})).not.toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')!).visible).not.toContain('priceChart')
+  })
+
   it('persists dragged column widths and restores them on remount',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
@@ -54,7 +69,7 @@ describe('SecuritiesView visible columns',()=>{
     fireEvent.click(within(menu).getByRole('button',{name:'Move Links up'}))
     fireEvent.click(within(menu).getByRole('button',{name:'Move Links up'}))
     expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Company','Links','Currency','Today %',''])
-    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','name','links','currency','todayChange'],visible:['symbol','name','currency','todayChange','links'],version:3})
+    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','name','links','currency','todayChange','priceChart'],visible:['symbol','name','priceChart','currency','todayChange','links'],version:4})
   })
 
   it('combines saved website columns into one cell with URL tooltips',async()=>{

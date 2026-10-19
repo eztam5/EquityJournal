@@ -341,3 +341,10 @@ table.bp6-html-table.bp6-compact.security-table th, table.bp6-html-table.bp6-com
 .security-table-resized th, .security-table-resized td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .security-table-resized thead th { overflow: visible; }
 .security-table-resized .sort-header { max-width: calc(100% - 4px); overflow: hidden; }
+.watchlist-price-sparkline, .watchlist-sparkline-empty { width: 96px; height: 24px; flex: 0 0 96px; }
+.watchlist-sparkline-empty { color: var(--muted); text-align: center; line-height: 24px; }
+.watchlist-price-sparkline path { fill: none; stroke: var(--muted); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.watchlist-price-sparkline.positive path { stroke: #238636; }
+.watchlist-price-sparkline.negative path { stroke: var(--danger); }
+
+.watchlist-chart-cell .watchlist-price-sparkline, .watchlist-chart-cell .watchlist-sparkline-empty { display: block; width: 100%; min-width: 36px; max-width: 160px; }

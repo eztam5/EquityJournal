@@ -8,12 +8,14 @@ import { copyHtmlTableToClipboard, copyTextToClipboard, csvFileName, exportTable
 import { announceClassificationDragHover, classificationDropTargetAt, announceWatchlistDragHover, isAdditiveSelectionModifier, watchlistDropTargetAt } from '../utils/watchlistSecurityDrag'
 import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
 import { PRICE_HISTORY_CHANGED_EVENT } from '../utils/priceUpdates'
+import { WatchlistPriceSparkline } from './WatchlistPriceSparkline'
+import { pricesInRange } from './SecurityPriceChart'
 import { SecurityLinkIcon } from './SecurityLinkIcon'
 import { ConfirmDialog, SecurityForm } from './Forms'
 import { PageHeader, PageToolbarIconBar, PageToolbarIconButton } from './PageHeader'
 
 export type SecuritySortKey = 'symbol'|'alternativeId'|'name'|'currency'|'todayChange'
-export type SecurityColumnKey = SecuritySortKey|'links'
+export type SecurityColumnKey = SecuritySortKey|'links'|'priceChart'
 export type SortDirection = 'asc'|'desc'
 
 export interface SecurityColumnPreferences {
@@ -30,13 +32,14 @@ interface SecurityColumnDefinition {
 }
 
 const COLUMN_PREFERENCES_KEY = 'equity-journal.visible-security-columns'
-const COLUMN_PREFERENCES_VERSION = 3
-const DEFAULT_COLUMN_WIDTHS={symbol:140,alternativeId:180,name:280,currency:110,todayChange:110,links:140,actions:68}
+const COLUMN_PREFERENCES_VERSION = 4
+const DEFAULT_COLUMN_WIDTHS={symbol:140,alternativeId:180,name:280,currency:110,todayChange:110,links:140,priceChart:130,actions:68}
 const MIN_COLUMN_WIDTH=60
 const BUILTIN_COLUMNS: SecurityColumnDefinition[] = [
   {key:'symbol',label:'Symbol',sortKey:'symbol'},
   {key:'alternativeId',label:'Alternative ID',sortKey:'alternativeId'},
   {key:'name',label:'Company',sortKey:'name'},
+  {key:'priceChart',label:'Price chart (1M)'},
   {key:'currency',label:'Currency',sortKey:'currency'},
   {key:'todayChange',label:'Today %',sortKey:'todayChange'},
   {key:'links',label:'Links'},
@@ -57,6 +60,7 @@ export function loadSecurityColumnPreferences(): SecurityColumnPreferences {
         const order=uniqueColumnKeys([...value.order,...visible,...defaults])
         if(visible.length){
           const migratedVisible:SecurityColumnKey[]=(typeof value.version==='number'&&value.version>=2)||visible.includes('todayChange')?visible:[...visible,'todayChange']
+          if(!(typeof value.version==='number'&&value.version>=4)&&!migratedVisible.includes('priceChart'))migratedVisible.push('priceChart')
           const widths:NonNullable<SecurityColumnPreferences['widths']>={}
           if(value.widths&&typeof value.widths==='object')for(const [key,width] of Object.entries(value.widths)){
             if((isColumnKey(key)||key==='actions')&&typeof width==='number'&&Number.isFinite(width)&&width>=MIN_COLUMN_WIDTH)widths[key]=width
@@ -109,6 +113,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const app=useApp()
   const page=useRef<HTMLElement>(null)
   const[rows,setRows]=useState<Security[]>([])
+  const[priceHistories,setPriceHistories]=useState<Record<string,SecurityPrice[]>>({})
   const[todayChanges,setTodayChanges]=useState<Record<string,number>>({})
   const[creating,setCreating]=useState(false)
   const[editing,setEditing]=useState<Security>()
@@ -143,8 +148,8 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     let active=true,request=0
     const load=async()=>{
       const current=++request
-      const values=await Promise.all(rows.map(async(security)=>[security.id,todayPriceChange((await app.repository.listSecurityPrices(security.id)).filter((price)=>price.sourceSymbol.toUpperCase()===security.symbol.toUpperCase()))] as const))
-      if(active&&current===request)setTodayChanges(Object.fromEntries(values))
+      const values=await Promise.all(rows.map(async(security)=>[security.id,(await app.repository.listSecurityPrices(security.id)).filter((price)=>price.sourceSymbol.toUpperCase()===security.symbol.toUpperCase())] as const))
+      if(active&&current===request){setTodayChanges(Object.fromEntries(values.map(([id,prices])=>[id,todayPriceChange(prices)])));setPriceHistories(Object.fromEntries(values.map(([id,prices])=>[id,pricesInRange(prices,'1M')])))}
     }
     void load()
     const refresh=()=>void load()
@@ -156,7 +161,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   useEffect(()=>{const clear=(event:KeyboardEvent)=>{if(event.key==='Escape'){selectionAnchorId.current=null;setSelectedSecurityIds(new Set())}};document.addEventListener('keydown',clear);return()=>document.removeEventListener('keydown',clear)},[])
   useEffect(()=>{localStorage.setItem(COLUMN_PREFERENCES_KEY,JSON.stringify(preferences))},[preferences])
 
-  const availableColumns=BUILTIN_COLUMNS.filter((column)=>column.key!=='links'||app.securityLinkTemplates.length>0)
+  const availableColumns=BUILTIN_COLUMNS.filter((column)=>(column.key!=='links'||app.securityLinkTemplates.length>0)&&(column.key!=='priceChart'||Boolean(watchlistId)))
   const availableKeys=availableColumns.map((column)=>column.key)
   const orderedColumns=[...availableColumns].toSorted((left,right)=>{
     const leftIndex=preferences.order.indexOf(left.key),rightIndex=preferences.order.indexOf(right.key)
@@ -190,6 +195,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     if(column.key==='symbol')return{text:security.symbol}
     if(column.key==='alternativeId')return{text:security.alternativeId}
     if(column.key==='name')return{text:security.name}
+    if(column.key==='priceChart')return{text:''}
     if(column.key==='currency')return{text:security.currency}
     if(column.key==='todayChange')return{text:formatTodayPriceChange(todayChanges[security.id]??0)}
     return{text:app.securityLinkTemplates.map((template)=>resolveSecurityLink(template,security)).filter(Boolean).join(' | ')}
@@ -237,6 +243,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     if(column.key==='symbol')return <td className="symbol" key={column.key}>{security.symbol}</td>
     if(column.key==='alternativeId')return <td key={column.key}>{security.alternativeId||'—'}</td>
     if(column.key==='name')return <td key={column.key}>{security.name}</td>
+    if(column.key==='priceChart')return <td className="watchlist-chart-cell" key={column.key}><WatchlistPriceSparkline prices={priceHistories[security.id]??[]} name={security.name}/></td>
     if(column.key==='currency')return <td key={column.key}>{security.currency}</td>
     if(column.key==='todayChange'){
       const change=todayChanges[security.id]??0

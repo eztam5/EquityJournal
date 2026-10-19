@@ -20,7 +20,7 @@ describe('sortSecurities',()=>{
   })
   it('loads valid visible-column preferences in table order',()=>{
     localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['currency','link:yahoo','symbol'],visible:['currency','link:yahoo','symbol']}))
-    expect(loadVisibleSecurityColumns()).toEqual(['currency','links','symbol','todayChange'])
+    expect(loadVisibleSecurityColumns()).toEqual(['currency','links','symbol','todayChange','priceChart'])
   })
   it('ignores invalid saved widths while preserving valid widths',()=>{
     localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['symbol'],visible:['symbol'],version:3,widths:{symbol:210,name:-10,currency:'100',links:null,unknown:100,actions:70}}))
@@ -28,7 +28,7 @@ describe('sortSecurities',()=>{
   })
   it('loads ordered column preferences',()=>{
     localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['name','link:yahoo','symbol'],visible:['link:yahoo','name']}))
-    expect(loadSecurityColumnPreferences()).toEqual({order:['name','links','symbol','alternativeId','currency','todayChange'],visible:['links','name','todayChange'],version:3})
+    expect(loadSecurityColumnPreferences()).toEqual({order:['name','links','symbol','alternativeId','priceChart','currency','todayChange'],visible:['links','name','todayChange','priceChart'],version:4})
   })
 })
 
