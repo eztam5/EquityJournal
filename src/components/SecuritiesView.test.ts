@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Security } from '../domain/types'
 import type { SecurityPrice } from '../domain/types'
-import { formatTodayPriceChange, loadSecurityColumnPreferences, loadVisibleSecurityColumns, sortSecurities, todayPriceChange } from './SecuritiesView'
+import { periodPriceChange, formatTodayPriceChange, loadSecurityColumnPreferences, loadVisibleSecurityColumns, sortSecurities, todayPriceChange } from './SecuritiesView'
 
 const rows:Security[]=[
   {id:'2',symbol:'MSFT',alternativeId:'US5949181045',name:'Microsoft',currency:'USD'},
@@ -20,7 +20,7 @@ describe('sortSecurities',()=>{
   })
   it('loads valid visible-column preferences in table order',()=>{
     localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['currency','link:yahoo','symbol'],visible:['currency','link:yahoo','symbol']}))
-    expect(loadVisibleSecurityColumns()).toEqual(['currency','links','symbol','todayChange','priceChart'])
+    expect(loadVisibleSecurityColumns()).toEqual(['currency','links','symbol','todayChange','priceChart','periodChange'])
   })
   it('ignores invalid saved widths while preserving valid widths',()=>{
     localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['symbol'],visible:['symbol'],version:3,widths:{symbol:210,name:-10,currency:'100',links:null,unknown:100,actions:70}}))
@@ -28,7 +28,7 @@ describe('sortSecurities',()=>{
   })
   it('loads ordered column preferences',()=>{
     localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['name','link:yahoo','symbol'],visible:['link:yahoo','name']}))
-    expect(loadSecurityColumnPreferences()).toEqual({order:['name','links','symbol','alternativeId','priceChart','currency','todayChange'],visible:['links','name','todayChange','priceChart'],version:4})
+    expect(loadSecurityColumnPreferences()).toEqual({order:['name','links','symbol','alternativeId','priceChart','currency','todayChange','periodChange'],visible:['links','name','todayChange','priceChart','periodChange'],version:5})
   })
 })
 
@@ -45,5 +45,22 @@ describe('todayPriceChange',()=>{
     expect(todayPriceChange([price('2026-09-16',100),price('2026-09-17',105)],'2026-09-18')).toBe(0)
     expect(todayPriceChange([price('2026-09-18',105)],'2026-09-18')).toBe(0)
     expect(formatTodayPriceChange(0)).toBe('0.00%')
+  })
+})
+
+describe('periodPriceChange',()=>{
+  const price=(priceDate:string,adjustedClose:number):SecurityPrice=>({securityId:'test',priceDate,close:adjustedClose*2,adjustedClose,currency:'USD',sourceSymbol:'TEST',fetchedAt:''})
+  it('uses exactly 52 weeks and the preceding trading date',()=>{
+    expect(periodPriceChange([price('2025-10-17',100),price('2025-10-21',110),price('2026-10-19',125)],'52W')).toBe(25)
+    expect(periodPriceChange([price('2025-10-19',100),price('2025-10-20',110),price('2026-10-19',125)],'52W')).toBeCloseTo((125/110-1)*100)
+  })
+  it('supports other ranges and requires coverage of the baseline',()=>{
+    expect(periodPriceChange([price('2026-09-18',100),price('2026-10-19',90)],'1M')).toBeCloseTo(-10)
+    expect(periodPriceChange([price('2026-09-18',100),price('2026-10-19',90)],'52W')).toBeNull()
+    expect(periodPriceChange([],'52W')).toBeNull()
+  })
+  it('sorts missing changes last in either direction',()=>{
+    expect(sortSecurities(rows,'periodChange','desc',{}, {'1':10,'2':-5}).map((row)=>row.id)).toEqual(['1','2','3'])
+    expect(sortSecurities(rows,'periodChange','asc',{}, {'1':10,'2':-5}).map((row)=>row.id)).toEqual(['2','1','3'])
   })
 })

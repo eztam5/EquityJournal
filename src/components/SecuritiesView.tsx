@@ -9,12 +9,12 @@ import { announceClassificationDragHover, classificationDropTargetAt, announceWa
 import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
 import { PRICE_HISTORY_CHANGED_EVENT } from '../utils/priceUpdates'
 import { WatchlistPriceSparkline } from './WatchlistPriceSparkline'
-import { PRICE_RANGES, pricesInRange, type PriceRange } from './SecurityPriceChart'
+import { PRICE_RANGES, priceRangeStart, pricesInRange, type PriceRange } from './SecurityPriceChart'
 import { SecurityLinkIcon } from './SecurityLinkIcon'
 import { ConfirmDialog, SecurityForm } from './Forms'
 import { PageHeader, PageToolbarIconBar, PageToolbarIconButton } from './PageHeader'
 
-export type SecuritySortKey = 'symbol'|'alternativeId'|'name'|'currency'|'todayChange'
+export type SecuritySortKey = 'symbol'|'alternativeId'|'name'|'currency'|'todayChange'|'periodChange'
 export type SecurityColumnKey = SecuritySortKey|'links'|'priceChart'
 export type SortDirection = 'asc'|'desc'
 
@@ -22,6 +22,7 @@ export interface SecurityColumnPreferences {
   order: SecurityColumnKey[]
   visible: SecurityColumnKey[]
   version: number
+  changeRange?: ChangeRange
   chartRange?: PriceRange
   widths?: Partial<Record<SecurityColumnKey|'actions',number>>
 }
@@ -33,8 +34,8 @@ interface SecurityColumnDefinition {
 }
 
 const COLUMN_PREFERENCES_KEY = 'equity-journal.visible-security-columns'
-const COLUMN_PREFERENCES_VERSION = 4
-const DEFAULT_COLUMN_WIDTHS={symbol:140,alternativeId:180,name:280,currency:110,todayChange:110,links:140,priceChart:130,actions:68}
+const COLUMN_PREFERENCES_VERSION = 5
+const DEFAULT_COLUMN_WIDTHS={symbol:140,alternativeId:180,name:280,currency:110,todayChange:110,periodChange:155,links:140,priceChart:130,actions:68}
 const MIN_COLUMN_WIDTH=60
 const BUILTIN_COLUMNS: SecurityColumnDefinition[] = [
   {key:'symbol',label:'Symbol',sortKey:'symbol'},
@@ -43,11 +44,12 @@ const BUILTIN_COLUMNS: SecurityColumnDefinition[] = [
   {key:'priceChart',label:'Price chart (6M)'},
   {key:'currency',label:'Currency',sortKey:'currency'},
   {key:'todayChange',label:'Today %',sortKey:'todayChange'},
+  {key:'periodChange',label:'Price change (52W)',sortKey:'periodChange'},
   {key:'links',label:'Links'},
 ]
 
 const isColumnKey = (value: unknown): value is SecurityColumnKey => typeof value==='string'&&BUILTIN_COLUMNS.some((column)=>column.key===value)
-const isSecuritySortKey = (value: SecurityColumnKey): value is SecuritySortKey => value==='symbol'||value==='alternativeId'||value==='name'||value==='currency'||value==='todayChange'
+const isSecuritySortKey = (value: SecurityColumnKey): value is SecuritySortKey => value==='symbol'||value==='alternativeId'||value==='name'||value==='currency'||value==='todayChange'||value==='periodChange'
 const uniqueColumnKeys = (values: unknown[]): SecurityColumnKey[] => [...new Set(values.map((value)=>typeof value==='string'&&value.startsWith('link:')?'links':value).filter(isColumnKey))]
 
 export function loadSecurityColumnPreferences(): SecurityColumnPreferences {
@@ -55,18 +57,19 @@ export function loadSecurityColumnPreferences(): SecurityColumnPreferences {
   try {
     const stored:unknown=JSON.parse(localStorage.getItem(COLUMN_PREFERENCES_KEY)??'null')
     if(stored&&typeof stored==='object'){
-      const value=stored as {order?:unknown;visible?:unknown;version?:unknown;widths?:unknown;chartRange?:unknown}
+      const value=stored as {order?:unknown;visible?:unknown;version?:unknown;widths?:unknown;chartRange?:unknown;changeRange?:unknown}
       if(Array.isArray(value.order)&&Array.isArray(value.visible)){
         const visible=uniqueColumnKeys(value.visible)
         const order=uniqueColumnKeys([...value.order,...visible,...defaults])
         if(visible.length){
           const migratedVisible:SecurityColumnKey[]=(typeof value.version==='number'&&value.version>=2)||visible.includes('todayChange')?visible:[...visible,'todayChange']
           if(!(typeof value.version==='number'&&value.version>=4)&&!migratedVisible.includes('priceChart'))migratedVisible.push('priceChart')
+          if(!(typeof value.version==='number'&&value.version>=5)&&!migratedVisible.includes('periodChange'))migratedVisible.push('periodChange')
           const widths:NonNullable<SecurityColumnPreferences['widths']>={}
           if(value.widths&&typeof value.widths==='object')for(const [key,width] of Object.entries(value.widths)){
             if((isColumnKey(key)||key==='actions')&&typeof width==='number'&&Number.isFinite(width)&&width>=MIN_COLUMN_WIDTH)widths[key]=width
           }
-          return{order,visible:migratedVisible,version:COLUMN_PREFERENCES_VERSION,...(PRICE_RANGES.includes(value.chartRange as PriceRange)?{chartRange:value.chartRange as PriceRange}:{}),...(Object.keys(widths).length?{widths}:{})}
+          return{order,visible:migratedVisible,version:COLUMN_PREFERENCES_VERSION,...(CHANGE_RANGES.includes(value.changeRange as ChangeRange)?{changeRange:value.changeRange as ChangeRange}:{}),...(PRICE_RANGES.includes(value.chartRange as PriceRange)?{chartRange:value.chartRange as PriceRange}:{}),...(Object.keys(widths).length?{widths}:{})}
         }
       }
     }
@@ -78,8 +81,27 @@ export function loadVisibleSecurityColumns(): SecurityColumnKey[] {
   return loadSecurityColumnPreferences().visible
 }
 
-export function sortSecurities(rows:Security[],key:SecuritySortKey,direction:SortDirection,todayChanges:Record<string,number>={}) {
+export const CHANGE_RANGES=[...PRICE_RANGES,'52W'] as const
+export type ChangeRange=typeof CHANGE_RANGES[number]
+
+export function periodPriceChange(prices:SecurityPrice[],range:ChangeRange):number|null {
+  const ordered=prices.filter((price)=>Number.isFinite(price.adjustedClose)&&price.adjustedClose>0).toSorted((a,b)=>a.priceDate.localeCompare(b.priceDate))
+  const latest=ordered.at(-1)
+  if(!latest)return null
+  let start:string
+  if(range==='52W'){
+    const date=new Date(`${latest.priceDate}T00:00:00Z`)
+    date.setUTCDate(date.getUTCDate()-364)
+    start=date.toISOString().slice(0,10)
+  }else start=priceRangeStart(latest.priceDate,range)
+  const baseline=ordered.findLast((price)=>price.priceDate<=start)
+  if(!baseline||baseline===latest)return null
+  return (latest.adjustedClose/baseline.adjustedClose-1)*100
+}
+
+export function sortSecurities(rows:Security[],key:SecuritySortKey,direction:SortDirection,todayChanges:Record<string,number>={},periodChanges:Record<string,number|null>={}) {
   return rows.toSorted((left,right)=>{
+    if(key==='periodChange'){const a=periodChanges[left.id],b=periodChanges[right.id];if(a==null||b==null)return a==null&&b==null?left.id.localeCompare(right.id):a==null?1:-1;return (direction==='asc'?a-b:b-a)||left.id.localeCompare(right.id)}
     const comparison=key==='todayChange'?(todayChanges[left.id]??0)-(todayChanges[right.id]??0):left[key].localeCompare(right[key],undefined,{numeric:true,sensitivity:'base'})
     return comparison===0?left.id.localeCompare(right.id):direction==='asc'?comparison:-comparison
   })
@@ -122,6 +144,8 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const[deleting,setDeleting]=useState<Security>()
   const[preferences,setPreferences]=useState<SecurityColumnPreferences>(loadSecurityColumnPreferences)
   const chartRange=preferences.chartRange??'6M'
+  const changeRange=preferences.changeRange??'52W'
+  const periodChanges=useMemo(()=>Object.fromEntries(Object.entries(priceHistories).map(([id,prices])=>[id,periodPriceChange(prices,changeRange)])),[priceHistories,changeRange])
   const[sortKey,setSortKey]=useState<SecuritySortKey>(()=>loadVisibleSecurityColumns().find(isSecuritySortKey)??'symbol')
   const[direction,setDirection]=useState<SortDirection>('asc')
   const[searchQuery,setSearchQuery]=useState('')
@@ -164,7 +188,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   useEffect(()=>{const clear=(event:KeyboardEvent)=>{if(event.key==='Escape'){selectionAnchorId.current=null;setSelectedSecurityIds(new Set())}};document.addEventListener('keydown',clear);return()=>document.removeEventListener('keydown',clear)},[])
   useEffect(()=>{localStorage.setItem(COLUMN_PREFERENCES_KEY,JSON.stringify(preferences))},[preferences])
 
-  const availableColumns=BUILTIN_COLUMNS.map((column)=>column.key==='priceChart'?{...column,label:`Price chart (${chartRange})`}:column).filter((column)=>column.key!=='links'||app.securityLinkTemplates.length>0)
+  const availableColumns=BUILTIN_COLUMNS.map((column)=>column.key==='priceChart'?{...column,label:`Price chart (${chartRange})`}:column.key==='periodChange'?{...column,label:`Price change (${changeRange})`}:column).filter((column)=>column.key!=='links'||app.securityLinkTemplates.length>0)
   const availableKeys=availableColumns.map((column)=>column.key)
   const orderedColumns=[...availableColumns].toSorted((left,right)=>{
     const leftIndex=preferences.order.indexOf(left.key),rightIndex=preferences.order.indexOf(right.key)
@@ -188,7 +212,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   },[preferences.visible,sortKey,visibleColumns])
 
   const filteredRows=useMemo(()=>{const query=searchQuery.trim().toLocaleLowerCase();return query?rows.filter((security)=>security.symbol.toLocaleLowerCase().includes(query)||security.name.toLocaleLowerCase().includes(query)):rows},[rows,searchQuery])
-  const sortedRows=useMemo(()=>sortSecurities(filteredRows,sortKey,direction,todayChanges),[filteredRows,sortKey,direction,todayChanges])
+  const sortedRows=useMemo(()=>sortSecurities(filteredRows,sortKey,direction,todayChanges,periodChanges),[filteredRows,sortKey,direction,todayChanges,periodChanges])
   const sort=(column:SecuritySortKey)=>{if(column===sortKey)setDirection((current)=>current==='asc'?'desc':'asc');else{setSortKey(column);setDirection('asc')}}
   const toggleColumn=(column:SecurityColumnKey)=>setPreferences((current)=>{const visible=current.visible.includes(column);if(visible&&visibleColumns.length===1)return current;return{...current,visible:visible?current.visible.filter((key)=>key!==column):[...current.visible,column]}})
   const reorderColumn=(source:SecurityColumnKey,target:SecurityColumnKey)=>setPreferences((current)=>{const order=orderedColumns.map((column)=>column.key),sourceIndex=order.indexOf(source),targetIndex=order.indexOf(target);if(sourceIndex<0||targetIndex<0||sourceIndex===targetIndex)return current;order.splice(sourceIndex,1);order.splice(targetIndex,0,source);return{...current,order:[...order,...current.order.filter((key)=>!order.includes(key))]}})
@@ -200,6 +224,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     if(column.key==='name')return{text:security.name}
     if(column.key==='priceChart')return{text:''}
     if(column.key==='currency')return{text:security.currency}
+    if(column.key==='periodChange')return{text:periodChanges[security.id]==null?'—':formatTodayPriceChange(periodChanges[security.id]!)}
     if(column.key==='todayChange')return{text:formatTodayPriceChange(todayChanges[security.id]??0)}
     return{text:app.securityLinkTemplates.map((template)=>resolveSecurityLink(template,security)).filter(Boolean).join(' | ')}
   }))}
@@ -213,7 +238,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const startSecurityDrag=(event:PointerEvent<HTMLTableRowElement>,security:Security)=>{if(event.button!==0||(event.target as Element).closest('button,a,input'))return;const securities=selectedSecurityIds.has(security.id)?sortedRows.filter((row)=>selectedSecurityIds.has(row.id)):[security];pendingDrag.current={securities,pointerId:event.pointerId,x:event.clientX,y:event.clientY};event.currentTarget.setPointerCapture?.(event.pointerId)}
   const moveSecurityDrag=(event:PointerEvent<HTMLTableRowElement>)=>{const pending=pendingDrag.current;if(!draggingSecurities.current.length&&pending&&pending.pointerId===event.pointerId){if(Math.hypot(event.clientX-pending.x,event.clientY-pending.y)<5)return;draggingSecurities.current=pending.securities;document.documentElement.classList.add('watchlist-security-dragging');document.documentElement.dataset.watchlistDragCount=String(pending.securities.length)}if(!draggingSecurities.current.length)return;event.preventDefault();announceClassificationDragHover(classificationDropTargetAt(event.clientX,event.clientY)?.tagId??null);const target=watchlistDropTargetAt(event.clientX,event.clientY);if(target!==hoveredWatchlistId.current){hoveredWatchlistId.current=target;announceWatchlistDragHover(target)}}
   const finishSecurityDrag=async(event:PointerEvent<HTMLTableRowElement>)=>{const securities=draggingSecurities.current;const classificationTarget=classificationDropTargetAt(event.clientX,event.clientY);const targetWatchlistId=watchlistDropTargetAt(event.clientX,event.clientY)??hoveredWatchlistId.current;event.currentTarget.releasePointerCapture?.(event.pointerId);if(!securities.length){pendingDrag.current=null;return}event.preventDefault();event.stopPropagation();suppressSelectionClick.current=true;window.setTimeout(()=>{suppressSelectionClick.current=false},0);resetSecurityDrag();if(classificationTarget){for(const security of securities)await app.repository.copySecurityTag(security.id,classificationTarget.tagId);notifyTaxonomyTreeChanged(classificationTarget.taxonomyId)}else if(targetWatchlistId){for(const security of securities)await app.repository.setWatchlistSecurity(targetWatchlistId,security.id,true);await app.refresh()}}
-  const columnMenu=<Menu aria-label="Visible columns" className="column-chooser">{orderedColumns.map((column,index)=><ColumnChooserRow key={column.key} column={column} index={index} count={orderedColumns.length} visible={preferences.visible.includes(column.key)} lastVisible={preferences.visible.includes(column.key)&&visibleColumns.length===1} onToggle={()=>toggleColumn(column.key)} onMove={(offset)=>moveColumn(column.key,offset)} rangeControl={column.key==='priceChart'?<PopoverNext placement="right-start" animation="minimal" arrow={false} content={<Menu aria-label="Price chart time range">{PRICE_RANGES.map((range)=><MenuItem key={range} text={range} role="menuitemradio" aria-checked={chartRange===range} icon={chartRange===range?'tick':'blank'} onClick={()=>setPreferences((current)=>({...current,chartRange:range}))}/>)}</Menu>}><Button variant="minimal" size="small" icon="cog" aria-label="Price chart time range" title="Price chart time range"/></PopoverNext>:undefined}/>)}</Menu>
+  const columnMenu=<Menu aria-label="Visible columns" className="column-chooser">{orderedColumns.map((column,index)=><ColumnChooserRow key={column.key} column={column} index={index} count={orderedColumns.length} visible={preferences.visible.includes(column.key)} lastVisible={preferences.visible.includes(column.key)&&visibleColumns.length===1} onToggle={()=>toggleColumn(column.key)} onMove={(offset)=>moveColumn(column.key,offset)} rangeControl={column.key==='priceChart'?<PopoverNext placement="right-start" animation="minimal" arrow={false} content={<Menu aria-label="Price chart time range">{PRICE_RANGES.map((range)=><MenuItem key={range} text={range} role="menuitemradio" aria-checked={chartRange===range} icon={chartRange===range?'tick':'blank'} onClick={()=>setPreferences((current)=>({...current,chartRange:range}))}/>)}</Menu>}><Button variant="minimal" size="small" icon="cog" aria-label="Price chart time range" title="Price chart time range"/></PopoverNext>:column.key==='periodChange'?<PopoverNext placement="right-start" animation="minimal" arrow={false} content={<Menu aria-label="Price change time range">{CHANGE_RANGES.map((range)=><MenuItem key={range} text={range==='52W'?'52 weeks':range} role="menuitemradio" aria-checked={changeRange===range} icon={changeRange===range?'tick':'blank'} onClick={()=>setPreferences((current)=>({...current,changeRange:range}))}/>)}</Menu>}><Button variant="minimal" size="small" icon="cog" aria-label="Price change time range" title="Price change time range"/></PopoverNext>:undefined}/>)}</Menu>
   const exportMenu=<Menu aria-label="Export table" className="table-export-menu"><MenuItem icon="clipboard" text="Export as CSV to Clipboard" onClick={()=>void runExport(()=>copyTextToClipboard(csvExport),'CSV copied to clipboard')}/><MenuItem icon="th" text="Export as HTML table to Clipboard" onClick={()=>void runExport(()=>copyHtmlTableToClipboard(exportTableAsHtml(tableForExport),csvExport),'HTML table copied to clipboard')}/><MenuItem icon="floppy-disk" text="Export as CSV to File" onClick={()=>void runExport(()=>saveCsvExport(csvExport,csvFileName(title)),'CSV file saved')}/></Menu>
 
   const startColumnResize=(event:PointerEvent<HTMLSpanElement>,key:SecurityColumnKey|'actions')=>{
@@ -248,6 +273,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     if(column.key==='name')return <td key={column.key}>{security.name}</td>
     if(column.key==='priceChart')return <td className="watchlist-chart-cell" key={column.key}><WatchlistPriceSparkline prices={pricesInRange(priceHistories[security.id]??[],chartRange)} name={security.name} range={chartRange}/></td>
     if(column.key==='currency')return <td key={column.key}>{security.currency}</td>
+    if(column.key==='periodChange'){const change=periodChanges[security.id];return <td key={column.key} className={`security-daily-change${change!=null&&change>0?' positive':change!=null&&change<0?' negative':''}`} title={change==null?'Not enough cached price history for this range':'Adjusted closing price change'}>{change==null?'—':formatTodayPriceChange(change)}</td>}
     if(column.key==='todayChange'){
       const change=todayChanges[security.id]??0
       return <td className={`security-daily-change${change>0?' positive':change<0?' negative':''}`} key={column.key} aria-label={formatTodayPriceChange(change)}><span className="security-change-display"><span aria-hidden="true">{change>0?'▲':change<0?'▼':'—'}</span><span className="security-change-value">{Math.abs(change).toFixed(2)}%</span></span></td>

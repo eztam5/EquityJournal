@@ -28,6 +28,21 @@ describe('SecuritiesView visible columns',()=>{
     expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')!).visible).not.toContain('priceChart')
   })
 
+  it('saves an independent price change range',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const view=render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    expect(screen.getByRole('columnheader',{name:'Price change (52W)'})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Columns'}))
+    fireEvent.click(await screen.findByRole('button',{name:'Price change time range'}))
+    expect(await screen.findByRole('menuitemradio',{name:'52 weeks'})).toHaveAttribute('aria-checked','true')
+    fireEvent.click(screen.getByRole('menuitemradio',{name:'1M'}))
+    expect(screen.getByRole('columnheader',{name:'Price change (1M)'})).toBeInTheDocument()
+    expect(screen.getByRole('columnheader',{name:'Price chart (6M)'})).toBeInTheDocument()
+    view.unmount()
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    expect(screen.getByRole('columnheader',{name:'Price change (1M)'})).toBeInTheDocument()
+  })
+
   it('changes the chart range from the column chooser and restores it',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const view=render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
@@ -83,8 +98,8 @@ describe('SecuritiesView visible columns',()=>{
 
     fireEvent.click(within(menu).getByRole('button',{name:'Move Links up'}))
     fireEvent.click(within(menu).getByRole('button',{name:'Move Links up'}))
-    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Company','Price chart (6M)','Links','Currency','Today %',''])
-    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','name','priceChart','links','currency','todayChange'],visible:['symbol','name','priceChart','currency','todayChange','links'],version:4})
+    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Company','Price chart (6M)','Currency','Links','Today %','Price change (52W)',''])
+    expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','name','priceChart','currency','links','todayChange','periodChange'],visible:['symbol','name','priceChart','currency','todayChange','periodChange','links'],version:5})
   })
 
   it('combines saved website columns into one cell with URL tooltips',async()=>{
@@ -104,13 +119,13 @@ describe('SecuritiesView visible columns',()=>{
     expect(yahoo).toHaveAttribute('title','https://finance.yahoo.com/quote/AAPL')
     expect(tikr).toHaveAttribute('title','https://app.tikr.com/AAPL')
     expect(screen.queryByRole('button',{name:'Open ISIN research'})).not.toBeInTheDocument()
-    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Links','Price chart (6M)',''])
+    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Links','Price chart (6M)','Price change (52W)',''])
     expect(yahoo.textContent).toBe('')
     expect(tikr.textContent).toBe('')
   })
 
   it('does not allow hiding the final visible column',async()=>{
-    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['symbol','alternativeId','name','currency','todayChange'],visible:['symbol'],version:4}))
+    localStorage.setItem('equity-journal.visible-security-columns',JSON.stringify({order:['symbol','alternativeId','name','currency','todayChange'],visible:['symbol'],version:5}))
     const repository=new LocalRepository();await repository.initialize()
     render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
 
@@ -213,7 +228,7 @@ describe('SecuritiesView visible columns',()=>{
     fireEvent.click(screen.getByRole('button',{name:'Export'}))
     fireEvent.click(await screen.findByRole('menuitem',{name:'Export as CSV to Clipboard'}))
 
-    await waitFor(()=>expect(writeText).toHaveBeenCalledWith('Symbol,Alternative ID,Company,Price chart (6M),Currency,Today %\r\nAAPL,US0378331005,Apple Inc.,,USD,0.00%\r\nMSFT,US5949181045,Microsoft,,USD,0.00%'))
+    await waitFor(()=>expect(writeText).toHaveBeenCalledWith('Symbol,Alternative ID,Company,Price chart (6M),Currency,Today %,Price change (52W)\r\nAAPL,US0378331005,Apple Inc.,,USD,0.00%,—\r\nMSFT,US5949181045,Microsoft,,USD,0.00%,—'))
     expect(await screen.findByRole('status')).toHaveTextContent('CSV copied to clipboard')
   })
 
