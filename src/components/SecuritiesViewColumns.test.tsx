@@ -20,12 +20,27 @@ describe('SecuritiesView visible columns',()=>{
     await repository.setWatchlistSecurity(watchlist.id,security.id,true)
     render(<AppProvider repository={repository}><SecuritiesView watchlistId={inWatchlist?watchlist.id:undefined}/></AppProvider>)
     const name=await screen.findByText('Apple Inc.')
-    expect(screen.getByRole('columnheader',{name:'Price chart (1M)'})).toBeInTheDocument()
+    expect(screen.getByRole('columnheader',{name:'Price chart (6M)'})).toBeInTheDocument()
     expect(name.closest('td')).not.toContainElement(screen.getByTitle('Not enough cached price history'))
     fireEvent.click(screen.getByRole('button',{name:'Columns'}))
-    fireEvent.click(await screen.findByRole('menuitemcheckbox',{name:'Price chart (1M)'}))
-    expect(screen.queryByRole('columnheader',{name:'Price chart (1M)'})).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('menuitemcheckbox',{name:'Price chart (6M)'}))
+    expect(screen.queryByRole('columnheader',{name:'Price chart (6M)'})).not.toBeInTheDocument()
     expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')!).visible).not.toContain('priceChart')
+  })
+
+  it('changes the chart range from the column chooser and restores it',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const view=render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    expect(screen.getByRole('columnheader',{name:'Price chart (6M)'})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Columns'}))
+    fireEvent.click(await screen.findByRole('button',{name:'Price chart time range'}))
+    expect(await screen.findByRole('menuitemradio',{name:'6M'})).toHaveAttribute('aria-checked','true')
+    fireEvent.click(screen.getByRole('menuitemradio',{name:'1Y'}))
+    expect(screen.getByRole('columnheader',{name:'Price chart (1Y)'})).toBeInTheDocument()
+    await waitFor(()=>expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')!).chartRange).toBe('1Y'))
+    view.unmount()
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    expect(screen.getByRole('columnheader',{name:'Price chart (1Y)'})).toBeInTheDocument()
   })
 
   it('persists dragged column widths and restores them on remount',async()=>{
@@ -68,7 +83,7 @@ describe('SecuritiesView visible columns',()=>{
 
     fireEvent.click(within(menu).getByRole('button',{name:'Move Links up'}))
     fireEvent.click(within(menu).getByRole('button',{name:'Move Links up'}))
-    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Company','Price chart (1M)','Links','Currency','Today %',''])
+    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Company','Price chart (6M)','Links','Currency','Today %',''])
     expect(JSON.parse(localStorage.getItem('equity-journal.visible-security-columns')??'{}')).toEqual({order:['symbol','alternativeId','name','priceChart','links','currency','todayChange'],visible:['symbol','name','priceChart','currency','todayChange','links'],version:4})
   })
 
@@ -89,7 +104,7 @@ describe('SecuritiesView visible columns',()=>{
     expect(yahoo).toHaveAttribute('title','https://finance.yahoo.com/quote/AAPL')
     expect(tikr).toHaveAttribute('title','https://app.tikr.com/AAPL')
     expect(screen.queryByRole('button',{name:'Open ISIN research'})).not.toBeInTheDocument()
-    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Links','Price chart (1M)',''])
+    expect(screen.getAllByRole('columnheader').map((header)=>header.textContent)).toEqual(['Symbol','Links','Price chart (6M)',''])
     expect(yahoo.textContent).toBe('')
     expect(tikr.textContent).toBe('')
   })
@@ -198,7 +213,7 @@ describe('SecuritiesView visible columns',()=>{
     fireEvent.click(screen.getByRole('button',{name:'Export'}))
     fireEvent.click(await screen.findByRole('menuitem',{name:'Export as CSV to Clipboard'}))
 
-    await waitFor(()=>expect(writeText).toHaveBeenCalledWith('Symbol,Alternative ID,Company,Price chart (1M),Currency,Today %\r\nAAPL,US0378331005,Apple Inc.,,USD,0.00%\r\nMSFT,US5949181045,Microsoft,,USD,0.00%'))
+    await waitFor(()=>expect(writeText).toHaveBeenCalledWith('Symbol,Alternative ID,Company,Price chart (6M),Currency,Today %\r\nAAPL,US0378331005,Apple Inc.,,USD,0.00%\r\nMSFT,US5949181045,Microsoft,,USD,0.00%'))
     expect(await screen.findByRole('status')).toHaveTextContent('CSV copied to clipboard')
   })
 
