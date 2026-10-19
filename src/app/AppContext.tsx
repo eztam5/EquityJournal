@@ -128,11 +128,17 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   },[ready,repository,priceUpdateKey,priceUpdateIntervalMinutes,updateQuotes])
 
   useEffect(() => {
-    const actual = theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme
-    document.documentElement.dataset.theme = actual
-    document.documentElement.style.colorScheme = actual
-    document.documentElement.classList.toggle('bp6-dark', actual === 'dark')
+    const systemTheme = theme === 'system' ? matchMedia('(prefers-color-scheme: dark)') : null
+    const applyTheme = () => {
+      const actual = theme === 'system' ? (systemTheme?.matches ? 'dark' : 'light') : theme
+      document.documentElement.dataset.theme = actual
+      document.documentElement.style.colorScheme = actual
+      document.documentElement.classList.toggle('bp6-dark', actual === 'dark')
+    }
+    applyTheme()
+    systemTheme?.addEventListener('change', applyTheme)
     localStorage.setItem(THEME_KEY, theme)
+    return () => systemTheme?.removeEventListener('change', applyTheme)
   }, [theme])
 
   useEffect(() => { localStorage.setItem(RECENT_KEY, JSON.stringify(recentIds)) }, [recentIds])
