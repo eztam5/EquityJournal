@@ -262,8 +262,9 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     onPointerCancel={()=>{columnResize.current=null}}
     onKeyDown={(event)=>{if(event.key!=='ArrowLeft'&&event.key!=='ArrowRight')return;event.preventDefault();setPreferences((current)=>({...current,widths:{...current.widths,[key]:Math.max(MIN_COLUMN_WIDTH,(current.widths?.[key]??DEFAULT_COLUMN_WIDTHS[key])+(event.key==='ArrowRight'?10:-10))}}))}}/>
   const renderHeader=(column:SecurityColumnDefinition)=>{
+    const headerLabel=column.key==='priceChart'?`Chart (${chartRange})`:column.key==='periodChange'?`Change (${changeRange})`:column.label
     const active=column.sortKey===sortKey
-    return <th key={column.key} data-column-key={column.key} aria-label={column.label} aria-sort={column.sortKey?(active?(direction==='asc'?'ascending':'descending'):'none'):undefined}>{column.sortKey?<Button className="sort-header" variant="minimal" size="small" alignText="start" text={column.label} rightIcon={active?(direction==='asc'?'sort-asc':'sort-desc'):undefined} onClick={()=>sort(column.sortKey!)}/>:column.label}{resizeHandle(column.key,column.label)}</th>
+    return <th key={column.key} data-column-key={column.key} aria-label={headerLabel} aria-sort={column.sortKey?(active?(direction==='asc'?'ascending':'descending'):'none'):undefined}>{column.sortKey?<Button className="sort-header" variant="minimal" size="small" alignText="start" text={headerLabel} rightIcon={active?(direction==='asc'?'sort-asc':'sort-desc'):undefined} onClick={()=>sort(column.sortKey!)}/>:headerLabel}{resizeHandle(column.key,column.label)}</th>
   }
   const sizedColumns=[...visibleColumns.map((column)=>column.key),'actions'] as Array<SecurityColumnKey|'actions'>
   const tableWidth=preferences.widths?sizedColumns.reduce((sum,key)=>sum+(preferences.widths?.[key]??DEFAULT_COLUMN_WIDTHS[key]),0):undefined
