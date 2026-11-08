@@ -1,3 +1,4 @@
+import type { ChecklistQuestion, ChecklistAnswer, SecurityChecklistAnswer } from '../domain/types'
 import Database from '@tauri-apps/plugin-sql'
 import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, extractEditorImageIds, type EditorImageInput, type EditorImageReferenceScope, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
@@ -19,6 +20,25 @@ export class TauriRepository implements EquityRepository {
     await this.markUnreferencedEditorImages()
   }
   private async removeEditorImageReferences(contentType:EditorImageContentType,contentId:string) { await this.db.execute('DELETE FROM editor_image_references WHERE content_type=$1 AND content_id=$2',[contentType,contentId]);await this.markUnreferencedEditorImages() }
+
+  async listChecklistQuestions(): Promise<ChecklistQuestion[]> {
+    return (await this.db.select<DbRow[]>('SELECT id,question,sort_order FROM checklist_questions ORDER BY sort_order,id')).map(r=>({id:String(r.id),question:String(r.question),sortOrder:Number(r.sort_order)}))
+  }
+  async saveChecklistQuestions(questions: ChecklistQuestion[]) {
+    const cleaned=questions.map((q,sortOrder)=>({...q,question:cleanRequired(q.question,'a checklist question'),sortOrder}))
+    if(new Set(cleaned.map(q=>q.id)).size!==cleaned.length)throw new Error('Duplicate question IDs.')
+    for(const q of cleaned)await this.db.execute('INSERT INTO checklist_questions (id,question,sort_order) VALUES ($1,$2,$3) ON CONFLICT(id) DO UPDATE SET question=excluded.question,sort_order=excluded.sort_order',[q.id,q.question,q.sortOrder])
+    for(const q of await this.listChecklistQuestions())if(!cleaned.some(item=>item.id===q.id))await this.db.execute('DELETE FROM checklist_questions WHERE id=$1',[q.id])
+  }
+  async listChecklistAnswers(securityId: string): Promise<SecurityChecklistAnswer[]> {
+    return (await this.db.select<DbRow[]>('SELECT security_id,question_id,answer FROM security_checklist_answers WHERE security_id=$1',[securityId])).map(r=>({securityId:String(r.security_id),questionId:String(r.question_id),answer:String(r.answer) as ChecklistAnswer}))
+  }
+  async setChecklistAnswer(securityId: string, questionId: string, answer: ChecklistAnswer | null) {
+    if(answer!==null&&!['yes','no','na'].includes(answer))throw new Error('Invalid checklist answer.')
+    if(answer===null)await this.db.execute('DELETE FROM security_checklist_answers WHERE security_id=$1 AND question_id=$2',[securityId,questionId])
+    else await this.db.execute('INSERT INTO security_checklist_answers (security_id,question_id,answer) VALUES ($1,$2,$3) ON CONFLICT(security_id,question_id) DO UPDATE SET answer=excluded.answer',[securityId,questionId,answer])
+  }
+
   async initialize() {
     this.db = await Database.load('sqlite:equity-journal.sqlite3')
     await this.db.execute('PRAGMA foreign_keys = ON')

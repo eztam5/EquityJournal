@@ -1,7 +1,10 @@
+import type { ChecklistQuestion, ChecklistAnswer, SecurityChecklistAnswer } from '../domain/types'
 import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, Tag, Taxonomy, Watchlist } from '../domain/types'
 import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, extractEditorImageIds, type EditorImageInput, type EditorImageReferenceScope, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
 
 interface LocalData {
+  checklistQuestions: ChecklistQuestion[]
+  checklistAnswers: SecurityChecklistAnswer[]
   securities: Security[]
   securityPrices: SecurityPrice[]
   watchlists: Watchlist[]
@@ -24,11 +27,29 @@ interface LocalData {
 
 const STORAGE_KEY = 'equity-journal.development-database.v1'
 const emptyData = (): LocalData => ({
-  securities: [], securityPrices: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [], securityDocuments: [], editorImages: [], editorImageReferences: [], securityLinkTemplates: [], researchTopics: [], researchTopicNotes: [], researchTopicJournalEntries: [], researchTopicSecurities: [], researchTopicTags: [],
+  checklistQuestions: [], checklistAnswers: [], securities: [], securityPrices: [], watchlists: [], watchlistSecurities: [], taxonomies: [], tags: [], securityTags: [], notes: [], journalEntries: [], securityDocuments: [], editorImages: [], editorImageReferences: [], securityLinkTemplates: [], researchTopics: [], researchTopicNotes: [], researchTopicJournalEntries: [], researchTopicSecurities: [], researchTopicTags: [],
 })
 
 export class LocalRepository implements EquityRepository {
   private data = emptyData()
+
+
+  async listChecklistQuestions() { return this.data.checklistQuestions.map((q)=>({...q})).sort((a,b)=>a.sortOrder-b.sortOrder) }
+  async saveChecklistQuestions(questions: ChecklistQuestion[]) {
+    const cleaned=questions.map((q,sortOrder)=>({...q,question:cleanRequired(q.question,'a checklist question'),sortOrder}))
+    if(new Set(cleaned.map(q=>q.id)).size!==cleaned.length)throw new Error('Duplicate question IDs.')
+    this.data.checklistQuestions=cleaned
+    this.data.checklistAnswers=this.data.checklistAnswers.filter(a=>cleaned.some(q=>q.id===a.questionId))
+    this.persist()
+  }
+  async listChecklistAnswers(securityId: string) { return this.data.checklistAnswers.filter(a=>a.securityId===securityId).map(a=>({...a})) }
+  async setChecklistAnswer(securityId: string, questionId: string, answer: ChecklistAnswer | null) {
+    if(answer!==null&&!['yes','no','na'].includes(answer))throw new Error('Invalid checklist answer.')
+    if(!this.data.securities.some(s=>s.id===securityId)||!this.data.checklistQuestions.some(q=>q.id===questionId))throw new Error('Company or question no longer exists.')
+    this.data.checklistAnswers=this.data.checklistAnswers.filter(a=>a.securityId!==securityId||a.questionId!==questionId)
+    if(answer!==null)this.data.checklistAnswers.push({securityId,questionId,answer})
+    this.persist()
+  }
 
   async initialize() {
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -76,6 +97,7 @@ export class LocalRepository implements EquityRepository {
     this.persist()
   }
   async deleteSecurity(id: string) {
+    this.data.checklistAnswers = this.data.checklistAnswers.filter((x) => x.securityId !== id)
     this.data.securities = this.data.securities.filter((x) => x.id !== id)
     this.data.securityTags = this.data.securityTags.filter((x) => x.securityId !== id)
     this.data.watchlistSecurities = this.data.watchlistSecurities.filter((x) => x.securityId !== id)

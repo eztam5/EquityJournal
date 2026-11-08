@@ -1,3 +1,4 @@
+import type { ChecklistQuestion, ChecklistAnswer, SecurityChecklistAnswer } from '../domain/types'
 import type { EditorImage, EditorImageContentType, EditorImageOwnerType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, ResearchTopicRelations, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 
 export type JournalEntryInput = Pick<SecurityJournalEntry, 'securityId' | 'entryDate' | 'contentHtml'> & { id?: string }
@@ -7,6 +8,10 @@ export type SecurityDocumentInput = Omit<SecurityDocument, 'createdAt' | 'update
 export type EditorImageInput = Omit<EditorImage, 'orphanedAt' | 'createdAt' | 'updatedAt'>
 
 export interface EquityRepository {
+  listChecklistQuestions(): Promise<ChecklistQuestion[]>
+  saveChecklistQuestions(questions: ChecklistQuestion[]): Promise<void>
+  listChecklistAnswers(securityId: string): Promise<SecurityChecklistAnswer[]>
+  setChecklistAnswer(securityId: string, questionId: string, answer: ChecklistAnswer | null): Promise<void>
   initialize(): Promise<void>
   listSecurities(watchlistId?: string): Promise<Security[]>
   addSecurity(input: SecurityInput): Promise<Security>

@@ -14,7 +14,7 @@ describe('SettingsDialog navigation',()=>{
     render(<AppProvider repository={new LocalRepository()}><SettingsDialog isOpen onClose={vi.fn()}/></AppProvider>)
 
     const navigation=screen.getByRole('navigation',{name:'Settings sections'})
-    expect(within(navigation).getAllByRole('button').map((button)=>button.textContent)).toEqual(['General','Documents','Security Links','Database Connection'])
+    expect(within(navigation).getAllByRole('button').map((button)=>button.textContent)).toEqual(['General','Documents','Security Links','Investment checklist','Database Connection'])
     expect(screen.getByRole('heading',{name:'General'})).toBeInTheDocument()
     expect(screen.queryByLabelText('Database Path')).not.toBeInTheDocument()
 

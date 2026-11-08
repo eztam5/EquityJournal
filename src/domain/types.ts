@@ -168,3 +168,7 @@ export function buildTagTree(tags: Tag[]): TagNode[] {
   sort(roots)
   return roots
 }
+
+export interface ChecklistQuestion { id: string; question: string; sortOrder: number }
+export type ChecklistAnswer = 'yes' | 'no' | 'na'
+export interface SecurityChecklistAnswer { securityId: string; questionId: string; answer: ChecklistAnswer }

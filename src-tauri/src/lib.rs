@@ -511,6 +511,11 @@ pub fn run() {
         description: "security_link_favicons",
         sql: include_str!("../migrations/010_security_link_favicons.sql"),
         kind: MigrationKind::Up,
+    }, Migration {
+        version: 11,
+        description: "investment_checklist",
+        sql: include_str!("../migrations/011_investment_checklist.sql"),
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()

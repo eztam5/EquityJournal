@@ -5,3 +5,10 @@
 .table-tools small{right:4px;bottom:5px;width:10px;height:10px;margin:0;display:grid;place-items:center;font-size:12px;line-height:10px;background:var(--sidebar);border-radius:2px}
 .sidebar-wrap{min-width:100px}
 @media(max-width:850px){.content.page{padding:24px}.info-card{grid-template-columns:repeat(2,1fr);gap:18px}.app-title{display:none}}
+
+.checklist-question-editor { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.checklist-question-editor > .bp6-input-group { flex: 1; min-width: 0; }
+.investment-checklist { padding-inline-start: 20px; padding-inline-end: 28px; }
+.checklist-answer-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 14px 0; border-bottom: 1px solid var(--border-color, #8884); }
+.checklist-answer-row > span { overflow-wrap: anywhere; }
+.checklist-answer-row > .bp6-html-select { flex-shrink: 0; }
