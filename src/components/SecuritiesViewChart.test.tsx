@@ -42,7 +42,7 @@ function pointer(element: HTMLElement, type: string, clientY: number) {
 }
 
 describe('Watchlist bottom price chart', () => {
-  afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); document.documentElement.classList.remove('watchlist-security-dragging') })
+  afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); document.documentElement.classList.remove('watchlist-security-dragging') })
 
   it.each([false, true])('previews the clicked security below the list using the full chart (watchlist: %s)', async (inWatchlist) => {
     const { repository, watchlist } = await fixtures()
@@ -66,6 +66,130 @@ describe('Watchlist bottom price chart', () => {
     expect(screen.queryByRole('region', { name: 'AAPL — Apple Inc.' })).not.toBeInTheDocument()
     fireEvent.click(within(nextPanel).getByRole('button', { name: 'Close price chart' }))
     expect(screen.queryByRole('separator', { name: 'Resize price chart panel' })).not.toBeInTheDocument()
+  })
+
+  it('refreshes the table prices along with the preview chart', async () => {
+    const { repository } = await fixtures()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ chart: { result: [{
+      meta: { symbol: 'AAPL', currency: 'USD', exchangeTimezoneName: 'UTC' },
+      timestamp: [Date.UTC(2025, 8, 18) / 1000, Date.UTC(2026, 8, 18) / 1000],
+      indicators: { quote: [{ close: [100, 150] }], adjclose: [{ adjclose: [100, 150] }] },
+    }] } }) }))
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    const row = (await screen.findByText('Apple Inc.')).closest('tr')!
+    fireEvent.click(row)
+    const panel = screen.getByRole('region', { name: 'AAPL — Apple Inc.' })
+    expect(await within(panel).findByText('+25.0%')).toBeInTheDocument()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Refresh prices' }))
+    expect(await within(panel).findByText('+50.0%')).toBeInTheDocument()
+    expect(await within(row).findByText('+50.00%')).toBeInTheDocument()
+  })
+
+  it.each([false, true])('overlays every company in a Shift-selected range (watchlist: %s)', async (inWatchlist) => {
+    const { repository, apple, nestle, watchlist } = await fixtures()
+    const microsoft = await repository.addSecurity({ symbol: 'MSFT', name: 'Microsoft', currency: 'USD' })
+    await repository.setWatchlistSecurity(watchlist.id, microsoft.id, true)
+    for (const [security, base, latest] of [[nestle, 1000, 900], [microsoft, 500, 550]] as const) await repository.saveSecurityPrices(security.id, security.symbol, security.currency, [
+      { priceDate: '2025-09-18', close: base, adjustedClose: base },
+      { priceDate: '2026-09-18', close: latest, adjustedClose: latest },
+    ])
+    render(<AppProvider repository={repository}><SecuritiesView watchlistId={inWatchlist ? watchlist.id : undefined}/></AppProvider>)
+    const appleRow = (await screen.findByText('Apple Inc.')).closest('tr')!
+    const nestleRow = screen.getByText('Nestlé').closest('tr')!
+    fireEvent.click(appleRow)
+    fireEvent.click(nestleRow, { shiftKey: true })
+
+    const panel = await screen.findByRole('region', { name: 'Compare 3 securities' })
+    const chart = await within(panel).findByRole('img', { name: /selected securities price comparison/i })
+    const paths = [...chart.querySelectorAll('.comparison-price-line')]
+    expect(paths.map((path) => path.getAttribute('data-security-id')).sort()).toEqual([apple.id, nestle.id, microsoft.id].sort())
+    expect(new Set(paths.map((path) => (path.parentElement as unknown as SVGElement).style.getPropertyValue('--series-color'))).size).toBe(3)
+    const legend = within(panel).getByRole('list', { name: 'Comparison legend' })
+    expect(within(legend).getByText('AAPL').closest('li')).toHaveTextContent('+25.0%')
+    expect(within(legend).getByText('NESN').closest('li')).toHaveTextContent('-10.0%')
+    expect(within(legend).getByText('MSFT').closest('li')).toHaveTextContent('+10.0%')
+    for (const row of [appleRow, nestleRow, screen.getByText('Microsoft').closest('tr')!]) expect(row).toHaveAttribute('aria-selected', 'true')
+
+    fireEvent.click(nestleRow)
+    expect(await screen.findByRole('region', { name: 'NESN — Nestlé' })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /selected securities price comparison/i })).not.toBeInTheDocument()
+  })
+
+  it('updates the overlay when companies are toggled with Ctrl or Cmd', async () => {
+    const { repository } = await fixtures()
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    const appleRow = (await screen.findByText('Apple Inc.')).closest('tr')!
+    const nestleRow = screen.getByText('Nestlé').closest('tr')!
+    fireEvent.click(appleRow)
+    fireEvent.click(nestleRow, { ctrlKey: true, metaKey: true })
+    expect(await screen.findByRole('img', { name: /selected securities price comparison/i })).toBeInTheDocument()
+    fireEvent.click(nestleRow, { ctrlKey: true, metaKey: true })
+    expect(screen.getByRole('region', { name: 'AAPL — Apple Inc.' })).toBeInTheDocument()
+    fireEvent.click(nestleRow, { ctrlKey: true, metaKey: true })
+    expect(await screen.findByRole('img', { name: /selected securities price comparison/i })).toBeInTheDocument()
+    fireEvent.click(appleRow, { ctrlKey: true, metaKey: true })
+    expect(screen.getByRole('region', { name: 'NESN — Nestlé' })).toBeInTheDocument()
+    fireEvent.click(nestleRow, { ctrlKey: true, metaKey: true })
+    expect(screen.queryByRole('button', { name: 'Close price chart' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the chosen time range when entering and leaving comparison mode', async () => {
+    const { repository } = await fixtures()
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    const appleRow = (await screen.findByText('Apple Inc.')).closest('tr')!
+    const nestleRow = screen.getByText('Nestlé').closest('tr')!
+    fireEvent.click(appleRow)
+    fireEvent.click(screen.getByRole('button', { name: '2Y' }))
+    fireEvent.click(nestleRow, { shiftKey: true })
+    const panel = screen.getByRole('region', { name: 'Compare 2 securities' })
+    expect(within(panel).getByRole('button', { name: '2Y' })).toHaveClass('bp6-active')
+    await within(panel).findByRole('img', { name: /selected securities price comparison/i })
+    fireEvent.click(within(panel).getByRole('button', { name: '1M' }))
+    expect(within(panel).queryByRole('img', { name: /selected securities price comparison/i })).not.toBeInTheDocument()
+    expect(within(panel).getAllByText('Not enough history')).toHaveLength(2)
+    fireEvent.click(within(panel).getByRole('button', { name: '1Y' }))
+    expect(within(panel).getByRole('img', { name: /selected securities price comparison/i })).toBeInTheDocument()
+    fireEvent.click(appleRow)
+    expect(screen.getByRole('button', { name: '1Y' })).toHaveClass('bp6-active')
+  })
+
+  it('identifies companies with missing history and still plots the available series', async () => {
+    const { repository } = await fixtures()
+    await repository.addSecurity({ symbol: 'ZZZ', name: 'No history company', currency: 'USD' })
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    fireEvent.click((await screen.findByText('Apple Inc.')).closest('tr')!)
+    fireEvent.click(screen.getByText('No history company').closest('tr')!, { shiftKey: true })
+    const panel = screen.getByRole('region', { name: 'Compare 3 securities' })
+    const chart = await within(panel).findByRole('img', { name: /selected securities price comparison/i })
+    expect(chart.querySelectorAll('.comparison-price-line')).toHaveLength(2)
+    const legend = within(panel).getByRole('list', { name: 'Comparison legend' })
+    expect(within(legend).getByText('ZZZ').closest('li')).toHaveTextContent('Not enough history')
+  })
+
+  it('refreshes all compared companies and keeps cached lines when one refresh fails', async () => {
+    const { repository } = await fixtures()
+    const fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('NESN')) throw new Error('Connection unavailable')
+      return { ok: true, json: async () => ({ chart: { result: [{
+        meta: { symbol: 'AAPL', currency: 'USD', exchangeTimezoneName: 'UTC' },
+        timestamp: [Date.UTC(2025, 8, 18) / 1000, Date.UTC(2026, 8, 18) / 1000],
+        indicators: { quote: [{ close: [100, 150] }], adjclose: [{ adjclose: [100, 150] }] },
+      }] } }) }
+    })
+    vi.stubGlobal('fetch', fetch)
+    render(<AppProvider repository={repository}><SecuritiesView/></AppProvider>)
+    fireEvent.click((await screen.findByText('Apple Inc.')).closest('tr')!)
+    fireEvent.click(screen.getByText('Nestlé').closest('tr')!, { shiftKey: true })
+    const panel = screen.getByRole('region', { name: 'Compare 2 securities' })
+    await within(panel).findByRole('img', { name: /selected securities price comparison/i })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Refresh prices' }))
+    expect(await within(panel).findByText('NESN: Connection unavailable')).toBeInTheDocument()
+    const legend = within(panel).getByRole('list', { name: 'Comparison legend' })
+    expect(within(legend).getByText('AAPL').closest('li')).toHaveTextContent('+50.0%')
+    expect(within(legend).getByText('NESN').closest('li')).toHaveTextContent('+25.0%')
+    expect(panel.querySelectorAll('.comparison-price-line')).toHaveLength(2)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(await within(screen.getByText('Apple Inc.').closest('tr')!).findByText('+50.00%')).toBeInTheDocument()
   })
 
   it('keeps double-click navigation to the security detail view', async () => {
@@ -125,6 +249,11 @@ describe('Watchlist bottom price chart', () => {
     expect(handle).toHaveAttribute('aria-valuenow', '720')
     fireEvent.doubleClick(handle)
     expect(handle).toHaveAttribute('aria-valuenow', '360')
+    resizeWindow(320)
+    fireEvent.keyDown(handle, { key: 'Home' })
+    expect(handle).toHaveAttribute('aria-valuenow', '160')
+    resizeWindow(900)
+    expect(handle).toHaveAttribute('aria-valuenow', '240')
   })
 
   it('closes when changing watchlists or filtering out the selected security', async () => {

@@ -3,7 +3,7 @@ import { Button, ButtonGroup, Callout, Card, Spinner, Tooltip } from '@blueprint
 import { useApp } from '../app/AppContext'
 import type { Security, SecurityJournalEntry, SecurityPrice } from '../domain/types'
 import { fetchYahooPriceHistory, isTauriDesktop, yahooTimestampDate, type YahooPricePoint } from '../utils/yahooFinance'
-import { PRICE_HISTORY_CHANGED_EVENT } from '../utils/priceUpdates'
+import { notifyPriceHistoryChanged, PRICE_HISTORY_CHANGED_EVENT } from '../utils/priceUpdates'
 
 export const PRICE_RANGES=['1M','2M','6M','1Y','2Y','5Y','10Y','YTD'] as const
 export type PriceRange=typeof PRICE_RANGES[number]
@@ -76,14 +76,17 @@ function PriceChartSvg({prices,currency,securityId,journalEntries,onJournalEntry
   </svg>
 }
 
-export function SecurityPriceChart({security,journalRevision=0,onJournalEntryClick}:{security:Security;journalRevision?:number;onJournalEntryClick?(entry:SecurityJournalEntry):void}) {
-  const app=useApp(),[prices,setPrices]=useState<SecurityPrice[]>([]),[journalEntries,setJournalEntries]=useState<SecurityJournalEntry[]>([]),[range,setRange]=useState<PriceRange>('1Y'),[loading,setLoading]=useState(true),[error,setError]=useState('')
+export function SecurityPriceChart({security,journalRevision=0,onJournalEntryClick,range:controlledRange,onRangeChange}:{security:Security;journalRevision?:number;onJournalEntryClick?(entry:SecurityJournalEntry):void;range?:PriceRange;onRangeChange?(range:PriceRange):void}) {
+  const app=useApp(),[prices,setPrices]=useState<SecurityPrice[]>([]),[journalEntries,setJournalEntries]=useState<SecurityJournalEntry[]>([]),[localRange,setLocalRange]=useState<PriceRange>('1Y'),[loading,setLoading]=useState(true),[error,setError]=useState('')
+  const range=controlledRange??localRange
+  const setRange=(next:PriceRange)=>{setLocalRange(next);onRangeChange?.(next)}
   const load=useCallback(async(force=false)=>{setLoading(true);setError('');try{
     const cached=(await app.repository.listSecurityPrices(security.id)).filter((price)=>price.sourceSymbol.toUpperCase()===security.symbol.toUpperCase())
     if(cached.length>=2&&!force){setPrices(cached);return}
     if(!force&&!isTauriDesktop()){setPrices(cached);return}
     const history=await fetchYahooPriceHistory(security.symbol,'10y'),records=history.prices.map((price)=>({priceDate:yahooTimestampDate(price.timestamp,history.timeZone),close:price.close,adjustedClose:price.adjustedClose}))
     setPrices(await app.repository.saveSecurityPrices(security.id,security.symbol,history.currency||security.currency,records))
+    notifyPriceHistoryChanged([security.id])
   }catch(reason){setError(reason instanceof Error?reason.message:String(reason))}finally{setLoading(false)}},[app.repository,security.currency,security.id,security.symbol])
   useEffect(()=>{void load()},[load])
   useEffect(()=>{

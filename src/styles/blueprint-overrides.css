@@ -38,10 +38,21 @@
 .watchlist-chart-titlebar > h2 { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 .watchlist-chart-titlebar > .bp6-button { flex: none; }
 .watchlist-chart-panel > .price-chart-card { flex: 1 0 220px; min-height: 220px; display: flex; flex-direction: column; margin-bottom: 0; }
+.watchlist-chart-panel > .security-comparison-chart { flex-basis: auto; }
 .watchlist-chart-panel .price-chart-card > header { flex: none; flex-wrap: wrap; }
 .watchlist-chart-panel .security-price-svg { flex: 1; height: 0; min-height: 90px; }
 .watchlist-chart-panel .price-chart-loading, .watchlist-chart-panel .price-chart-empty { flex: 1; min-height: 90px; }
 .watchlist-chart-panel .price-chart-card > footer { flex: none; }
+.security-comparison-chart { --comparison-color-0: var(--accent); --comparison-color-1: #b45309; --comparison-color-2: #21835c; --comparison-color-3: #8356c6; --comparison-color-4: #c13c60; --comparison-color-5: #087f8c; --comparison-color-6: #8e5b3a; --comparison-color-7: #60718f; }
+:root[data-theme=dark] .security-comparison-chart { --comparison-color-1: #fbbf24; --comparison-color-2: #5bd4a4; --comparison-color-3: #c4a5ff; --comparison-color-4: #ff8aab; --comparison-color-5: #62d9e5; --comparison-color-6: #dba97f; --comparison-color-7: #b4c4e4; }
+.comparison-price-line { fill: none; stroke: var(--series-color); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.comparison-price-end { fill: var(--series-color); }
+.comparison-zero-line { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: .6; }
+.comparison-legend { flex: none; display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 8px 0 0; padding: 0; list-style: none; }
+.comparison-legend > li { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.comparison-legend-swatch { flex: none; }
+.comparison-legend-swatch line { stroke-width: 2; }
+.comparison-legend-value { color: var(--muted); font-variant-numeric: tabular-nums; }
 .securities-page .security-table thead th { box-shadow: inset 0 -1px 0 var(--border); }
 .page-header-leading { min-width: 0; display: flex; align-items: flex-start; gap: 6px; }
 .page-back-button.bp6-button { width: 32px; height: 32px; min-width: 32px; flex: none; margin-top: 1px; }

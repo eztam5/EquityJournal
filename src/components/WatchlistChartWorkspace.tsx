@@ -2,7 +2,8 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEv
 import { Button } from '@blueprintjs/core'
 import { useApp } from '../app/AppContext'
 import type { Security } from '../domain/types'
-import { SecurityPriceChart } from './SecurityPriceChart'
+import { SecurityPriceChart, type PriceRange } from './SecurityPriceChart'
+import { SecurityComparisonChart } from './SecurityComparisonChart'
 
 const HEIGHT_KEY = 'equity-journal.watchlist-chart-height.v1'
 const DEFAULT_HEIGHT = 360
@@ -19,17 +20,20 @@ function loadHeight() {
   } catch { return DEFAULT_HEIGHT }
 }
 
-export function WatchlistChartWorkspace({ security, onClose, children }: { security?: Security; onClose(): void; children: ReactNode }) {
+export function WatchlistChartWorkspace({ securities, onClose, children }: { securities: Security[]; onClose(): void; children: ReactNode }) {
   const app = useApp()
   const [preferredHeight, setPreferredHeight] = useState(loadHeight)
   const [availableHeight, setAvailableHeight] = useState<number | null>(null)
   const [resizing, setResizing] = useState(false)
+  const [range, setRange] = useState<PriceRange>('1Y')
+  const security = securities.length === 1 ? securities[0] : undefined
+  const hasSelection = securities.length > 0
   const workspace = useRef<HTMLDivElement>(null)
   const drag = useRef<{ pointerId: number; startY: number; startHeight: number } | null>(null)
   const chartId = useId()
   const maxHeight = availableHeight === null ? MAX_HEIGHT : Math.max(160, Math.min(MAX_HEIGHT, availableHeight - LIST_MIN_HEIGHT - HANDLE_HEIGHT))
   const minHeight = Math.min(MIN_HEIGHT, maxHeight)
-  const height = Math.min(preferredHeight, maxHeight)
+  const height = Math.min(maxHeight, Math.max(minHeight, preferredHeight))
 
   useEffect(() => {
     try { localStorage.setItem(HEIGHT_KEY, String(preferredHeight)) }
@@ -51,8 +55,8 @@ export function WatchlistChartWorkspace({ security, onClose, children }: { secur
   }, [])
 
   useEffect(() => {
-    if (!security) { drag.current = null; setResizing(false) }
-  }, [security])
+    if (!hasSelection) { drag.current = null; setResizing(false) }
+  }, [hasSelection])
 
   const resizeTo = (next: number) => setPreferredHeight(Math.min(maxHeight, Math.max(minHeight, Math.round(next))))
   const startResize = (event: PointerEvent<HTMLDivElement>) => {
@@ -84,12 +88,12 @@ export function WatchlistChartWorkspace({ security, onClose, children }: { secur
 
   return <div ref={workspace} className={`watchlist-chart-workspace${resizing ? ' is-resizing' : ''}`} style={{ '--watchlist-chart-height': `${height}px` } as CSSProperties}>
     {children}
-    {security && <>
+    {hasSelection && <>
       <div className="watchlist-chart-resizer" role="separator" tabIndex={0} aria-label="Resize price chart panel" aria-orientation="horizontal" aria-controls={chartId} aria-valuemin={minHeight} aria-valuemax={maxHeight} aria-valuenow={height} aria-valuetext={`${height} pixels`}
         title="Drag to resize. Double-click to reset height." onPointerDown={startResize} onPointerMove={moveResize} onPointerUp={stopResize} onPointerCancel={stopResize} onLostPointerCapture={stopResize} onKeyDown={resizeWithKeyboard} onDoubleClick={() => resizeTo(DEFAULT_HEIGHT)}/>
       <section id={chartId} className="watchlist-chart-panel" aria-labelledby={`${chartId}-title`}>
-        <header className="watchlist-chart-titlebar"><h2 id={`${chartId}-title`}>{security.symbol} — {security.name}</h2><Button variant="minimal" size="small" icon="cross" aria-label="Close price chart" title="Close price chart" onClick={onClose}/></header>
-        <SecurityPriceChart key={security.id} security={security} onJournalEntryClick={(entry) => app.openSecurity(security.id, entry.id)}/>
+        <header className="watchlist-chart-titlebar"><h2 id={`${chartId}-title`}>{security ? `${security.symbol} — ${security.name}` : `Compare ${securities.length} securities`}</h2><Button variant="minimal" size="small" icon="cross" aria-label="Close price chart" title="Close price chart" onClick={onClose}/></header>
+        {security ? <SecurityPriceChart key={security.id} security={security} range={range} onRangeChange={setRange} onJournalEntryClick={(entry) => app.openSecurity(security.id, entry.id)}/> : <SecurityComparisonChart securities={securities} range={range} onRangeChange={setRange}/>}
       </section>
     </>}
   </div>
