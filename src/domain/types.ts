@@ -119,6 +119,11 @@ export interface ResearchTopic {
   updatedAt: string
 }
 
+export interface SecurityResearchTopic extends ResearchTopic {
+  direct: boolean
+  matchingTagIds: string[]
+}
+
 export interface ResearchTopicNote {
   topicId: string
   contentHtml: string

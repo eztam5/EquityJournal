@@ -238,6 +238,39 @@ describe('LocalRepository',()=>{
     expect((await repository.loadResearchTopicNote(topic.id)).contentHtml).toBe('')
     expect(await repository.listResearchTopicJournalEntries(topic.id)).toEqual([])
   })
+  it('looks up each related topic once and reports the classification rules matching a security',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const software=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Software',description:'',color:taxonomy.color})
+    const vms=await repository.addTag({taxonomyId:taxonomy.id,parentId:software.id,name:'VMS',description:'',color:taxonomy.color})
+    const unrelated=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Hardware',description:'',color:taxonomy.color})
+    const security=await repository.addSecurity({symbol:'CSU',currency:'CAD',name:'Constellation Software'})
+    await repository.setAssignedTags(security.id,[vms.id,software.id])
+    const direct=await repository.addResearchTopic('A direct topic')
+    const inherited=await repository.addResearchTopic('B inherited topic')
+    const both=await repository.addResearchTopic('C combined topic')
+    const excluded=await repository.addResearchTopic('Unrelated topic')
+    await repository.setResearchTopicRelations(direct.id,[security.id],[])
+    await repository.setResearchTopicRelations(inherited.id,[],[software.id])
+    await repository.setResearchTopicRelations(both.id,[security.id],[software.id,vms.id])
+    await repository.setResearchTopicRelations(excluded.id,[],[unrelated.id])
+
+    expect(await repository.listSecurityResearchTopics(security.id)).toEqual([
+      expect.objectContaining({id:direct.id,direct:true,matchingTagIds:[]}),
+      expect.objectContaining({id:inherited.id,direct:false,matchingTagIds:[software.id]}),
+      expect.objectContaining({id:both.id,direct:true,matchingTagIds:[software.id,vms.id].sort()}),
+    ])
+    expect(await repository.listSecurityResearchTopics('missing-security')).toEqual([])
+
+    await repository.setAssignedTags(security.id,[])
+    expect(await repository.listSecurityResearchTopics(security.id)).toEqual([
+      expect.objectContaining({id:direct.id,direct:true,matchingTagIds:[]}),
+      expect.objectContaining({id:both.id,direct:true,matchingTagIds:[]}),
+    ])
+    await repository.setAssignedTags(security.id,[software.id])
+    await repository.setResearchTopicRelations(inherited.id,[],[vms.id])
+    expect((await repository.listSecurityResearchTopics(security.id)).map((topic)=>topic.id)).not.toContain(inherited.id)
+  })
   it('persists prices and invalidates them when the Yahoo symbol changes',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'AAPL',currency:'USD',name:'Apple'})

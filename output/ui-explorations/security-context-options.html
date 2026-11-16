@@ -1,0 +1,199 @@
+<div id="security-context-options" class="viz-carousel" aria-label="Security context placement options">
+  <section data-variant="Compact metadata" aria-label="Compact metadata layout">
+    <div class="ej-page ej-compact" aria-label="Security detail with compact metadata"></div>
+  </section>
+  <section data-variant="Research side panel" aria-label="Research side panel layout" hidden>
+    <div class="ej-page ej-side" aria-label="Security detail with research side panel"></div>
+  </section>
+  <section data-variant="Context popover" aria-label="Context popover layout" hidden>
+    <div class="ej-page ej-popover" aria-label="Security detail with context popover"></div>
+  </section>
+</div>
+
+<template id="ej-page-template">
+  <header class="ej-heading"><div><span class="ej-back" aria-hidden="true">‹</span><div><h1>ACME</h1><p>Acme Corporation</p></div></div><span class="ej-sample">Illustrative content</span></header>
+  <section class="ej-information" aria-label="Security information">
+    <div class="ej-facts"><div><span>Symbol</span><strong>ACME</strong></div><div><span>Alternative ID</span><strong>—</strong></div><div><span>Currency</span><strong>USD</strong></div><div><span>Company name</span><strong>Acme Corporation</strong></div></div>
+    <div class="ej-context-slot"></div>
+  </section>
+  <section class="ej-chart" aria-label="Existing price chart area"><h2>Price history</h2><div class="ej-chart-placeholder"><i data-lucide="chart-no-axes-combined" aria-hidden="true"></i><span>Price chart</span></div></section>
+  <div class="ej-research-layout">
+    <section class="ej-research" aria-label="Research workspace"><h2>Research</h2><div class="ej-tabs" aria-label="Research sections"><span class="ej-selected">Current Thesis</span><span>Journal</span><span>Documents</span><span>Checklist</span></div><div class="ej-editor"><h3>Investment thesis</h3><div class="ej-writing" aria-hidden="true"><i></i><i></i><i></i></div><h3>Key questions</h3><div class="ej-writing" aria-hidden="true"><i></i><i></i></div></div></section>
+    <aside class="ej-side-slot" aria-label="Security context"></aside>
+  </div>
+  <section class="ej-topic-preview" aria-label="Research topic preview" hidden><button type="button" class="ej-link ej-topic-back">‹ Back to security</button><h2></h2><span class="ej-label">Research topic</span><h3>Related securities</h3><span class="ej-chip">ACME · Acme Corporation</span></section>
+</template>
+
+<template id="ej-context-template">
+  <div class="ej-context" aria-label="Classifications and research topics">
+    <section class="ej-tags"><h3>Classifications</h3><div class="ej-chip-list"><span class="ej-chip">Sector: Industrials</span><span class="ej-chip">Style: Quality</span></div></section>
+    <section class="ej-topics"><h3>Research topics</h3><div class="ej-topic-list"><button type="button" class="ej-topic" data-topic="Industrial automation"><span>Industrial automation ↗</span><small class="ej-reason">Direct</small></button><button type="button" class="ej-topic" data-topic="Quality compounders"><span>Quality compounders ↗</span><small class="ej-reason">Via Style: Quality</small></button></div></section>
+  </div>
+</template>
+
+<style>
+  #security-context-options .ej-page {
+    --ej-window: light-dark(#f7f8fa, #20242a);
+    --ej-content: light-dark(#ffffff, #171a1f);
+    --ej-sidebar: light-dark(#f0f2f5, #20242a);
+    --ej-border: light-dark(#d7dbe2, #363c46);
+    --ej-text: light-dark(#172033, #f2f4f7);
+    --ej-secondary: light-dark(#667085, #b2bac7);
+    --ej-selected: light-dark(#e5eaf1, #343b47);
+    --ej-accent: light-dark(#1f5fbf, #9fc7ff);
+    color: var(--ej-text); background: var(--ej-content); font: 13px/1.45 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 640px; border: 1px solid var(--ej-border); position: relative; isolation: isolate;
+  }
+  #security-context-options .ej-page * { box-sizing: border-box; }
+  #security-context-options .ej-page [hidden] { display: none !important; }
+  #security-context-options .ej-page h1 { font-size: 24px; font-weight: 600; margin: 0; }
+  #security-context-options .ej-page h2 { font-size: 16px; font-weight: 600; margin: 0; }
+  #security-context-options .ej-page h3 { font-size: 12px; font-weight: 600; margin: 0; }
+  #security-context-options .ej-page p { margin: 0; color: var(--ej-secondary); }
+  #security-context-options .ej-heading { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px 14px 12px; background: var(--ej-sidebar); border-bottom: 1px solid var(--ej-border); gap: 12px; }
+  #security-context-options .ej-heading > div { display: flex; gap: 12px; align-items: center; }
+  #security-context-options .ej-back { font-size: 28px; }
+  #security-context-options .ej-sample { color: var(--ej-secondary); font-size: 11px; padding-right: 70px; }
+  #security-context-options .ej-information { padding: 16px 20px; background: var(--ej-window); border-bottom: 1px solid var(--ej-border); position: relative; }
+  #security-context-options .ej-facts { display: grid; grid-template-columns: 1fr 1fr .8fr 1.8fr; gap: 16px; }
+  #security-context-options .ej-facts > div { display: grid; gap: 4px; min-width: 0; }
+  #security-context-options .ej-facts span, #security-context-options .ej-label { color: var(--ej-secondary); font-size: 11px; }
+  #security-context-options .ej-facts strong { font-weight: 500; overflow-wrap: anywhere; }
+  #security-context-options .ej-chart { padding: 16px 20px; border-bottom: 1px solid var(--ej-border); }
+  #security-context-options .ej-chart-placeholder { display: flex; gap: 8px; align-items: center; justify-content: center; color: var(--ej-secondary); background: var(--ej-sidebar); height: 132px; margin-top: 10px; }
+  #security-context-options .ej-chart-placeholder svg { width: 22px; height: 22px; }
+  #security-context-options .ej-research-layout { display: grid; }
+  #security-context-options .ej-research { min-width: 0; padding: 16px 20px 24px; }
+  #security-context-options .ej-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; border-bottom: 1px solid var(--ej-border); padding-bottom: 10px; }
+  #security-context-options .ej-tabs > span { font-size: 11px; padding: 5px 7px; color: var(--ej-secondary); }
+  #security-context-options .ej-tabs > .ej-selected { background: var(--ej-selected); color: var(--ej-text); }
+  #security-context-options .ej-editor { padding-top: 18px; }
+  #security-context-options .ej-editor h3 { font-size: 14px; }
+  #security-context-options .ej-writing { display: grid; gap: 8px; margin: 12px 0 20px; }
+  #security-context-options .ej-writing i { height: 5px; background: var(--ej-selected); width: 96%; }
+  #security-context-options .ej-writing i:last-child { width: 65%; }
+  #security-context-options .ej-context { display: grid; gap: 12px; }
+  #security-context-options .ej-context h3 { color: var(--ej-secondary); }
+  #security-context-options .ej-chip-list, #security-context-options .ej-topic-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  #security-context-options .ej-chip { display: inline-flex; background: var(--ej-selected); border-radius: 12px; padding: 3px 8px; font-size: 11px; overflow-wrap: anywhere; }
+  #security-context-options .ej-page button { font: inherit; color: var(--ej-accent); cursor: pointer; }
+  #security-context-options .ej-page button:focus-visible { outline: 2px solid var(--ej-accent); outline-offset: 2px; }
+  #security-context-options .ej-topic { border: 0; border-radius: 4px; background: transparent; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 2px 0; text-align: left; max-width: 100%; }
+  #security-context-options .ej-topic > span { overflow-wrap: anywhere; }
+  #security-context-options .ej-topic:hover { text-decoration: underline; }
+  #security-context-options .ej-reason { color: var(--ej-secondary); font-size: 11px; background: var(--ej-sidebar); padding: 2px 5px; border-radius: 3px; }
+  #security-context-options .ej-compact .ej-context { border-top: 1px solid var(--ej-border); padding-top: 12px; margin-top: 14px; }
+  #security-context-options .ej-compact .ej-context > section { display: grid; grid-template-columns: 116px minmax(0, 1fr); align-items: start; gap: 8px; }
+  #security-context-options .ej-compact .ej-context h3 { padding-top: 4px; }
+  #security-context-options .ej-side .ej-research-layout { grid-template-columns: minmax(0, 1fr) 230px; }
+  #security-context-options .ej-side-slot:empty { display: none; }
+  #security-context-options .ej-side .ej-side-slot { background: var(--ej-window); border-left: 1px solid var(--ej-border); padding: 18px 16px; }
+  #security-context-options .ej-side .ej-context { gap: 24px; }
+  #security-context-options .ej-side .ej-context h3 { margin-bottom: 8px; }
+  #security-context-options .ej-side .ej-topic-list { display: grid; gap: 10px; }
+  #security-context-options .ej-side .ej-topic { display: grid; justify-items: start; }
+  #security-context-options .ej-popover .ej-context-slot { margin-top: 12px; }
+  #security-context-options .ej-context-trigger { border: 1px solid var(--ej-border); background: var(--ej-content); padding: 5px 10px; border-radius: 5px; display: inline-flex; gap: 8px; align-items: center; }
+  #security-context-options .ej-floating { position: absolute; top: calc(100% - 4px); left: 20px; width: min(380px, calc(100% - 40px)); padding: 16px; background: var(--ej-window); border: 1px solid var(--ej-border); box-shadow: 0 10px 24px light-dark(#17203324, #00000066); border-radius: 6px; z-index: 3; }
+  #security-context-options .ej-floating header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 16px; }
+  #security-context-options .ej-link { border: 0; background: transparent; padding: 3px 0; }
+  #security-context-options .ej-floating .ej-context h3 { margin-bottom: 8px; }
+  #security-context-options .ej-floating .ej-topic-list { display: grid; }
+  #security-context-options .ej-topic-preview { position: absolute; inset: 0; background: var(--ej-content); padding: 24px; z-index: 5; }
+  #security-context-options .ej-topic-preview h2 { margin-top: 24px; }
+  #security-context-options .ej-topic-preview h3 { margin-top: 30px; margin-bottom: 12px; }
+  @media (max-width: 540px) {
+    #security-context-options .ej-page { min-height: 920px; }
+    #security-context-options .ej-sample { display: none; }
+    #security-context-options .ej-facts { grid-template-columns: 1fr 1fr; }
+    #security-context-options .ej-compact .ej-context > section { grid-template-columns: 1fr; gap: 5px; }
+    #security-context-options .ej-side .ej-research-layout { display: flex; flex-direction: column; }
+    #security-context-options .ej-side .ej-side-slot { border-left: 0; border-bottom: 1px solid var(--ej-border); order: -1; }
+    #security-context-options .ej-chart-placeholder { height: 110px; }
+  }
+  @media (pointer: coarse) {
+    #security-context-options .ej-page button { min-height: 44px; }
+  }
+</style>
+
+<script>
+(() => {
+  const root = document.getElementById('security-context-options');
+  const pageTemplate = document.getElementById('ej-page-template');
+  const contextTemplate = document.getElementById('ej-context-template');
+  const saved = window.openai?.widgetState?.privateContent;
+  const states = [];
+  root.querySelectorAll('.ej-page').forEach((page, index) => {
+    page.append(pageTemplate.content.cloneNode(true));
+    const context = contextTemplate.content.cloneNode(true);
+    const slot = page.querySelector('.ej-context-slot');
+    const state = { reasons: saved?.reasons?.[index] !== false };
+    states.push(state);
+    if (page.classList.contains('ej-side')) {
+      page.querySelector('.ej-side-slot').append(context);
+    } else if (page.classList.contains('ej-popover')) {
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'ej-context-trigger';
+      trigger.textContent = 'Classifications 2 · Topics 2 ▾';
+      trigger.setAttribute('aria-expanded', 'false');
+      trigger.setAttribute('aria-controls', 'ej-context-popover');
+      const popover = document.createElement('section');
+      popover.className = 'ej-floating';
+      popover.id = 'ej-context-popover';
+      popover.hidden = true;
+      popover.setAttribute('aria-label', 'Classifications and research topics');
+      const header = document.createElement('header');
+      const heading = document.createElement('h3');
+      heading.textContent = 'Security context';
+      const close = document.createElement('button');
+      close.className = 'ej-link';
+      close.type = 'button';
+      close.textContent = 'Close';
+      header.append(heading, close);
+      popover.append(header, context);
+      slot.append(trigger, popover);
+      const setOpen = (open) => {
+        popover.hidden = !open;
+        trigger.setAttribute('aria-expanded', String(open));
+      };
+      trigger.addEventListener('click', () => setOpen(popover.hidden));
+      close.addEventListener('click', () => { setOpen(false); trigger.focus(); });
+      page.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !popover.hidden) { setOpen(false); trigger.focus(); }
+      });
+    } else {
+      slot.append(context);
+    }
+    const renderReasons = () => {
+      page.querySelectorAll('.ej-reason').forEach((reason) => { reason.hidden = !state.reasons; });
+    };
+    renderReasons();
+    const preview = page.querySelector('.ej-topic-preview');
+    let lastTopic;
+    page.querySelectorAll('.ej-topic').forEach((button) => button.addEventListener('click', () => {
+      lastTopic = button;
+      preview.querySelector('h2').textContent = button.dataset.topic;
+      preview.hidden = false;
+      preview.querySelector('button').focus();
+    }));
+    preview.querySelector('button').addEventListener('click', () => { preview.hidden = true; lastTopic?.focus(); });
+    if (globalThis.Tweak) {
+      const tweak = new Tweak({ container: page, onChange: () => {
+        renderReasons();
+        window.openai?.setWidgetState?.({ privateContent: { reasons: states.map((item) => item.reasons) } })?.catch(() => {});
+      } });
+      tweak.addToggle(state, 'reasons', { label: 'Show topic connection reasons' });
+    }
+  });
+  window.addEventListener('openai:set_globals', (event) => {
+    const reasons = event.detail?.globals?.widgetState?.privateContent?.reasons;
+    if (!Array.isArray(reasons)) return;
+    root.querySelectorAll('.ej-page').forEach((page, index) => {
+      states[index].reasons = reasons[index] !== false;
+      page.querySelectorAll('.ej-reason').forEach((reason) => { reason.hidden = !states[index].reasons; });
+    });
+  });
+  globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+})();
+</script>

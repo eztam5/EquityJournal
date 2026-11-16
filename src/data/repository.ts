@@ -1,5 +1,5 @@
 import type { ChecklistQuestion, ChecklistAnswer, SecurityChecklistAnswer } from '../domain/types'
-import type { EditorImage, EditorImageContentType, EditorImageOwnerType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, ResearchTopicRelations, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import type { EditorImage, EditorImageContentType, EditorImageOwnerType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, ResearchTopicRelations, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, SecurityResearchTopic, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 
 export type JournalEntryInput = Pick<SecurityJournalEntry, 'securityId' | 'entryDate' | 'contentHtml'> & { id?: string }
 export type TopicJournalEntryInput = Pick<ResearchTopicJournalEntry, 'topicId' | 'entryDate' | 'contentHtml'> & { id?: string }
@@ -56,6 +56,7 @@ export interface EquityRepository {
   listSecurityLinkTemplates(): Promise<SecurityLinkTemplate[]>
   saveSecurityLinkTemplates(templates: SecurityLinkTemplate[]): Promise<SecurityLinkTemplate[]>
   listResearchTopics(): Promise<ResearchTopic[]>
+  listSecurityResearchTopics(securityId: string): Promise<SecurityResearchTopic[]>
   addResearchTopic(title: string): Promise<ResearchTopic>
   updateResearchTopic(topic: Pick<ResearchTopic, 'id' | 'title'>): Promise<void>
   deleteResearchTopic(id: string): Promise<void>

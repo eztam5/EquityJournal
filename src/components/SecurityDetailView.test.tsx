@@ -1,8 +1,16 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AppProvider } from '../app/AppContext'
+import { AppProvider, useApp } from '../app/AppContext'
 import { LocalRepository } from '../data/localRepository'
 import { SecurityDetailView } from './SecurityDetailView'
+import { ResearchTopicDetailView } from './ResearchTopicDetailView'
+
+function SecurityTopicNavigation({ securityId }: { securityId: string }) {
+  const app = useApp()
+  if (app.view.type === 'security') return <SecurityDetailView id={app.view.id}/>
+  if (app.view.type === 'topic') return <ResearchTopicDetailView id={app.view.id}/>
+  return <button onClick={() => app.openSecurity(securityId)}>Open security</button>
+}
 
 describe('SecurityDetailView research notes',()=>{
   afterEach(()=>{cleanup();localStorage.clear()})
@@ -83,7 +91,7 @@ describe('SecurityDetailView research notes',()=>{
     expect(screen.getByLabelText('Company name')).toHaveValue('Apple Inc.')
   })
 
-  it('shows assigned tags with their parent path but without the taxonomy name',async()=>{
+  it('puts taxonomy and parent paths in compact chips inside the security information panel',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'NEM',name:'Newmont',currency:'USD'})
     const taxonomy=await repository.addTaxonomy({name:'Asset Allocation',description:'',color:'#4F7CAC'})
@@ -94,9 +102,94 @@ describe('SecurityDetailView research notes',()=>{
 
     render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
 
-    expect(await screen.findByText('Materials ▸ Precious Metals ▸ Gold')).toBeInTheDocument()
-    expect(screen.getByRole('heading',{name:'Asset Allocation'})).toBeInTheDocument()
-    expect(screen.queryByText('Asset Allocation › Materials › Precious Metals › Gold')).not.toBeInTheDocument()
+    const tag=await screen.findByText('Asset Allocation: Materials ▸ Precious Metals ▸ Gold')
+    expect(tag.closest('.info-card')).toBeInTheDocument()
+    expect(screen.getByRole('heading',{name:'Classifications'}).closest('.info-card')).toBeInTheDocument()
+    expect(screen.queryByRole('heading',{name:'Asset Allocation'})).not.toBeInTheDocument()
+    expect(document.querySelector('.classification-card')).not.toBeInTheDocument()
+  })
+
+  it('shows only topic names for direct and inherited connections and refreshes them after editing tags',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'CSU',name:'Constellation Software',currency:'CAD'})
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const software=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Software',description:'',color:taxonomy.color})
+    const vms=await repository.addTag({taxonomyId:taxonomy.id,parentId:software.id,name:'VMS',description:'',color:taxonomy.color})
+    await repository.setAssignedTags(security.id,[vms.id])
+    const direct=await repository.addResearchTopic('Direct research')
+    const inherited=await repository.addResearchTopic('Inherited research')
+    const both=await repository.addResearchTopic('Combined research')
+    await repository.addResearchTopic('Unrelated research')
+    await repository.setResearchTopicRelations(direct.id,[security.id],[])
+    await repository.setResearchTopicRelations(inherited.id,[],[software.id])
+    await repository.setResearchTopicRelations(both.id,[security.id],[vms.id])
+
+    render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
+
+    const context=await screen.findByRole('region',{name:'Security context'})
+    await within(context).findByRole('button',{name:'Inherited research'})
+    const topics=within(context).getByRole('region',{name:'Research topics'})
+    expect(topics).toHaveTextContent(/^Research topicsCombined researchDirect researchInherited research$/)
+    expect(within(context).queryByText('Unrelated research')).not.toBeInTheDocument()
+
+    fireEvent.click(within(context).getByRole('button',{name:'Edit classifications'}))
+    const dialog=await screen.findByRole('dialog',{name:'Assign classifications'})
+    const checkbox=await within(dialog).findByRole('checkbox',{name:'VMS'})
+    await waitFor(()=>expect(checkbox).toBeChecked())
+    fireEvent.click(checkbox)
+    fireEvent.click(within(dialog).getByRole('button',{name:'Save'}))
+
+    await waitFor(()=>expect(within(context).queryByRole('button',{name:'Inherited research'})).not.toBeInTheDocument())
+    expect(within(context).getByText('No tags assigned')).toBeInTheDocument()
+    expect(within(context).getByRole('button',{name:'Combined research'})).toBeInTheDocument()
+    expect(topics).toHaveTextContent(/^Research topicsCombined researchDirect research$/)
+  })
+
+  it('opens a related topic and returns to the security with the Back button',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'CSU',name:'Constellation Software',currency:'CAD'})
+    const topic=await repository.addResearchTopic('Serial acquirers')
+    await repository.setResearchTopicRelations(topic.id,[security.id],[])
+    render(<AppProvider repository={repository}><SecurityTopicNavigation securityId={security.id}/></AppProvider>)
+
+    fireEvent.click(await screen.findByRole('button',{name:'Open security'}))
+    fireEvent.click(await screen.findByRole('button',{name:'Serial acquirers'}))
+    expect(await screen.findByRole('heading',{name:'Serial acquirers'})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Back'}))
+    expect(await screen.findByRole('heading',{name:'CSU'})).toBeInTheDocument()
+    expect(await screen.findByRole('button',{name:'Serial acquirers'})).toBeInTheDocument()
+  })
+
+  it('expands long classification and topic lists independently and resets when changing security',async()=>{
+    const repository=new LocalRepository();await repository.initialize()
+    const security=await repository.addSecurity({symbol:'CSU',name:'Constellation Software',currency:'CAD'})
+    const other=await repository.addSecurity({symbol:'DSG',name:'Descartes',currency:'CAD'})
+    const taxonomy=await repository.addTaxonomy({name:'Industry',description:'',color:'#4F7CAC'})
+    const tags=[]
+    for(let index=1;index<=5;index++){
+      tags.push(await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:`Tag ${index}`,description:'',color:taxonomy.color}))
+      const topic=await repository.addResearchTopic(`Topic ${index}`)
+      await repository.setResearchTopicRelations(topic.id,[security.id],[])
+    }
+    await repository.setAssignedTags(security.id,tags.map((tag)=>tag.id))
+    const view=render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
+
+    const moreTags=await screen.findByRole('button',{name:'Show 2 more classifications'})
+    const moreTopics=screen.getByRole('button',{name:'Show 2 more research topics'})
+    expect(screen.queryByText('Industry: Tag 5')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'Topic 5'})).not.toBeInTheDocument()
+    fireEvent.click(moreTags)
+    expect(screen.getByText('Industry: Tag 5')).toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'Topic 5'})).not.toBeInTheDocument()
+    fireEvent.click(moreTopics)
+    expect(screen.getByRole('button',{name:'Topic 5'})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Show fewer research topics'}))
+    expect(screen.queryByRole('button',{name:'Topic 5'})).not.toBeInTheDocument()
+
+    view.rerender(<AppProvider repository={repository}><SecurityDetailView id={other.id}/></AppProvider>)
+    expect(await screen.findByText('No related topics')).toBeInTheDocument()
+    expect(screen.getByText('No tags assigned')).toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'Topic 1'})).not.toBeInTheDocument()
   })
 
   it('lists, searches, and edits managed PDF metadata in the Documents tab',async()=>{

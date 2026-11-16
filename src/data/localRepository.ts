@@ -1,5 +1,5 @@
 import type { ChecklistQuestion, ChecklistAnswer, SecurityChecklistAnswer } from '../domain/types'
-import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, Tag, Taxonomy, Watchlist } from '../domain/types'
+import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, SecurityResearchTopic, Tag, Taxonomy, Watchlist } from '../domain/types'
 import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, extractEditorImageIds, type EditorImageInput, type EditorImageReferenceScope, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
 
 interface LocalData {
@@ -277,6 +277,23 @@ export class LocalRepository implements EquityRepository {
     this.data.securityLinkTemplates = cleaned; this.persist(); return cleaned
   }
   async listResearchTopics() { return this.data.researchTopics.toSorted((left,right)=>right.updatedAt.localeCompare(left.updatedAt)||left.title.localeCompare(right.title)) }
+  async listSecurityResearchTopics(securityId: string): Promise<SecurityResearchTopic[]> {
+    const tagsById = new Map(this.data.tags.map((tag) => [tag.id, tag]))
+    const matchingTags = new Set<string>()
+    for (const assignment of this.data.securityTags.filter((item) => item.securityId === securityId)) {
+      let tag = tagsById.get(assignment.tagId)
+      while (tag && !matchingTags.has(tag.id)) {
+        matchingTags.add(tag.id)
+        tag = tag.parentId ? tagsById.get(tag.parentId) : undefined
+      }
+    }
+    const directTopicIds = new Set(this.data.researchTopicSecurities.filter((item) => item.securityId === securityId).map((item) => item.topicId))
+    return this.data.researchTopics.flatMap((topic) => {
+      const matchingTagIds = this.data.researchTopicTags.filter((item) => item.topicId === topic.id && matchingTags.has(item.tagId)).map((item) => item.tagId).sort()
+      const direct = directTopicIds.has(topic.id)
+      return direct || matchingTagIds.length ? [{ ...topic, direct, matchingTagIds }] : []
+    }).toSorted((left, right) => left.title.localeCompare(right.title))
+  }
   async addResearchTopic(value:string) {
     const title=cleanRequired(value,'a topic title')
     if(this.data.researchTopics.some((topic)=>topic.title.toLowerCase()===title.toLowerCase()))throw new Error('A research topic with this title already exists.')

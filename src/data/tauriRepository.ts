@@ -1,6 +1,6 @@
 import type { ChecklistQuestion, ChecklistAnswer, SecurityChecklistAnswer } from '../domain/types'
 import Database from '@tauri-apps/plugin-sql'
-import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
+import type { EditorImage, EditorImageContentType, ResearchTopic, ResearchTopicJournalEntry, ResearchTopicNote, Security, SecurityDocument, SecurityJournalEntry, SecurityLinkTemplate, SecurityNote, SecurityPrice, SecurityResearchTopic, Tag, TaggedSecurity, Taxonomy, Watchlist } from '../domain/types'
 import { cleanJournalDate, cleanOptionalDate, cleanRequired, cleanSecurityLinkTemplate, extractEditorImageIds, type EditorImageInput, type EditorImageReferenceScope, type EquityRepository, type JournalEntryInput, type SecurityDocumentInput, type SecurityInput, type TopicJournalEntryInput, uuid } from './repository'
 
 type DbRow = Record<string, string | number | null>
@@ -283,6 +283,29 @@ export class TauriRepository implements EquityRepository {
     await this.db.execute('DELETE FROM research_topic_journal_entries WHERE id=$1',[id])
     await this.removeEditorImageReferences('topic-journal',id)
     if(rows[0])await this.db.execute('UPDATE research_topics SET updated_at=$1 WHERE id=$2',[new Date().toISOString(),rows[0].topic_id])
+  }
+  async listSecurityResearchTopics(securityId: string): Promise<SecurityResearchTopic[]> {
+    const rows = await this.db.select<DbRow[]>(`WITH RECURSIVE matching_tags(id) AS (
+      SELECT tag_id FROM security_tags WHERE security_id=$1
+      UNION SELECT tags.parent_id FROM tags JOIN matching_tags ON tags.id=matching_tags.id WHERE tags.parent_id IS NOT NULL
+    ) SELECT topic.id,topic.title,topic.created_at,topic.updated_at,
+        EXISTS(SELECT 1 FROM research_topic_securities direct WHERE direct.topic_id=topic.id AND direct.security_id=$1) AS direct,
+        rule.tag_id AS matching_tag_id
+      FROM research_topics topic
+      LEFT JOIN research_topic_tags rule ON rule.topic_id=topic.id AND rule.tag_id IN (SELECT id FROM matching_tags)
+      WHERE rule.tag_id IS NOT NULL OR EXISTS(SELECT 1 FROM research_topic_securities direct WHERE direct.topic_id=topic.id AND direct.security_id=$1)
+      ORDER BY lower(topic.title),topic.id,rule.tag_id`, [securityId])
+    const topics = new Map<string, SecurityResearchTopic>()
+    for (const row of rows) {
+      const id = String(row.id)
+      let topic = topics.get(id)
+      if (!topic) {
+        topic = { id, title: String(row.title), createdAt: String(row.created_at), updatedAt: String(row.updated_at), direct: Boolean(row.direct), matchingTagIds: [] }
+        topics.set(id, topic)
+      }
+      if (row.matching_tag_id !== null) topic.matchingTagIds.push(String(row.matching_tag_id))
+    }
+    return [...topics.values()]
   }
   async getResearchTopicRelations(topicId:string) {
     const direct=await this.db.select<Array<{security_id:string}>>('SELECT security_id FROM research_topic_securities WHERE topic_id=$1 ORDER BY security_id',[topicId])
