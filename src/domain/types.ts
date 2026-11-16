@@ -156,7 +156,7 @@ export type View =
   | { type: 'topics' }
   | { type: 'topic'; id: string }
   | { type: 'taxonomy'; id: string }
-  | { type: 'security'; id: string }
+  | { type: 'security'; id: string; journalEntryId?: string }
 
 export function buildTagTree(tags: Tag[]): TagNode[] {
   const nodes = new Map(tags.map((tag) => [tag.id, { ...tag, children: [] as TagNode[] }]))

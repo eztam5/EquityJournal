@@ -30,7 +30,7 @@ interface AppContextValue {
   setSecurityDisplayMode(mode: SecurityDisplayMode): void
   setPriceUpdateIntervalMinutes(minutes: number): void
   updateQuotes(watchlistId?: string): Promise<void>
-  openSecurity(id: string): void
+  openSecurity(id: string, journalEntryId?: string): void
   openResearchTopic(id: string): void
   refresh(): Promise<void>
   addSecurity(input: SecurityInput): Promise<Security>
@@ -54,7 +54,7 @@ const THEME_KEY = 'equity-journal.theme'
 const RECENT_KEY = 'equity-journal.recent-securities'
 type NavigationState={view:View;history:View[]}
 type NavigationAction={type:'navigate';view:View}|{type:'replace';view:View}|{type:'back'}
-const sameView=(left:View,right:View)=>left.type===right.type&&(!('id'in left)||!('id'in right)||left.id===right.id)
+const sameView=(left:View,right:View)=>left.type===right.type&&(!('id'in left)||!('id'in right)||left.id===right.id)&&(left.type!=='security'||right.type!=='security'||left.journalEntryId===right.journalEntryId)
 export function navigationReducer(state:NavigationState,action:NavigationAction):NavigationState {
   if(action.type==='back'){const previous=state.history.at(-1);return previous?{view:previous,history:state.history.slice(0,-1)}:state}
   if(sameView(state.view,action.view))return state
@@ -148,10 +148,10 @@ export function AppProvider({ children, repository: suppliedRepository }: { chil
   const setTheme = (next: ThemeMode) => setThemeState(next)
   const setSecurityDisplayMode = (next: SecurityDisplayMode) => setSecurityDisplayModeState(next)
   const setPriceUpdateIntervalMinutes = (minutes: number) => setPriceUpdateIntervalMinutesState(normalizePriceUpdateIntervalMinutes(minutes))
-  const openSecurity = (id: string) => {
+  const openSecurity = (id: string, journalEntryId?: string) => {
     if (!securities.some((security) => security.id === id)) return
     setRecentIds((ids) => [id, ...ids.filter((value) => value !== id)].slice(0, 5))
-    setView({ type: 'security', id })
+    setView({ type: 'security', id, ...(journalEntryId ? { journalEntryId } : {}) })
   }
   const openResearchTopic = (id: string) => { if(researchTopics.some((topic)=>topic.id===id))setView({type:'topic',id}) }
   const ensurePriceHistory=async(security:Security)=>{

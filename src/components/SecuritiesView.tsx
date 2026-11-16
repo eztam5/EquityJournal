@@ -9,6 +9,7 @@ import { announceClassificationDragHover, classificationDropTargetAt, announceWa
 import { notifyTaxonomyTreeChanged } from '../utils/taxonomyTreeChanges'
 import { PRICE_HISTORY_CHANGED_EVENT } from '../utils/priceUpdates'
 import { WatchlistPriceSparkline } from './WatchlistPriceSparkline'
+import { WatchlistChartWorkspace } from './WatchlistChartWorkspace'
 import { PRICE_RANGES, priceRangeStart, pricesInRange, type PriceRange } from './SecurityPriceChart'
 import { SecurityLinkIcon } from './SecurityLinkIcon'
 import { ConfirmDialog, SecurityForm } from './Forms'
@@ -135,7 +136,6 @@ function ColumnChooserRow({column,index,count,visible,lastVisible,onToggle,onMov
 
 export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const app=useApp()
-  const page=useRef<HTMLElement>(null)
   const[rows,setRows]=useState<Security[]>([])
   const[priceHistories,setPriceHistories]=useState<Record<string,SecurityPrice[]>>({})
   const[todayChanges,setTodayChanges]=useState<Record<string,number>>({})
@@ -151,6 +151,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const[searchQuery,setSearchQuery]=useState('')
   const[exportStatus,setExportStatus]=useState('')
   const[selectedSecurityIds,setSelectedSecurityIds]=useState<Set<string>>(()=>new Set())
+  const[chartSelection,setChartSelection]=useState<{securityId:string;watchlistId?:string}|null>(null)
   const columnResize=useRef<{key:SecurityColumnKey|'actions';x:number;width:number;pointerId:number}|null>(null)
   const pendingDrag=useRef<{securities:Security[];pointerId:number;x:number;y:number}|null>(null)
   const draggingSecurities=useRef<Security[]>([])
@@ -158,19 +159,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const suppressSelectionClick=useRef(false)
   const selectionAnchorId=useRef<string|null>(null)
 
-  useEffect(()=>{
-    const container=page.current
-    const header=container?.querySelector<HTMLElement>('.securities-page-header')
-    if(!container||!header)return
-    const updateHeaderHeight=()=>container.style.setProperty('--securities-header-height',`${header.getBoundingClientRect().height}px`)
-    updateHeaderHeight()
-    if(typeof ResizeObserver==='undefined')return
-    const observer=new ResizeObserver(updateHeaderHeight)
-    observer.observe(header)
-    return()=>observer.disconnect()
-  },[])
-
-  useEffect(()=>{app.repository.listSecurities(watchlistId).then(setRows)},[app.repository,app.securities,watchlistId])
+  useEffect(()=>{let active=true;app.repository.listSecurities(watchlistId).then((next)=>{if(active)setRows(next)});return()=>{active=false}},[app.repository,app.securities,watchlistId])
   useEffect(()=>{
     let active=true,request=0
     const load=async()=>{
@@ -183,7 +172,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
     window.addEventListener(PRICE_HISTORY_CHANGED_EVENT,refresh)
     return()=>{active=false;window.removeEventListener(PRICE_HISTORY_CHANGED_EVENT,refresh)}
   },[app.repository,rows])
-  useEffect(()=>{selectionAnchorId.current=null;setSelectedSecurityIds(new Set());setSearchQuery('')},[watchlistId])
+  useEffect(()=>{selectionAnchorId.current=null;setSelectedSecurityIds(new Set());setSearchQuery('');setChartSelection(null)},[watchlistId])
   useEffect(()=>setSelectedSecurityIds((current)=>{const visibleIds=new Set(rows.map((row)=>row.id));if(selectionAnchorId.current&&!visibleIds.has(selectionAnchorId.current))selectionAnchorId.current=null;const next=new Set([...current].filter((id)=>visibleIds.has(id)));return next.size===current.size?current:next}),[rows])
   useEffect(()=>{const clear=(event:KeyboardEvent)=>{if(event.key==='Escape'){selectionAnchorId.current=null;setSelectedSecurityIds(new Set())}};document.addEventListener('keydown',clear);return()=>document.removeEventListener('keydown',clear)},[])
   useEffect(()=>{localStorage.setItem(COLUMN_PREFERENCES_KEY,JSON.stringify(preferences))},[preferences])
@@ -213,6 +202,8 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
 
   const filteredRows=useMemo(()=>{const query=searchQuery.trim().toLocaleLowerCase();return query?rows.filter((security)=>security.symbol.toLocaleLowerCase().includes(query)||security.name.toLocaleLowerCase().includes(query)):rows},[rows,searchQuery])
   const sortedRows=useMemo(()=>sortSecurities(filteredRows,sortKey,direction,todayChanges,periodChanges),[filteredRows,sortKey,direction,todayChanges,periodChanges])
+  const chartSecurity=chartSelection?.watchlistId===watchlistId?filteredRows.find((security)=>security.id===chartSelection?.securityId):undefined
+  useEffect(()=>{setChartSelection((current)=>current&&current.watchlistId===watchlistId&&!filteredRows.some((security)=>security.id===current.securityId)?null:current)},[filteredRows,watchlistId])
   const sort=(column:SecuritySortKey)=>{if(column===sortKey)setDirection((current)=>current==='asc'?'desc':'asc');else{setSortKey(column);setDirection('asc')}}
   const toggleColumn=(column:SecurityColumnKey)=>setPreferences((current)=>{const visible=current.visible.includes(column);if(visible&&visibleColumns.length===1)return current;return{...current,visible:visible?current.visible.filter((key)=>key!==column):[...current.visible,column]}})
   const reorderColumn=(source:SecurityColumnKey,target:SecurityColumnKey)=>setPreferences((current)=>{const order=orderedColumns.map((column)=>column.key),sourceIndex=order.indexOf(source),targetIndex=order.indexOf(target);if(sourceIndex<0||targetIndex<0||sourceIndex===targetIndex)return current;order.splice(sourceIndex,1);order.splice(targetIndex,0,source);return{...current,order:[...order,...current.order.filter((key)=>!order.includes(key))]}})
@@ -233,7 +224,7 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
   const removeFromWatchlist=async(security:Security)=>{if(!watchlistId)return;await app.repository.setWatchlistSecurity(watchlistId,security.id,false);setRows((current)=>current.filter((item)=>item.id!==security.id))}
   const securityMenu=(security:Security)=><Menu><MenuItem icon="edit" text={watchlistId?'Edit':'Edit security'} onClick={()=>setEditing(security)}/>{watchlistId&&<MenuItem icon="remove" text="Remove from watchlist" onClick={()=>void removeFromWatchlist(security)}/>}<MenuItem icon="trash" intent="danger" text="Delete security" onClick={()=>setDeleting(security)}/></Menu>
   const openMenu=(event:MouseEvent,security:Security)=>{event.preventDefault();showContextMenu({targetOffset:{left:event.clientX,top:event.clientY},isDarkTheme:document.documentElement.classList.contains('bp6-dark'),content:securityMenu(security)})}
-  const selectSecurity=(event:MouseEvent<HTMLTableRowElement>,security:Security)=>{if((event.target as Element).closest('button,a,input')||suppressSelectionClick.current){suppressSelectionClick.current=false;return}const additive=isAdditiveSelectionModifier(event);const anchorIndex=selectionAnchorId.current?sortedRows.findIndex((row)=>row.id===selectionAnchorId.current):-1;const targetIndex=sortedRows.findIndex((row)=>row.id===security.id);if(event.shiftKey&&anchorIndex>=0&&targetIndex>=0){const [start,end]=anchorIndex<targetIndex?[anchorIndex,targetIndex]:[targetIndex,anchorIndex];const rangeIds=sortedRows.slice(start,end+1).map((row)=>row.id);setSelectedSecurityIds((current)=>additive?new Set([...current,...rangeIds]):new Set(rangeIds));return}selectionAnchorId.current=security.id;setSelectedSecurityIds((current)=>{if(!additive)return new Set([security.id]);const next=new Set(current);if(next.has(security.id))next.delete(security.id);else next.add(security.id);return next})}
+  const selectSecurity=(event:MouseEvent<HTMLTableRowElement>,security:Security)=>{if((event.target as Element).closest('button,a,input')||suppressSelectionClick.current){suppressSelectionClick.current=false;return}const additive=isAdditiveSelectionModifier(event);if(!additive&&!event.shiftKey)setChartSelection({securityId:security.id,watchlistId});const anchorIndex=selectionAnchorId.current?sortedRows.findIndex((row)=>row.id===selectionAnchorId.current):-1;const targetIndex=sortedRows.findIndex((row)=>row.id===security.id);if(event.shiftKey&&anchorIndex>=0&&targetIndex>=0){const [start,end]=anchorIndex<targetIndex?[anchorIndex,targetIndex]:[targetIndex,anchorIndex];const rangeIds=sortedRows.slice(start,end+1).map((row)=>row.id);setSelectedSecurityIds((current)=>additive?new Set([...current,...rangeIds]):new Set(rangeIds));return}selectionAnchorId.current=security.id;setSelectedSecurityIds((current)=>{if(!additive)return new Set([security.id]);const next=new Set(current);if(next.has(security.id))next.delete(security.id);else next.add(security.id);return next})}
   const resetSecurityDrag=()=>{pendingDrag.current=null;draggingSecurities.current=[];hoveredWatchlistId.current=null;document.documentElement.classList.remove('watchlist-security-dragging');document.documentElement.removeAttribute('data-watchlist-drag-count');announceWatchlistDragHover(null);announceClassificationDragHover(null)}
   const startSecurityDrag=(event:PointerEvent<HTMLTableRowElement>,security:Security)=>{if(event.button!==0||(event.target as Element).closest('button,a,input'))return;const securities=selectedSecurityIds.has(security.id)?sortedRows.filter((row)=>selectedSecurityIds.has(row.id)):[security];pendingDrag.current={securities,pointerId:event.pointerId,x:event.clientX,y:event.clientY};event.currentTarget.setPointerCapture?.(event.pointerId)}
   const moveSecurityDrag=(event:PointerEvent<HTMLTableRowElement>)=>{const pending=pendingDrag.current;if(!draggingSecurities.current.length&&pending&&pending.pointerId===event.pointerId){if(Math.hypot(event.clientX-pending.x,event.clientY-pending.y)<5)return;draggingSecurities.current=pending.securities;document.documentElement.classList.add('watchlist-security-dragging');document.documentElement.dataset.watchlistDragCount=String(pending.securities.length)}if(!draggingSecurities.current.length)return;event.preventDefault();announceClassificationDragHover(classificationDropTargetAt(event.clientX,event.clientY)?.tagId??null);const target=watchlistDropTargetAt(event.clientX,event.clientY);if(target!==hoveredWatchlistId.current){hoveredWatchlistId.current=target;announceWatchlistDragHover(target)}}
@@ -285,8 +276,10 @@ export function SecuritiesView({ watchlistId }: { watchlistId?: string }) {
 
   const searching=searchQuery.trim().length>0
   const description=searching?`${filteredRows.length} of ${rows.length} ${rows.length===1?'security':'securities'}`:`${rows.length} ${rows.length===1?'security':'securities'}`
-  return <main ref={page} className="content page securities-page"><PageHeader className="securities-page-header" title={title} description={<>{description}{exportStatus&&<span className="export-status" role="status"> · {exportStatus}</span>}</>} actions={<PageToolbarIconBar label="Security controls"><InputGroup className="security-search" type="search" autoCorrect="off" autoComplete="off" autoCapitalize="none" spellCheck={false} leftIcon="search" placeholder="Search securities" aria-label="Search securities" value={searchQuery} onChange={(event)=>setSearchQuery(event.target.value)} rightElement={searchQuery?<Button variant="minimal" icon="cross" aria-label="Clear search" onClick={()=>setSearchQuery('')}/>:undefined}/><PageToolbarIconButton icon="add" label="New security" onClick={()=>setCreating(true)}/><PopoverNext content={exportMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="export" label="Export"/></PopoverNext><PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="properties" label="Columns"/></PopoverNext></PageToolbarIconBar>}/>
+  return <main className="content page securities-page"><PageHeader className="securities-page-header" title={title} description={<>{description}{exportStatus&&<span className="export-status" role="status"> · {exportStatus}</span>}</>} actions={<PageToolbarIconBar label="Security controls"><InputGroup className="security-search" type="search" autoCorrect="off" autoComplete="off" autoCapitalize="none" spellCheck={false} leftIcon="search" placeholder="Search securities" aria-label="Search securities" value={searchQuery} onChange={(event)=>setSearchQuery(event.target.value)} rightElement={searchQuery?<Button variant="minimal" icon="cross" aria-label="Clear search" onClick={()=>setSearchQuery('')}/>:undefined}/><PageToolbarIconButton icon="add" label="New security" onClick={()=>setCreating(true)}/><PopoverNext content={exportMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="export" label="Export"/></PopoverNext><PopoverNext content={columnMenu} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><PageToolbarIconButton icon="properties" label="Columns"/></PopoverNext></PageToolbarIconBar>}/>
+    <WatchlistChartWorkspace security={chartSecurity} onClose={()=>setChartSelection(null)}>
     <div className="content-panel data-card"><HTMLTable className={`security-table ${preferences.widths?'security-table-resized':''}`} style={tableWidth?{width:tableWidth,tableLayout:'fixed'}:undefined} compact interactive striped><colgroup>{sizedColumns.map((key)=><col key={key} style={preferences.widths?{width:preferences.widths[key]??DEFAULT_COLUMN_WIDTHS[key]}:undefined}/>)}</colgroup><thead><tr>{visibleColumns.map(renderHeader)}<th aria-label="Actions" data-column-key="actions">{resizeHandle('actions','Actions')}</th></tr></thead><tbody>{sortedRows.map((security)=>{const selected=selectedSecurityIds.has(security.id);return <tr key={security.id} className={`security-draggable-row ${selected?'security-selected':''}`} aria-selected={selected} onClick={(event)=>selectSecurity(event,security)} onPointerDown={(event)=>startSecurityDrag(event,security)} onPointerMove={moveSecurityDrag} onPointerUp={(event)=>void finishSecurityDrag(event)} onPointerCancel={resetSecurityDrag} onDoubleClick={()=>app.openSecurity(security.id)} onContextMenu={(event)=>openMenu(event,security)}>{visibleColumns.map((column)=>renderCell(column,security))}<td><PopoverNext content={securityMenu(security)} placement="bottom-end" animation="minimal" arrow={false} shouldReturnFocusOnClose={false}><Button variant="minimal" size="small" icon="more" aria-label={`Actions for ${security.name}`}/></PopoverNext></td></tr>})}</tbody></HTMLTable>{rows.length===0?<div className="empty-state">No securities yet.</div>:searching&&filteredRows.length===0?<div className="empty-state">No securities match “{searchQuery.trim()}”.</div>:null}</div>
+    </WatchlistChartWorkspace>
     {creating&&<SecurityForm onClose={()=>setCreating(false)}/>} {editing&&<SecurityForm security={editing} onClose={()=>setEditing(undefined)}/>} {deleting&&<ConfirmDialog title="Delete security" message={`Permanently delete ${deleting.name} from the database?`} confirmLabel="Delete" onClose={()=>setDeleting(undefined)} onConfirm={()=>app.deleteSecurity(deleting.id)}/>}
   </main>
 }
