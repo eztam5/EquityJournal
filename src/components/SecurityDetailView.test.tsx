@@ -49,7 +49,7 @@ describe('SecurityDetailView research notes',()=>{
     expect(screen.getByDisplayValue('2026-08-18')).toBeInTheDocument()
   })
 
-  it('shows configured external links with the security alternative ID',async()=>{
+  it('keeps the identity and navigation in the top bar with other details and links in the side panel',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'AAPL',alternativeId:'US0378331005',name:'Apple Inc.',currency:'USD'})
     await repository.saveSecurityLinkTemplates([{id:'yahoo',linkText:'Yahoo Finance',urlPattern:'https://finance.yahoo.com/quote/{SYMBOL}',sortOrder:0}])
@@ -57,10 +57,30 @@ describe('SecurityDetailView research notes',()=>{
     render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
 
     const link=await screen.findByRole('button',{name:'Yahoo Finance'})
+    const panel=screen.getByRole('complementary',{name:'Security details'})
     expect(link).toHaveAttribute('title','https://finance.yahoo.com/quote/AAPL')
-    expect(link).toHaveTextContent('')
+    expect(link).toHaveTextContent('Yahoo Finance')
+    expect(panel).toContainElement(link)
     expect(link.querySelector('[data-icon="share"]')).toBeInTheDocument()
-    expect(screen.getByText('US0378331005')).toBeInTheDocument()
+    const header=document.querySelector<HTMLElement>('.detail-page > .page-header')!
+    expect(header).toBeInTheDocument()
+    expect(within(header).getByRole('heading',{name:'AAPL'})).toBeInTheDocument()
+    expect(within(header).getByText('Apple Inc.')).toBeInTheDocument()
+    expect(within(header).getByRole('button',{name:'Back'})).toBeInTheDocument()
+    expect(within(header).getByRole('button',{name:'Edit security'})).toBeInTheDocument()
+    expect(within(panel).queryByText('AAPL')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('Apple Inc.')).not.toBeInTheDocument()
+    expect(within(panel).queryByRole('button',{name:'Back'})).not.toBeInTheDocument()
+    expect(within(panel).getByText('US0378331005')).toBeInTheDocument()
+    expect(within(panel).getByText('USD')).toBeInTheDocument()
+    expect(document.querySelector('.info-card')).not.toBeInTheDocument()
+    const chart=document.querySelector('.price-chart-card')!
+    expect(header.compareDocumentPosition(chart)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const research=screen.getByRole('heading',{name:'Research'}).closest('.notes-card')!
+    expect(chart.parentElement).toBe(research.parentElement)
+    expect(chart.parentElement).toHaveClass('security-main-column')
+    expect(panel.parentElement).toBe(chart.parentElement?.parentElement)
+    expect(chart.compareDocumentPosition(research)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('shows cached price history with all requested chart ranges',async()=>{
@@ -79,32 +99,36 @@ describe('SecurityDetailView research notes',()=>{
     expect(screen.getByRole('tab',{name:'Journal'})).toHaveAttribute('aria-selected','true')
   })
 
-  it('opens the existing edit-security dialog from the detail header',async()=>{
+  it('opens the existing edit-security dialog from the top bar',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'AAPL',name:'Apple Inc.',currency:'USD'})
     render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
 
-    fireEvent.click(await screen.findByRole('button',{name:'Edit security'}))
+    const edit=await screen.findByRole('button',{name:'Edit security'})
+    expect(edit.closest('.page-header')).toBeInTheDocument()
+    fireEvent.click(edit)
 
     expect(screen.getByRole('dialog',{name:'Edit security'})).toBeInTheDocument()
     expect(screen.getByLabelText('Symbol')).toHaveValue('AAPL')
     expect(screen.getByLabelText('Company name')).toHaveValue('Apple Inc.')
   })
 
-  it('puts taxonomy and parent paths in compact chips inside the security information panel',async()=>{
+  it('puts colored classification chips and their full paths inside the side panel',async()=>{
     const repository=new LocalRepository();await repository.initialize()
     const security=await repository.addSecurity({symbol:'NEM',name:'Newmont',currency:'USD'})
     const taxonomy=await repository.addTaxonomy({name:'Asset Allocation',description:'',color:'#4F7CAC'})
     const materials=await repository.addTag({taxonomyId:taxonomy.id,parentId:null,name:'Materials',description:'',color:taxonomy.color})
     const metals=await repository.addTag({taxonomyId:taxonomy.id,parentId:materials.id,name:'Precious Metals',description:'',color:taxonomy.color})
-    const gold=await repository.addTag({taxonomyId:taxonomy.id,parentId:metals.id,name:'Gold',description:'',color:taxonomy.color})
+    const gold=await repository.addTag({taxonomyId:taxonomy.id,parentId:metals.id,name:'Gold',description:'',color:'#D69E2E'})
     await repository.setAssignedTags(security.id,[gold.id])
 
     render(<AppProvider repository={repository}><SecurityDetailView id={security.id}/></AppProvider>)
 
     const tag=await screen.findByText('Asset Allocation: Materials ▸ Precious Metals ▸ Gold')
-    expect(tag.closest('.info-card')).toBeInTheDocument()
-    expect(screen.getByRole('heading',{name:'Classifications'}).closest('.info-card')).toBeInTheDocument()
+    const panel=screen.getByRole('complementary',{name:'Security details'})
+    expect(panel).toContainElement(tag)
+    expect(tag.closest('.security-classification-tag')).toHaveStyle({borderColor:gold.color})
+    expect(within(panel).getByRole('heading',{name:'Classifications'})).toBeInTheDocument()
     expect(screen.queryByRole('heading',{name:'Asset Allocation'})).not.toBeInTheDocument()
     expect(document.querySelector('.classification-card')).not.toBeInTheDocument()
   })

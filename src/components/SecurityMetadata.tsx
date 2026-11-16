@@ -72,7 +72,7 @@ export function SecurityMetadata({ securityId }: { securityId: string }) {
         </div>
         <Button className="security-context-edit" variant="minimal" size="small" icon={classifications.length ? 'edit' : 'add'} text={classifications.length ? 'Edit tags' : 'Add tags'} aria-label="Edit classifications" onClick={() => setAssigning(true)}/>
       </section>
-      <section className="security-context-row" aria-labelledby="security-topics-label">
+      <section className="security-context-row security-topics-row" aria-labelledby="security-topics-label">
         <h2 id="security-topics-label">Research topics</h2>
         <div className="security-context-items" id="security-topics">
           {topics.length ? (showAllTopics ? topics : topics.slice(0, VISIBLE_ITEMS)).map((topic) =>
